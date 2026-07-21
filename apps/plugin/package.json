@@ -1,0 +1,25 @@
+{
+  "name": "obsync-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "check": "vp check src package.json tsconfig.json vite.config.ts",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@hocuspocus/provider": "catalog:",
+    "y-codemirror.next": "catalog:",
+    "y-indexeddb": "catalog:",
+    "yjs": "catalog:"
+  },
+  "devDependencies": {
+    "@codemirror/state": "catalog:",
+    "@codemirror/view": "catalog:",
+    "@types/node": "catalog:",
+    "obsidian": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

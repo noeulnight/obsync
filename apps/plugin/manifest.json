@@ -1,0 +1,9 @@
+{
+  "id": "obsync",
+  "name": "Obsync",
+  "version": "0.1.0",
+  "minAppVersion": "1.8.0",
+  "description": "Live and offline Vault sync powered by Yjs.",
+  "author": "Obsync",
+  "isDesktopOnly": false
+}
