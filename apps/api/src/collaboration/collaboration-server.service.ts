@@ -18,6 +18,7 @@ import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { PrismaService } from '../database/prisma.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
 import type { CollaborationContext } from './types/collaboration-context.type';
+import type { CanvasData, CanvasItem } from './types/canvas-data.type';
 import { parseCollaborationRoom } from './types/collaboration-room.type';
 import type { ManifestEntry } from './types/manifest.type';
 import { nextFileRevision } from './vault-file-version';
@@ -232,6 +233,43 @@ export class CollaborationServerService
     }
   }
 
+  async readCanvas(vaultId: string, fileId: string) {
+    const connection = await this.hocuspocus.openDirectConnection(
+      `vault:${vaultId}:canvas:${fileId}`,
+      { vaultId, userId: 'server', role: 'OWNER' },
+    );
+    try {
+      let data: CanvasData = { meta: {}, nodes: [], edges: [] };
+      await connection.transact((document) => {
+        data = canvasData(document);
+      });
+      return data;
+    } finally {
+      await connection.disconnect({ unloadImmediately: true });
+    }
+  }
+
+  async writeCanvas(
+    vaultId: string,
+    fileId: string,
+    data: CanvasData,
+    userId: string,
+  ) {
+    const connection = await this.hocuspocus.openDirectConnection(
+      `vault:${vaultId}:canvas:${fileId}`,
+      { vaultId, userId, role: 'OWNER' },
+    );
+    try {
+      await connection.transact((document) => {
+        if (JSON.stringify(canvasData(document)) === JSON.stringify(data))
+          return;
+        syncCanvas(document, data);
+      });
+    } finally {
+      await connection.disconnect({ unloadImmediately: true });
+    }
+  }
+
   private async manifestDocument(vaultId: string): Promise<Y.Doc> {
     const files = await this.prisma.vaultFile.findMany({
       where: { vaultId },
@@ -379,4 +417,70 @@ function documentText(state: Uint8Array) {
   const document = new Y.Doc();
   Y.applyUpdate(document, state);
   return document.getText('content').toJSON();
+}
+
+function canvasData(document: Y.Doc): CanvasData {
+  const nodes = document.getMap<Y.Map<unknown>>('nodes');
+  const order = document.getMap<number>('node-z-order');
+  return {
+    meta: document.getMap<unknown>('meta').toJSON(),
+    nodes: [...nodes.values()]
+      .map((node) => {
+        const value = node.toJSON() as CanvasItem;
+        return value.type === 'text'
+          ? {
+              ...value,
+              text: document.getText(`canvas-node:${value.id}:text`).toJSON(),
+            }
+          : value;
+      })
+      .sort(
+        (left, right) =>
+          (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+      ),
+    edges: [...document.getMap<Y.Map<unknown>>('edges').values()].map(
+      (edge) => edge.toJSON() as CanvasItem,
+    ),
+  };
+}
+
+function syncCanvas(document: Y.Doc, data: CanvasData) {
+  syncMap(document.getMap('meta'), data.meta);
+  const nodes = document.getMap<Y.Map<unknown>>('nodes');
+  const edges = document.getMap<Y.Map<unknown>>('edges');
+  syncItems(nodes, data.nodes, (item) => {
+    const { text = '', ...value } = item;
+    const sharedText = document.getText(`canvas-node:${item.id}:text`);
+    sharedText.delete(0, sharedText.length);
+    if (text) sharedText.insert(0, text);
+    return value;
+  });
+  syncItems(edges, data.edges, (item) => item);
+  const order = document.getMap<number>('node-z-order');
+  const ids = new Set(data.nodes.map((node) => node.id));
+  for (const id of order.keys()) if (!ids.has(id)) order.delete(id);
+  data.nodes.forEach((node, index) => order.set(node.id, index));
+}
+
+function syncItems(
+  target: Y.Map<Y.Map<unknown>>,
+  items: CanvasItem[],
+  value: (item: CanvasItem) => Record<string, unknown>,
+) {
+  const wanted = new Set(items.map((item) => item.id));
+  for (const id of target.keys()) if (!wanted.has(id)) target.delete(id);
+  for (const item of items) {
+    let shared = target.get(item.id);
+    if (!shared) {
+      shared = new Y.Map<unknown>();
+      target.set(item.id, shared);
+    }
+    syncMap(shared, value(item));
+  }
+}
+
+function syncMap(target: Y.Map<unknown>, value: Record<string, unknown>) {
+  for (const key of target.keys()) if (!(key in value)) target.delete(key);
+  for (const [key, next] of Object.entries(value)) target.set(key, next);
 }

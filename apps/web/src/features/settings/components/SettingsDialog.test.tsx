@@ -18,6 +18,15 @@ describe("settings", () => {
       url: "https://sync.example.com/mcp",
       scopes: ["vault:read", "vault:write"],
     });
+    vi.spyOn(api, "mcpApps").mockResolvedValue([
+      {
+        clientId: "client-1",
+        name: "Claude",
+        scopes: ["vault:read", "vault:write"],
+        connectedAt: "2026-07-22T00:00:00.000Z",
+      },
+    ]);
+    const revoke = vi.spyOn(api, "revokeMcpApp").mockResolvedValue();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
@@ -37,6 +46,10 @@ describe("settings", () => {
 
     expect(await screen.findByDisplayValue("https://sync.example.com/mcp")).toBeTruthy();
     expect(screen.getByText("How to connect")).toBeTruthy();
+    expect(await screen.findByText("Claude")).toBeTruthy();
+    fireEvent.click(screen.getByText("Revoke", { selector: "button" }));
+    fireEvent.click(screen.getAllByText("Revoke", { selector: "button" }).at(-1)!);
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith("client-1"));
   });
 
   it("renames and deletes a Vault", async () => {

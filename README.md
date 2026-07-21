@@ -51,6 +51,8 @@ pnpm --filter web dev --host 0.0.0.0
 
 Add the endpoint to an OAuth-capable MCP client. Obsync opens a browser approval screen and grants only the requested `vault:read` and `vault:write` scopes using Authorization Code with PKCE.
 
+MCP clients can manage files, Markdown, Canvas, attachments, backlinks, graphs, and document history. Connected clients can be reviewed and revoked under **Account settings → MCP**.
+
 See the [plugin guide](./apps/plugin/README.md) for the Obsidian build and installation steps. See [local backend development](./docs/backend-local-development.md) for environment configuration.
 
 ## Verify

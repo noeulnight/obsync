@@ -1,12 +1,26 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/error";
-import { useMcpConfig } from "../queries/use-mcp-config";
+import { Separator } from "@/components/ui/separator";
+import { useMcpApps, useMcpConfig, useRevokeMcpApp } from "../queries/use-mcp-config";
 
 export function McpSettings({ enabled }: { enabled: boolean }) {
   const config = useMcpConfig(enabled);
+  const apps = useMcpApps(enabled);
+  const revoke = useRevokeMcpApp();
   const [copied, setCopied] = useState(false);
 
   if (config.isPending) return <p className="text-sm text-muted-foreground">Loading MCP…</p>;
@@ -47,6 +61,51 @@ export function McpSettings({ enabled }: { enabled: boolean }) {
           <li>Review the requested permissions and allow access.</li>
         </ol>
       </div>
+
+      <Separator className="my-6" />
+      <h3 className="font-medium">Connected apps</h3>
+      <div className="mt-3 grid gap-2">
+        {apps.data?.map((app) => (
+          <div key={app.clientId} className="flex items-center gap-3 rounded-lg border p-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{app.name}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {app.scopes.map(scopeLabel).join(" · ")}
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={revoke.isPending}>
+                  Revoke
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Revoke {app.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This app will immediately lose access to your Vaults.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => revoke.mutate(app.clientId)}>
+                    Revoke
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        ))}
+        {!apps.isPending && !apps.data?.length && (
+          <p className="text-sm text-muted-foreground">No connected MCP apps.</p>
+        )}
+      </div>
     </section>
   );
+}
+
+function scopeLabel(scope: string) {
+  if (scope === "vault:read") return "Read Vaults";
+  if (scope === "vault:write") return "Edit Vaults";
+  return scope;
 }

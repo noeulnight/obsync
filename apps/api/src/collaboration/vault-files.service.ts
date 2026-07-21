@@ -18,6 +18,7 @@ import {
 import { CollaborationServerService } from './collaboration-server.service';
 import { nextFileRevision } from './vault-file-version';
 import { VaultLinksService } from './vault-links.service';
+import type { CanvasData } from './types/canvas-data.type';
 
 @Injectable()
 export class VaultFilesService {
@@ -119,6 +120,46 @@ export class VaultFilesService {
       file = { id: fileId, path, kind: 'MARKDOWN' };
     }
     await this.collaboration.writeDocument(vaultId, file.id, content, userId);
+    return { id: file.id, path: file.path };
+  }
+
+  async readCanvas(userId: string, vaultId: string, rawPath: string) {
+    await this.access.requireRead(userId, vaultId);
+    const file = await this.liveFile(vaultId, rawPath, 'CANVAS');
+    return {
+      id: file.id,
+      path: file.path,
+      data: await this.collaboration.readCanvas(vaultId, file.id),
+    };
+  }
+
+  async writeCanvas(
+    userId: string,
+    vaultId: string,
+    rawPath: string,
+    data: CanvasData,
+  ) {
+    await this.access.requireWrite(userId, vaultId);
+    const path = vaultPath(rawPath);
+    let file = await this.prisma.vaultFile.findFirst({
+      where: { vaultId, activePathKey: vaultPathKey(path), deletedAt: null },
+      select: { id: true, path: true, kind: true },
+    });
+    if (file && file.kind !== 'CANVAS') {
+      throw new ConflictException('The path is not a Canvas document.');
+    }
+    if (!file) {
+      const fileId = randomUUID();
+      await this.apply(userId, vaultId, {
+        operationId: randomUUID(),
+        fileId,
+        type: FileOperationType.CREATE,
+        kind: FileKind.CANVAS,
+        path,
+      });
+      file = { id: fileId, path, kind: 'CANVAS' };
+    }
+    await this.collaboration.writeCanvas(vaultId, file.id, data, userId);
     return { id: file.id, path: file.path };
   }
 
@@ -553,6 +594,25 @@ export class VaultFilesService {
       ...file,
       content: documentText(byRoom.get(`vault:${vaultId}:doc:${file.id}`)),
     }));
+  }
+
+  private async liveFile(
+    vaultId: string,
+    rawPath: string,
+    kind: VaultFileKind,
+  ) {
+    const path = vaultPath(rawPath);
+    const file = await this.prisma.vaultFile.findFirst({
+      where: {
+        vaultId,
+        activePathKey: vaultPathKey(path),
+        kind,
+        deletedAt: null,
+      },
+      select: { id: true, path: true },
+    });
+    if (!file) throw new NotFoundException('File not found');
+    return file;
   }
 }
 

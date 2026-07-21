@@ -9,5 +9,6 @@ import { VaultsModule } from '../vaults/vaults.module';
   imports: [AuthModule, VaultsModule],
   controllers: [AttachmentsController],
   providers: [AttachmentsService, AttachmentCleanupService],
+  exports: [AttachmentsService],
 })
 export class AttachmentsModule {}

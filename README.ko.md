@@ -51,6 +51,8 @@ pnpm --filter web dev --host 0.0.0.0
 
 OAuth를 지원하는 MCP 클라이언트에 엔드포인트를 추가하면 Obsync가 브라우저 승인 화면을 엽니다. Authorization Code와 PKCE를 사용하며 요청된 `vault:read`, `vault:write` 권한만 부여합니다.
 
+MCP 클라이언트는 파일, Markdown, Canvas, 첨부파일, 백링크, 그래프와 문서 기록을 관리할 수 있습니다. 연결된 클라이언트는 **Account settings → MCP**에서 확인하고 철회할 수 있습니다.
+
 Obsidian 빌드 및 설치 방법은 [플러그인 안내서](./apps/plugin/README.md)를 참고하세요. 환경 설정은 [백엔드 로컬 개발 안내서](./docs/backend-local-development.md)에 정리되어 있습니다.
 
 ## 검증

@@ -3,6 +3,7 @@ export const queryKeys = {
   account: ["account"] as const,
   accountSessions: ["account", "sessions"] as const,
   mcpConfig: ["mcp", "config"] as const,
+  mcpApps: ["mcp", "apps"] as const,
   vaults: ["vaults"] as const,
   invitations: ["invitations"] as const,
   mcpAuthorization: (id: string) => ["mcp", "authorization", id] as const,

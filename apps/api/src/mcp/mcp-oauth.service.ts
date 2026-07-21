@@ -50,6 +50,54 @@ export class McpOAuthService implements OAuthServerProvider {
     };
   }
 
+  async connectedApps(userId: string) {
+    const tokens = await this.prisma.mcpOAuthRefreshToken.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: {
+        clientId: true,
+        scopes: true,
+        createdAt: true,
+        client: { select: { metadata: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const apps = new Map<
+      string,
+      { clientId: string; name: string; scopes: Set<string>; connectedAt: Date }
+    >();
+    for (const token of tokens) {
+      const existing = apps.get(token.clientId);
+      if (existing) {
+        token.scopes.forEach((scope) => existing.scopes.add(scope));
+        continue;
+      }
+      const client = OAuthClientInformationFullSchema.parse(
+        token.client.metadata,
+      );
+      apps.set(token.clientId, {
+        clientId: token.clientId,
+        name: client.client_name ?? 'MCP client',
+        scopes: new Set(token.scopes),
+        connectedAt: token.createdAt,
+      });
+    }
+    return [...apps.values()].map((app) => ({
+      ...app,
+      scopes: [...app.scopes],
+    }));
+  }
+
+  async revokeApp(userId: string, clientId: string) {
+    await this.prisma.mcpOAuthRefreshToken.updateMany({
+      where: { userId, clientId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   router(): RequestHandler {
     const resource = this.resourceUrl();
     const issuer = new URL(resource.origin);
@@ -236,6 +284,17 @@ export class McpOAuthService implements OAuthServerProvider {
       if (payload.type !== 'mcp' || payload.resource !== resource) {
         throw new Error('Invalid token');
       }
+      const activeGrant = await this.prisma.mcpOAuthRefreshToken.findFirst({
+        where: {
+          userId: payload.sub,
+          clientId: payload.clientId,
+          resource,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+      if (!activeGrant) throw new Error('Revoked token');
       return {
         token,
         clientId: payload.clientId,

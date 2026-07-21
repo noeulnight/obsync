@@ -26,6 +26,13 @@ export type McpConfig = {
   scopes: string[];
 };
 
+export type McpApp = {
+  clientId: string;
+  name: string;
+  scopes: string[];
+  connectedAt: string;
+};
+
 export type VaultRole = "EDITOR" | "VIEWER";
 
 export type VaultMember = {
@@ -215,7 +222,18 @@ export class ApiClient {
   }
 
   mcpConfig(): Promise<McpConfig> {
-    return this.request<McpConfig>({ url: "/api/auth/mcp/authorization/config" });
+    return this.request<McpConfig>({ url: "/api/auth/mcp/config" });
+  }
+
+  mcpApps(): Promise<McpApp[]> {
+    return this.request<McpApp[]>({ url: "/api/auth/mcp/apps" });
+  }
+
+  async revokeMcpApp(clientId: string) {
+    await this.request({
+      url: `/api/auth/mcp/apps/${encodeURIComponent(clientId)}`,
+      method: "DELETE",
+    });
   }
 
   async revokeSession(sessionId: string) {

@@ -2,7 +2,7 @@
 
 실행 단위와 진행 상태는 [백엔드 구현 체크리스트](./backend-implementation-checklist.md)에서 관리한다.
 
-> 현재 상태 (2026-07-21): Step 00~17A가 완료됐다. 계정·Device Auth·Web session·여러 Vault·멤버 역할·Yjs 영속화·파일 버전 이력·S3 첨부파일까지 구현됐으며 MCP(Step 18~19)는 범위에서 제외한다. 아래 Phase 설명은 구현 순서를 보존한 history이며 현재 완료 여부는 체크리스트를 기준으로 한다.
+> 현재 상태 (2026-07-22): Step 00~19가 완료됐다. 계정·Device Auth·Web session·여러 Vault·멤버 역할·Yjs 영속화·파일 버전 이력·S3 첨부파일·OAuth MCP까지 구현됐다. 아래 Phase 설명은 구현 순서를 보존한 history이며 현재 완료 여부는 체크리스트를 기준으로 한다.
 
 ## 1. 목표
 
@@ -12,7 +12,7 @@ NestJS 단일 서버에서 다음 기능을 단계적으로 제공한다.
 - Obsidian 플러그인의 Yjs 실시간·오프라인 동기화
 - Markdown 파일 manifest 및 문서별 Y.Doc 영속화
 - S3-compatible storage 기반 첨부파일 동기화
-- 사용자 Vault를 안전하게 조회·수정하는 MCP 서버 (현재 구현 제외)
+- 사용자 Vault를 안전하게 조회·수정하는 OAuth MCP 서버
 
 첫 배포 목표는 한 사용자가 여러 Vault를 만들고 두 Obsidian 클라이언트에서 Markdown을 실시간 편집하는 것이다.
 
@@ -349,7 +349,8 @@ LOG_LEVEL
 
 - Streamable HTTP endpoint `/mcp`
 - OAuth Authorization Code + PKCE와 동적 client 등록
-- Vault 목록, 파일 목록, Markdown 읽기·쓰기 tools
+- Vault와 파일 작업, Markdown/Canvas, 첨부파일, 링크 그래프와 버전 tools
+- 연결된 MCP 앱 조회와 즉시 철회
 - 모든 tool에서 사용자와 Vault owner 검사
 
 완료 조건:
@@ -418,4 +419,4 @@ LOG_LEVEL
 5. 로컬 Yjs snapshot 저장
 6. 두 Node client를 사용한 WebSocket E2E 테스트
 
-계정, PostgreSQL, S3는 이후 Step에서 완료됐고 MCP는 현재 제외했다.
+계정, PostgreSQL, S3와 MCP는 이후 Step에서 완료됐다.
