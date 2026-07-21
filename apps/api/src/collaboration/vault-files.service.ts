@@ -1,0 +1,423 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, type VaultFile, type VaultFileKind } from '@prisma/client';
+import { PrismaService } from '../database/prisma.service';
+import { VaultAccessService } from '../vaults/vault-access.service';
+import {
+  FileKind,
+  FileOperationDto,
+  FileOperationType,
+} from './dto/file-operation.dto';
+import { CollaborationServerService } from './collaboration-server.service';
+
+@Injectable()
+export class VaultFilesService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: VaultAccessService,
+    private readonly collaboration: CollaborationServerService,
+  ) {}
+
+  async list(userId: string, vaultId: string) {
+    await this.access.requireRead(userId, vaultId);
+    const files = await this.prisma.vaultFile.findMany({
+      where: { vaultId },
+      orderBy: { path: 'asc' },
+    });
+    return files.map(fileResponse);
+  }
+
+  async apply(userId: string, vaultId: string, input: FileOperationDto) {
+    await this.access.requireWrite(userId, vaultId);
+
+    const completed = await this.prisma.vaultFileOperation.findUnique({
+      where: { id: input.operationId },
+      include: { file: true },
+    });
+    if (completed) {
+      if (completed.vaultId !== vaultId) throw new NotFoundException();
+      const files =
+        completed.file.kind === 'FOLDER'
+          ? await this.prisma.vaultFile.findMany({
+              where: {
+                vaultId,
+                OR: [
+                  { path: completed.file.path },
+                  { path: { startsWith: `${completed.file.path}/` } },
+                ],
+              },
+            })
+          : [completed.file];
+      await this.collaboration.publishFiles(vaultId, files);
+      return { files: files.map(fileResponse) };
+    }
+
+    try {
+      const files = await this.prisma.$transaction(
+        (transaction) =>
+          this.applyTransaction(transaction, userId, vaultId, input),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      await this.collaboration.publishFiles(vaultId, files);
+      return { files: files.map(fileResponse) };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2002' || error.code === 'P2034')
+      ) {
+        throw new ConflictException('같은 이름의 파일이 이미 있습니다.');
+      }
+      throw error;
+    }
+  }
+
+  async versions(userId: string, vaultId: string, fileId: string) {
+    await this.access.requireRead(userId, vaultId);
+    const file = await this.prisma.vaultFile.findFirst({
+      where: { id: fileId, vaultId },
+      select: { id: true },
+    });
+    if (!file) throw new NotFoundException('File not found');
+    return this.prisma.vaultFileVersion.findMany({
+      where: { fileId },
+      select: {
+        id: true,
+        version: true,
+        path: true,
+        deletedAt: true,
+        attachmentId: true,
+        createdAt: true,
+        createdBy: { select: { id: true, displayName: true, email: true } },
+      },
+      orderBy: { version: 'desc' },
+    });
+  }
+
+  private async applyTransaction(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    vaultId: string,
+    input: FileOperationDto,
+  ): Promise<VaultFile[]> {
+    if (input.type === FileOperationType.CREATE) {
+      return [await this.create(transaction, userId, vaultId, input)];
+    }
+
+    const file = await transaction.vaultFile.findFirst({
+      where: { id: input.fileId, vaultId },
+    });
+    if (!file) throw new NotFoundException('File not found');
+    if (input.baseVersion === undefined) {
+      throw new BadRequestException('baseVersion is required');
+    }
+    if (file.version !== input.baseVersion) {
+      throw new ConflictException('다른 기기에서 파일이 변경되었습니다.');
+    }
+
+    if (input.type === FileOperationType.RENAME) {
+      return this.rename(transaction, userId, vaultId, file, input);
+    }
+    if (input.type === FileOperationType.UPDATE_ATTACHMENT) {
+      return [
+        await this.updateAttachment(transaction, userId, vaultId, file, input),
+      ];
+    }
+    return this.delete(transaction, userId, vaultId, file, input.operationId);
+  }
+
+  private async create(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    vaultId: string,
+    input: FileOperationDto,
+  ) {
+    if (!input.kind || !input.path) {
+      throw new BadRequestException('kind and path are required');
+    }
+    const path = vaultPath(input.path);
+    const attachment =
+      input.kind === FileKind.ATTACHMENT
+        ? await this.attachment(transaction, vaultId, input.attachmentId)
+        : undefined;
+    const file = await transaction.vaultFile.create({
+      data: {
+        id: input.fileId,
+        vaultId,
+        kind: databaseKind(input.kind),
+        path,
+        activePathKey: pathKey(path),
+        attachmentId: attachment?.id,
+        mimeType: attachment?.mimeType,
+        sha256: attachment?.sha256,
+        size: attachment?.size,
+        versions: {
+          create: {
+            version: 1,
+            path,
+            attachmentId: attachment?.id,
+            createdById: userId,
+            state: await documentState(
+              transaction,
+              vaultId,
+              input.fileId,
+              input.kind,
+            ),
+          },
+        },
+      },
+    });
+    await transaction.vaultFileOperation.create({
+      data: { id: input.operationId, vaultId, fileId: file.id },
+    });
+    return file;
+  }
+
+  private async rename(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    vaultId: string,
+    file: VaultFile,
+    input: FileOperationDto,
+  ) {
+    if (!input.path) throw new BadRequestException('path is required');
+    if (file.deletedAt) throw new ConflictException('삭제된 파일입니다.');
+    const path = vaultPath(input.path);
+    const affected =
+      file.kind === 'FOLDER'
+        ? await transaction.vaultFile.findMany({
+            where: {
+              vaultId,
+              deletedAt: null,
+              OR: [
+                { path: file.path },
+                { path: { startsWith: `${file.path}/` } },
+              ],
+            },
+            orderBy: { path: 'asc' },
+          })
+        : [file];
+    const ids = affected.map((entry) => entry.id);
+    const paths = affected.map((entry) =>
+      movePath(entry.path, file.path, path),
+    );
+    const collision = await transaction.vaultFile.findFirst({
+      where: {
+        vaultId,
+        deletedAt: null,
+        id: { notIn: ids },
+        activePathKey: { in: paths.map(pathKey) },
+      },
+      select: { id: true },
+    });
+    if (collision)
+      throw new ConflictException('같은 이름의 파일이 이미 있습니다.');
+
+    const changed: VaultFile[] = [];
+    for (const [index, entry] of affected.entries()) {
+      const nextPath = paths[index];
+      const version = entry.version + 1;
+      changed.push(
+        await transaction.vaultFile.update({
+          where: { id: entry.id },
+          data: {
+            path: nextPath,
+            activePathKey: pathKey(nextPath),
+            version,
+            versions: {
+              create: {
+                version,
+                path: nextPath,
+                attachmentId: entry.attachmentId,
+                createdById: userId,
+                state: await documentState(
+                  transaction,
+                  vaultId,
+                  entry.id,
+                  clientKind(entry.kind),
+                ),
+              },
+            },
+          },
+        }),
+      );
+    }
+    await transaction.vaultFileOperation.create({
+      data: { id: input.operationId, vaultId, fileId: file.id },
+    });
+    return changed;
+  }
+
+  private async delete(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    vaultId: string,
+    file: VaultFile,
+    operationId: string,
+  ) {
+    const affected =
+      file.kind === 'FOLDER'
+        ? await transaction.vaultFile.findMany({
+            where: {
+              vaultId,
+              deletedAt: null,
+              OR: [
+                { path: file.path },
+                { path: { startsWith: `${file.path}/` } },
+              ],
+            },
+          })
+        : [file];
+    const now = new Date();
+    const changed: VaultFile[] = [];
+    for (const entry of affected) {
+      const version = entry.version + 1;
+      changed.push(
+        await transaction.vaultFile.update({
+          where: { id: entry.id },
+          data: {
+            activePathKey: null,
+            deletedAt: now,
+            version,
+            versions: {
+              create: {
+                version,
+                path: entry.path,
+                deletedAt: now,
+                attachmentId: entry.attachmentId,
+                createdById: userId,
+                state: await documentState(
+                  transaction,
+                  vaultId,
+                  entry.id,
+                  clientKind(entry.kind),
+                ),
+              },
+            },
+          },
+        }),
+      );
+    }
+    await transaction.vaultFileOperation.create({
+      data: { id: operationId, vaultId, fileId: file.id },
+    });
+    return changed;
+  }
+
+  private async updateAttachment(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    vaultId: string,
+    file: VaultFile,
+    input: FileOperationDto,
+  ) {
+    if (file.kind !== 'ATTACHMENT' || file.deletedAt) {
+      throw new ConflictException('첨부파일이 아닙니다.');
+    }
+    const attachment = await this.attachment(
+      transaction,
+      vaultId,
+      input.attachmentId,
+    );
+    const version = file.version + 1;
+    const changed = await transaction.vaultFile.update({
+      where: { id: file.id },
+      data: {
+        version,
+        attachmentId: attachment.id,
+        mimeType: attachment.mimeType,
+        sha256: attachment.sha256,
+        size: attachment.size,
+        versions: {
+          create: {
+            version,
+            path: file.path,
+            attachmentId: attachment.id,
+            createdById: userId,
+          },
+        },
+      },
+    });
+    await transaction.vaultFileOperation.create({
+      data: { id: input.operationId, vaultId, fileId: file.id },
+    });
+    return changed;
+  }
+
+  private async attachment(
+    transaction: Prisma.TransactionClient,
+    vaultId: string,
+    attachmentId?: string,
+  ) {
+    if (!attachmentId)
+      throw new BadRequestException('attachmentId is required');
+    const attachment = await transaction.attachment.findFirst({
+      where: { id: attachmentId, vaultId, status: 'READY' },
+    });
+    if (!attachment) throw new BadRequestException('Attachment is not ready');
+    return attachment;
+  }
+}
+
+function vaultPath(input: string) {
+  const path = input.trim().normalize('NFC');
+  if (
+    !path ||
+    path.startsWith('/') ||
+    path.includes('\0') ||
+    path.split('/').some((part) => !part || part === '.' || part === '..')
+  ) {
+    throw new BadRequestException('올바른 Vault 경로를 입력하세요.');
+  }
+  return path;
+}
+
+function pathKey(path: string) {
+  return path.normalize('NFC').toLowerCase();
+}
+
+function movePath(path: string, from: string, to: string) {
+  return path === from ? to : `${to}${path.slice(from.length)}`;
+}
+
+function databaseKind(kind: FileKind): VaultFileKind {
+  return kind.toUpperCase() as VaultFileKind;
+}
+
+function clientKind(kind: VaultFileKind): FileKind {
+  return kind.toLowerCase() as FileKind;
+}
+
+async function documentState(
+  transaction: Prisma.TransactionClient,
+  vaultId: string,
+  fileId: string,
+  kind: FileKind,
+) {
+  if (kind !== FileKind.MARKDOWN && kind !== FileKind.CANVAS) return undefined;
+  const roomName = `vault:${vaultId}:${kind === FileKind.MARKDOWN ? 'doc' : 'canvas'}:${fileId}`;
+  return (
+    await transaction.yDocument.findUnique({
+      where: { roomName },
+      select: { state: true },
+    })
+  )?.state;
+}
+
+function fileResponse(file: VaultFile) {
+  return {
+    id: file.id,
+    kind: file.kind.toLowerCase(),
+    path: file.path,
+    deleted: file.deletedAt !== null,
+    version: file.version,
+    updatedAt: file.updatedAt,
+    attachmentId: file.attachmentId,
+    mimeType: file.mimeType,
+    sha256: file.sha256,
+    size: file.size === null ? null : Number(file.size),
+  };
+}

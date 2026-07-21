@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                   String                @id @default(uuid()) @db.Uuid
+  email                String                @unique
+  displayName          String?               @map("display_name")
+  passwordHash         String                @map("password_hash")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  deviceAuthorizations DeviceAuthorization[]
+  sessions             Session[]
+  vaults               Vault[]
+  vaultMemberships     VaultMember[]
+  vaultInvitationsSent VaultInvitation[]    @relation("VaultInvitationInviter")
+  fileVersions         VaultFileVersion[]
+
+  @@map("users")
+}
+
+model DeviceAuthorization {
+  id             String    @id @default(uuid()) @db.Uuid
+  deviceCodeHash String    @unique @map("device_code_hash")
+  userCodeHash   String    @unique @map("user_code_hash")
+  userId         String?   @map("user_id") @db.Uuid
+  expiresAt      DateTime  @map("expires_at")
+  approvedAt     DateTime? @map("approved_at")
+  consumedAt     DateTime? @map("consumed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("device_authorizations")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash")
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Vault {
+  id          String       @id @default(uuid()) @db.Uuid
+  ownerId     String       @map("owner_id") @db.Uuid
+  name        String
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documents   YDocument[]
+  attachments Attachment[]
+  members     VaultMember[]
+  invitations VaultInvitation[]
+  files       VaultFile[]
+  fileOperations VaultFileOperation[]
+
+  @@index([ownerId])
+  @@map("vaults")
+}
+
+enum VaultFileKind {
+  MARKDOWN
+  ATTACHMENT
+  FOLDER
+  CANVAS
+}
+
+model VaultFile {
+  id            String        @id @db.Uuid
+  vaultId       String        @map("vault_id") @db.Uuid
+  kind          VaultFileKind
+  path          String
+  activePathKey String?       @map("active_path_key")
+  version       Int           @default(1)
+  attachmentId  String?       @map("attachment_id") @db.Uuid
+  mimeType      String?       @map("mime_type")
+  sha256        String?
+  size          BigInt?
+  deletedAt     DateTime?     @map("deleted_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  vault         Vault         @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  attachment    Attachment?   @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  versions      VaultFileVersion[]
+  operations    VaultFileOperation[]
+
+  @@unique([vaultId, activePathKey])
+  @@index([vaultId, deletedAt])
+  @@map("vault_files")
+}
+
+model VaultFileVersion {
+  id           String    @id @default(uuid()) @db.Uuid
+  fileId       String    @map("file_id") @db.Uuid
+  version      Int
+  path         String
+  deletedAt    DateTime? @map("deleted_at")
+  state        Bytes?
+  attachmentId String?   @map("attachment_id") @db.Uuid
+  createdById  String?   @map("created_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  file         VaultFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  attachment   Attachment? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  createdBy    User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([fileId, version])
+  @@index([fileId, createdAt])
+  @@map("vault_file_versions")
+}
+
+model VaultFileOperation {
+  id        String    @id @db.Uuid
+  vaultId   String    @map("vault_id") @db.Uuid
+  fileId    String    @map("file_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  vault     Vault     @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  file      VaultFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([vaultId, createdAt])
+  @@map("vault_file_operations")
+}
+
+enum VaultRole {
+  EDITOR
+  VIEWER
+}
+
+model VaultMember {
+  id        String    @id @default(uuid()) @db.Uuid
+  vaultId   String    @map("vault_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      VaultRole
+  createdAt DateTime  @default(now()) @map("created_at")
+  vault     Vault     @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([vaultId, userId])
+  @@index([userId])
+  @@map("vault_members")
+}
+
+model VaultInvitation {
+  id          String    @id @default(uuid()) @db.Uuid
+  vaultId     String    @map("vault_id") @db.Uuid
+  email       String
+  role        VaultRole
+  invitedById String    @map("invited_by_id") @db.Uuid
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  vault       Vault     @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("VaultInvitationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([vaultId, email])
+  @@index([email, expiresAt])
+  @@map("vault_invitations")
+}
+
+enum AttachmentStatus {
+  PENDING
+  READY
+  DELETED
+}
+
+model Attachment {
+  id             String           @id @default(uuid()) @db.Uuid
+  vaultId        String           @map("vault_id") @db.Uuid
+  path           String
+  objectKey      String           @unique @map("object_key")
+  size           BigInt
+  mimeType       String           @map("mime_type")
+  sha256         String
+  etag           String?
+  idempotencyKey String           @map("idempotency_key") @db.Uuid
+  status         AttachmentStatus @default(PENDING)
+  deletedAt      DateTime?        @map("deleted_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  vault          Vault            @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  files          VaultFile[]
+  fileVersions   VaultFileVersion[]
+
+  @@unique([vaultId, idempotencyKey])
+  @@unique([vaultId, path, sha256])
+  @@index([vaultId])
+  @@map("attachments")
+}
+
+model YDocument {
+  roomName  String   @id @map("room_name")
+  vaultId   String   @map("vault_id") @db.Uuid
+  state     Bytes
+  updatedAt DateTime @updatedAt @map("updated_at")
+  vault     Vault    @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+
+  @@index([vaultId])
+  @@map("y_documents")
+}
