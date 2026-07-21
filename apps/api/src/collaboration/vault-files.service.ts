@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, type VaultFile, type VaultFileKind } from '@prisma/client';
+import * as Y from 'yjs';
 import { PrismaService } from '../database/prisma.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
 import { vaultPath, vaultPathKey } from '../vaults/utils/vault-path';
@@ -30,6 +31,58 @@ export class VaultFilesService {
       orderBy: { path: 'asc' },
     });
     return files.map(fileResponse);
+  }
+
+  async search(userId: string, vaultId: string, query: string) {
+    await this.access.requireRead(userId, vaultId);
+    const term = query.trim().toLowerCase();
+    if (!term) return [];
+    const documents = await this.markdownDocuments(vaultId);
+    return documents
+      .map((document) => {
+        const pathMatch = document.path.toLowerCase().includes(term);
+        const contentIndex = document.content.toLowerCase().indexOf(term);
+        return pathMatch || contentIndex >= 0
+          ? {
+              id: document.id,
+              path: document.path,
+              excerpt: excerpt(document.content, contentIndex, term.length),
+              pathMatch,
+            }
+          : undefined;
+      })
+      .filter((result) => result !== undefined)
+      .sort(
+        (left, right) =>
+          Number(right.pathMatch) - Number(left.pathMatch) ||
+          left.path.localeCompare(right.path),
+      )
+      .slice(0, 50)
+      .map((result) => ({
+        id: result.id,
+        path: result.path,
+        excerpt: result.excerpt,
+      }));
+  }
+
+  async backlinks(userId: string, vaultId: string, fileId: string) {
+    await this.access.requireRead(userId, vaultId);
+    const documents = await this.markdownDocuments(vaultId);
+    const target = documents.find((document) => document.id === fileId);
+    if (!target) throw new NotFoundException('File not found');
+    return documents
+      .filter(
+        (document) =>
+          document.id !== fileId &&
+          markdownLinks(document.content).some((link) =>
+            resolvesMarkdownLink(document.path, link, target.path),
+          ),
+      )
+      .map((document) => ({
+        id: document.id,
+        path: document.path,
+        excerpt: linkExcerpt(document.content, target.path),
+      }));
   }
 
   async apply(userId: string, vaultId: string, input: FileOperationDto) {
@@ -348,6 +401,107 @@ export class VaultFilesService {
     if (!attachment) throw new BadRequestException('Attachment is not ready');
     return attachment;
   }
+
+  private async markdownDocuments(vaultId: string) {
+    // ponytail: A linear scan is enough for personal Vaults. Add a persisted
+    // search index only after measured latency shows this path is too slow.
+    const files = await this.prisma.vaultFile.findMany({
+      where: { vaultId, kind: 'MARKDOWN', deletedAt: null },
+      select: { id: true, path: true },
+      orderBy: { path: 'asc' },
+    });
+    const states = await this.prisma.yDocument.findMany({
+      where: {
+        roomName: {
+          in: files.map((file) => `vault:${vaultId}:doc:${file.id}`),
+        },
+      },
+      select: { roomName: true, state: true },
+    });
+    const byRoom = new Map(
+      states.map((state) => [state.roomName, state.state]),
+    );
+    return files.map((file) => ({
+      ...file,
+      content: documentText(byRoom.get(`vault:${vaultId}:doc:${file.id}`)),
+    }));
+  }
+}
+
+function documentText(state?: Uint8Array) {
+  if (!state) return '';
+  const document = new Y.Doc();
+  Y.applyUpdate(document, state);
+  return document.getText('content').toJSON();
+}
+
+function excerpt(content: string, index: number, length: number) {
+  if (index < 0) return '';
+  const compact = content.replace(/\s+/g, ' ').trim();
+  const compactIndex = compact
+    .toLowerCase()
+    .indexOf(content.slice(index, index + length).toLowerCase());
+  const match = Math.max(0, compactIndex);
+  const start = Math.max(0, match - 45);
+  const end = Math.min(compact.length, match + length + 75);
+  return `${start ? '…' : ''}${compact.slice(start, end)}${end < compact.length ? '…' : ''}`;
+}
+
+function markdownLinks(content: string) {
+  return [
+    ...[...content.matchAll(/!?\[\[([^\]]+)\]\]/g)].map((match) => match[1]),
+    ...[...content.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)].map(
+      (match) => match[1],
+    ),
+  ];
+}
+
+function resolvesMarkdownLink(
+  sourcePath: string,
+  href: string,
+  targetPath: string,
+) {
+  const raw = decodeLink(href).split('|')[0].split('#')[0].trim();
+  if (!raw || /^[a-z][a-z\d+.-]*:/i.test(raw)) return false;
+  const target = normalizedMarkdownPath(targetPath.split('/'));
+  const folder = sourcePath.split('/').slice(0, -1);
+  const link = raw.replace(/^\/+/, '');
+  const candidates = link.startsWith('.')
+    ? [normalizedMarkdownPath([...folder, ...link.split('/')])]
+    : [
+        normalizedMarkdownPath(link.split('/')),
+        normalizedMarkdownPath([...folder, ...link.split('/')]),
+      ];
+  return (
+    candidates.includes(target) ||
+    (!link.includes('/') &&
+      target.split('/').at(-1) === normalizedMarkdownPath([link]))
+  );
+}
+
+function normalizedMarkdownPath(parts: string[]) {
+  const path: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') path.pop();
+    else path.push(part);
+  }
+  return path.join('/').replace(/\.md$/i, '').normalize('NFC').toLowerCase();
+}
+
+function decodeLink(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function linkExcerpt(content: string, targetPath: string) {
+  const target =
+    targetPath.split('/').at(-1)?.replace(/\.md$/i, '') ?? targetPath;
+  const index = content.toLowerCase().indexOf(target.toLowerCase());
+  return excerpt(content, Math.max(0, index), target.length);
 }
 
 function movePath(path: string, from: string, to: string) {

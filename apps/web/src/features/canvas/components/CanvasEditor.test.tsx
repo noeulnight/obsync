@@ -13,6 +13,7 @@ afterEach(cleanup);
 describe("CanvasEditor", () => {
   it("pans beyond the old Canvas boundaries", () => {
     HTMLElement.prototype.setPointerCapture = vi.fn();
+    const onAddFile = vi.fn();
     const session = {
       nodes: () => [],
       edges: () => [],
@@ -35,6 +36,7 @@ describe("CanvasEditor", () => {
         resolveAsset={() => Promise.resolve(undefined)}
         resolveFileAsset={() => Promise.resolve(undefined)}
         files={[]}
+        onAddFile={onAddFile}
       />,
     );
 
@@ -46,6 +48,9 @@ describe("CanvasEditor", () => {
     expect(screen.getByTestId("canvas-viewport").style.transform).toContain(
       "translate(-80px, -90px)",
     );
+    fireEvent.click(screen.getByRole("button", { name: "Add document" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add media" }));
+    expect(onAddFile).toHaveBeenCalledTimes(2);
   });
 
   it("keeps embedded documents connected while their nodes are not being edited", async () => {
@@ -94,6 +99,7 @@ describe("CanvasEditor", () => {
         resolveAsset={() => Promise.resolve(undefined)}
         resolveFileAsset={() => Promise.resolve(undefined)}
         files={[]}
+        onAddFile={() => undefined}
       />,
     );
 
@@ -140,6 +146,7 @@ describe("CanvasEditor", () => {
         resolveAsset={() => Promise.resolve(undefined)}
         resolveFileAsset={() => Promise.resolve(undefined)}
         files={[]}
+        onAddFile={() => undefined}
       />,
     );
 
@@ -210,6 +217,7 @@ describe("CanvasEditor", () => {
             deleted: false,
           },
         ]}
+        onAddFile={() => undefined}
       />,
     );
 
@@ -256,6 +264,7 @@ describe("CanvasEditor", () => {
         resolveAsset={() => Promise.resolve(undefined)}
         resolveFileAsset={() => Promise.resolve(undefined)}
         files={[]}
+        onAddFile={() => undefined}
       />,
     );
 

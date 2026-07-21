@@ -5,12 +5,14 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { FileOperationDto } from './dto/file-operation.dto';
+import { SearchFilesDto } from './dto/search-files.dto';
 import { VaultFilesService } from './vault-files.service';
 
 @Controller('vaults/:vaultId/files')
@@ -24,6 +26,15 @@ export class VaultFilesController {
     @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
   ) {
     return this.files.list(request.user.id, vaultId);
+  }
+
+  @Get('search')
+  search(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+    @Query() query: SearchFilesDto,
+  ) {
+    return this.files.search(request.user.id, vaultId, query.query);
   }
 
   @Post('operations')
@@ -42,5 +53,14 @@ export class VaultFilesController {
     @Param('fileId', new ParseUUIDPipe()) fileId: string,
   ) {
     return this.files.versions(request.user.id, vaultId, fileId);
+  }
+
+  @Get(':fileId/backlinks')
+  backlinks(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    return this.files.backlinks(request.user.id, vaultId, fileId);
   }
 }

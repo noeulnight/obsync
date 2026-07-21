@@ -35,6 +35,8 @@ export function WorkspaceContent({
   navigateFromCanvas,
   resolveCanvasAsset,
   resolveCanvasFileAsset,
+  onAddCanvasFile,
+  onOpenEntry,
 }: {
   api: ApiClient;
   vaultId: string;
@@ -55,6 +57,8 @@ export function WorkspaceContent({
   navigateFromCanvas: (file: string, href: string) => void;
   resolveCanvasAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveCanvasFileAsset: (file: string) => Promise<string | undefined>;
+  onAddCanvasFile: () => void;
+  onOpenEntry: (entry: FileEntry) => void;
 }) {
   return (
     <SidebarInset className="h-svh min-w-0 overflow-hidden">
@@ -68,11 +72,18 @@ export function WorkspaceContent({
               entry={activeEntry}
               vaultName={vaultName}
               session={documentSession}
+              api={api}
+              vaultId={vaultId}
+              files={entries}
               onRename={onRenamePath}
               onRequestRename={onRename}
               onDelete={onDelete}
               onNavigate={onNavigate}
               resolveAsset={resolveAsset}
+              onOpenDocument={(fileId) => {
+                const entry = entries.find((item) => item.id === fileId);
+                if (entry) onOpenEntry(entry);
+              }}
               readOnly={!canWrite}
             />
           </Suspense>
@@ -90,6 +101,7 @@ export function WorkspaceContent({
               resolveAsset={resolveCanvasAsset}
               resolveFileAsset={resolveCanvasFileAsset}
               files={entries}
+              onAddFile={onAddCanvasFile}
               readOnly={!canWrite}
             />
           </Suspense>

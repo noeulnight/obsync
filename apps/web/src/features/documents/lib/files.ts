@@ -74,6 +74,20 @@ export function imagePath(href: string) {
   return /\.(?:avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(path) ? path : undefined;
 }
 
+export function markdownLinkOptions(entries: FileEntry[]) {
+  return entries
+    .filter((entry) => entry.kind === "markdown" && !entry.deleted)
+    .map((entry) => {
+      const parts = entry.path.replace(/\.md$/i, "").split("/");
+      return {
+        label: parts.at(-1) ?? entry.path,
+        detail: parts.slice(0, -1).join("/"),
+        target: parts.join("/"),
+      };
+    })
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
+
 export function renamedMarkdownPath(path: string, title: string) {
   const name = title.trim();
   if (!name || /[\\/]/.test(name)) return undefined;

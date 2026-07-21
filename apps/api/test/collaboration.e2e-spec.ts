@@ -394,6 +394,73 @@ describe('Collaboration WebSocket (e2e)', () => {
     document.destroy();
   });
 
+  it('searches document contents and returns authorized backlinks', async () => {
+    const sourceId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const targetId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    await prisma.vaultFile.createMany({
+      data: [
+        {
+          id: sourceId,
+          vaultId,
+          kind: 'MARKDOWN',
+          path: 'Source.md',
+          activePathKey: 'source.md',
+        },
+        {
+          id: targetId,
+          vaultId,
+          kind: 'MARKDOWN',
+          path: 'Notes/Target.md',
+          activePathKey: 'notes/target.md',
+        },
+      ],
+    });
+    const source = new Y.Doc();
+    const target = new Y.Doc();
+    source.getText('content').insert(0, 'Read [[Notes/Target]] after lunch.');
+    target.getText('content').insert(0, 'A uniquely searchable phrase.');
+    await prisma.yDocument.createMany({
+      data: [
+        {
+          roomName: `vault:${vaultId}:doc:${sourceId}`,
+          vaultId,
+          state: Buffer.from(Y.encodeStateAsUpdate(source)),
+        },
+        {
+          roomName: `vault:${vaultId}:doc:${targetId}`,
+          vaultId,
+          state: Buffer.from(Y.encodeStateAsUpdate(target)),
+        },
+      ],
+    });
+    const headers = { Authorization: `Bearer ${accessToken}` };
+
+    const search = await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/search`)
+      .query({ query: 'uniquely searchable' })
+      .set(headers)
+      .expect(200);
+    expect(search.body).toEqual([
+      expect.objectContaining({ id: targetId, path: 'Notes/Target.md' }),
+    ]);
+
+    const backlinks = await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/${targetId}/backlinks`)
+      .set(headers)
+      .expect(200);
+    expect(backlinks.body).toEqual([
+      expect.objectContaining({ id: sourceId, path: 'Source.md' }),
+    ]);
+
+    await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/search`)
+      .query({ query: 'uniquely searchable' })
+      .set({ Authorization: `Bearer ${otherAccessToken}` })
+      .expect(404);
+    source.destroy();
+    target.destroy();
+  });
+
   it.each([
     ['wrong token', manifestRoom, 'wrong-token'],
     ['invalid room', 'invalid-room', () => accessToken],

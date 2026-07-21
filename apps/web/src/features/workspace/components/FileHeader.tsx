@@ -1,4 +1,5 @@
 import { ChevronRight, Ellipsis, Pencil, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,12 +12,14 @@ export function FileHeader({
   vaultName,
   path,
   title,
+  actions,
   onRename,
   onDelete,
 }: {
   vaultName: string;
   path: string;
   title?: string;
+  actions?: ReactNode;
   onRename?: () => void;
   onDelete?: () => void;
 }) {
@@ -40,28 +43,31 @@ export function FileHeader({
         </ol>
       </nav>
       <div className="max-w-[40vw] truncate text-[13px] text-foreground">{name}</div>
-      {onRename && onDelete && (
-        <div className="justify-self-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="File menu">
-                <Ellipsis />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => window.setTimeout(onRename)}>
-                <Pencil />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                onSelect={() => window.setTimeout(onDelete)}
-              >
-                <Trash2 />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      {(actions || (onRename && onDelete)) && (
+        <div className="flex items-center justify-self-end gap-1">
+          {actions}
+          {onRename && onDelete && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="File menu">
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => window.setTimeout(onRename)}>
+                  <Pencil />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  onSelect={() => window.setTimeout(onDelete)}
+                >
+                  <Trash2 />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       )}
     </header>

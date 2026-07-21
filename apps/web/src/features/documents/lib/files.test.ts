@@ -3,6 +3,7 @@ import {
   conflictPath,
   fileTree,
   isWithin,
+  markdownLinkOptions,
   moveWithin,
   newEntryPath,
   imagePath,
@@ -61,6 +62,13 @@ describe("resolveMarkdownLink", () => {
   it("recognizes an Obsidian image embed", () => {
     expect(imagePath("assets/photo.png|400")).toBe("assets/photo.png");
     expect(imagePath("document.pdf")).toBeUndefined();
+  });
+
+  it("builds wiki-link completions from active Markdown files", () => {
+    expect(markdownLinkOptions(entries)).toEqual([
+      { label: "a", detail: "notes", target: "notes/a" },
+      { label: "b", detail: "shared", target: "shared/b" },
+    ]);
   });
 
   it("renames a Markdown file inside its current folder", () => {

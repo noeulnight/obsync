@@ -13,6 +13,7 @@ import {
 } from "@/features/documents/lib/files";
 import { WebVault } from "@/features/documents/lib/sync";
 import type { Vault } from "@/features/vaults/types/vault";
+import { VaultSearchDialog, type SearchMode } from "@/features/search/components/VaultSearchDialog";
 import type { ApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/error";
 import { queryClient } from "@/lib/query/client";
@@ -61,9 +62,11 @@ export function Workspace({
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
   const [deleteTarget, setDeleteTarget] = useState<FileEntry>();
   const [createKind, setCreateKind] = useState<CreateEntryKind>();
+  const [searchMode, setSearchMode] = useState<SearchMode>();
   const uploadInput = useRef<HTMLInputElement>(null);
   const uploadAttachment = useUploadAttachment(api, vault.id);
   const canWrite = vault.role !== "VIEWER" && online;
+  const activeEntry = entries.find((entry) => entry.id === active);
   const open = useCallback(
     (entry: FileEntry, replace = false) => {
       setNotice("");
@@ -97,6 +100,22 @@ export function Workspace({
   }, [api, userName, vault.id, vault.role]);
 
   useEffect(() => {
+    const shortcuts = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === "k") {
+        event.preventDefault();
+        setSearchMode(activeEntry?.kind === "canvas" && canWrite ? "canvas" : "open");
+      } else if (event.shiftKey && key === "f") {
+        event.preventDefault();
+        setSearchMode("search");
+      }
+    };
+    window.addEventListener("keydown", shortcuts);
+    return () => window.removeEventListener("keydown", shortcuts);
+  }, [activeEntry?.kind, canWrite]);
+
+  useEffect(() => {
     if (active && entries.some((entry) => entry.id === active)) return;
     const first = entries.find((entry) => entry.kind === "markdown");
     if (first) open(first, true);
@@ -106,7 +125,6 @@ export function Workspace({
     if (routeVaultId === vault.id) setActive(routeFileId ?? "");
   }, [routeFileId, routeVaultId, vault.id]);
 
-  const activeEntry = entries.find((entry) => entry.id === active);
   const documentSession =
     sync && activeEntry?.kind === "markdown"
       ? sync.openDocument(activeEntry, api, userName)
@@ -285,6 +303,7 @@ export function Workspace({
           uploadInput={uploadInput}
           onSelectVault={onSelect}
           onCreateVault={onCreate}
+          onSearch={() => setSearchMode("search")}
           onOpen={open}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
@@ -313,8 +332,21 @@ export function Workspace({
           navigateFromCanvas={navigateFromCanvas}
           resolveCanvasAsset={resolveCanvasAsset}
           resolveCanvasFileAsset={resolveCanvasFileAsset}
+          onAddCanvasFile={() => setSearchMode("canvas")}
+          onOpenEntry={open}
         />
       </SidebarProvider>
+      <VaultSearchDialog
+        api={api}
+        vaultId={vault.id}
+        mode={searchMode}
+        entries={entries}
+        close={() => setSearchMode(undefined)}
+        open={(entry) => {
+          if (searchMode === "canvas") canvasSession?.addFile(entry.path);
+          else open(entry);
+        }}
+      />
       <RenameFileDialog
         entry={renameTarget}
         close={() => setRenameTarget(undefined)}

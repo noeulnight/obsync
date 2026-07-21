@@ -6,6 +6,7 @@ import type {
   VaultFileOperation,
   YDocument,
 } from '@prisma/client';
+import * as Y from 'yjs';
 import { PrismaService } from '../../database/prisma.service';
 import { VaultAccessService } from '../../vaults/vault-access.service';
 import { CollaborationServerService } from '../collaboration-server.service';
@@ -270,6 +271,38 @@ describe('VaultFilesService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(publishFiles).toHaveBeenCalledWith(vaultId, [root, child]);
   });
+
+  it('searches document text and resolves wiki backlinks', async () => {
+    const project = file({ path: 'Projects/Roadmap.md' });
+    const daily = file({ id: childId, path: 'Daily/Today.md' });
+    const { service, prisma, requireRead } = setup(transactionMock());
+    prisma.vaultFile.findMany.mockResolvedValue([daily, project]);
+    prisma.yDocument.findMany.mockResolvedValue([
+      documentRecord(project.id, '# Roadmap\nAlpha release'),
+      documentRecord(daily.id, 'Continue [[Roadmap]] after the alpha review.'),
+    ]);
+
+    await expect(service.search(userId, vaultId, 'alpha')).resolves.toEqual([
+      {
+        id: childId,
+        path: 'Daily/Today.md',
+        excerpt: 'Continue [[Roadmap]] after the alpha review.',
+      },
+      {
+        id: fileId,
+        path: 'Projects/Roadmap.md',
+        excerpt: '# Roadmap Alpha release',
+      },
+    ]);
+    await expect(service.backlinks(userId, vaultId, fileId)).resolves.toEqual([
+      {
+        id: childId,
+        path: 'Daily/Today.md',
+        excerpt: 'Continue [[Roadmap]] after the alpha review.',
+      },
+    ]);
+    expect(requireRead).toHaveBeenCalledWith(userId, vaultId);
+  });
 });
 
 function operation(overrides: Partial<FileOperationDto>): FileOperationDto {
@@ -384,19 +417,30 @@ function setup(
       findUnique: jest.fn().mockResolvedValue(completed),
     },
     vaultFile: { findMany: jest.fn() },
+    yDocument: { findMany: jest.fn() },
     $transaction: jest.fn(
       (callback: (client: Prisma.TransactionClient) => Promise<VaultFile[]>) =>
         callback(transaction as unknown as Prisma.TransactionClient),
     ),
   };
+  const requireRead = jest.fn().mockResolvedValue(undefined);
   const requireWrite = jest.fn().mockResolvedValue(undefined);
   const publishFiles = jest.fn().mockResolvedValue(undefined);
   const service = new VaultFilesService(
     prisma as unknown as PrismaService,
-    { requireWrite } as unknown as VaultAccessService,
+    { requireRead, requireWrite } as unknown as VaultAccessService,
     { publishFiles } as unknown as CollaborationServerService,
   );
-  return { service, prisma, publishFiles };
+  return { service, prisma, publishFiles, requireRead };
+}
+
+function documentRecord(id: string, content: string) {
+  const document = new Y.Doc();
+  document.getText('content').insert(0, content);
+  return {
+    roomName: `vault:${vaultId}:doc:${id}`,
+    state: Buffer.from(Y.encodeStateAsUpdate(document)),
+  };
 }
 
 type VersionCreate = {

@@ -58,6 +58,12 @@ export type FileOperationResult = {
   files: Array<{ id: string; version: number }>;
 };
 
+export type DocumentSearchResult = {
+  id: string;
+  path: string;
+  excerpt: string;
+};
+
 type UploadApproval = {
   attachment: { id: string };
   uploadUrl: string | null;
@@ -256,6 +262,19 @@ export class ApiClient {
 
   listFiles(vaultId: string) {
     return this.request<RemoteFile[]>({ url: `/api/vaults/${vaultId}/files` });
+  }
+
+  searchVault(vaultId: string, query: string) {
+    return this.request<DocumentSearchResult[]>({
+      url: `/api/vaults/${vaultId}/files/search`,
+      params: { query },
+    });
+  }
+
+  backlinks(vaultId: string, fileId: string) {
+    return this.request<DocumentSearchResult[]>({
+      url: `/api/vaults/${vaultId}/files/${fileId}/backlinks`,
+    });
   }
 
   async uploadAttachment(vaultId: string, file: File, path: string): Promise<UploadedAttachment> {

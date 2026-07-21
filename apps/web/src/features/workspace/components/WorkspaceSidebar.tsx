@@ -6,6 +6,7 @@ import {
   LogOut,
   Plus,
   Settings2,
+  Search,
   Upload,
 } from "lucide-react";
 import type { RefObject } from "react";
@@ -51,6 +52,7 @@ export function WorkspaceSidebar({
   uploadInput,
   onSelectVault,
   onCreateVault,
+  onSearch,
   onOpen,
   onRename,
   onDelete,
@@ -68,6 +70,7 @@ export function WorkspaceSidebar({
   uploadInput: RefObject<HTMLInputElement | null>;
   onSelectVault: (id: string) => void;
   onCreateVault: () => void;
+  onSearch: () => void;
   onOpen: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
@@ -104,6 +107,19 @@ export function WorkspaceSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup className="py-1">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Search" onClick={onSearch}>
+                  <Search />
+                  <span>Search</span>
+                  <kbd className="ml-auto text-[10px] text-muted-foreground">⌘⇧F</kbd>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel className="justify-between pr-1">
             <span>Files</span>

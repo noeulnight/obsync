@@ -16,6 +16,7 @@ export function CanvasEditor({
   resolveAsset,
   resolveFileAsset,
   files,
+  onAddFile,
   readOnly = false,
 }: {
   session: WebCanvas;
@@ -28,6 +29,7 @@ export function CanvasEditor({
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveFileAsset: (file: string) => Promise<string | undefined>;
   files: FileEntry[];
+  onAddFile: () => void;
   readOnly?: boolean;
 }) {
   const [, render] = useState(0);
@@ -51,6 +53,7 @@ export function CanvasEditor({
         resolveAsset={resolveAsset}
         resolveFileAsset={resolveFileAsset}
         files={files}
+        onAddFile={onAddFile}
         readOnly={readOnly}
       />
     </div>

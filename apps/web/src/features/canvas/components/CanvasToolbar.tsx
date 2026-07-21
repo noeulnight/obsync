@@ -21,7 +21,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FileEntry } from "@/features/documents/lib/files";
 import type { CanvasNode, WebCanvas } from "../lib/sync";
 import { canvasColor } from "./CanvasNode";
 
@@ -97,46 +96,24 @@ export function CanvasNodeToolbar({
   );
 }
 
-export function CanvasAddToolbar({ session, files }: { session: WebCanvas; files: FileEntry[] }) {
+export function CanvasAddToolbar({
+  session,
+  onAddFile,
+}: {
+  session: WebCanvas;
+  onAddFile: () => void;
+}) {
   return (
     <div className="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 overflow-hidden rounded-md bg-popover p-1 shadow-md">
       <Button variant="ghost" size="icon" aria-label="Add card" onClick={() => session.addText()}>
         <SquarePen />
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Add document">
-            <FileText />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="center" className="max-h-72 overflow-y-auto">
-          {files
-            .filter((entry) => entry.kind === "markdown")
-            .map((entry) => (
-              <DropdownMenuItem key={entry.id} onSelect={() => session.addFile(entry.path)}>
-                <FileText />
-                {entry.path}
-              </DropdownMenuItem>
-            ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Add media">
-            <Image />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="center" className="max-h-72 overflow-y-auto">
-          {files
-            .filter((entry) => entry.kind === "attachment")
-            .map((entry) => (
-              <DropdownMenuItem key={entry.id} onSelect={() => session.addFile(entry.path)}>
-                <Image />
-                {entry.path}
-              </DropdownMenuItem>
-            ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button variant="ghost" size="icon" aria-label="Add document" onClick={onAddFile}>
+        <FileText />
+      </Button>
+      <Button variant="ghost" size="icon" aria-label="Add media" onClick={onAddFile}>
+        <Image />
+      </Button>
     </div>
   );
 }

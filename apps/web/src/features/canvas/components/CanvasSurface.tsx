@@ -26,6 +26,7 @@ export function CanvasSurface({
   resolveAsset,
   resolveFileAsset,
   files,
+  onAddFile,
   readOnly,
 }: {
   session: WebCanvas;
@@ -34,6 +35,7 @@ export function CanvasSurface({
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveFileAsset: (file: string) => Promise<string | undefined>;
   files: FileEntry[];
+  onAddFile: () => void;
   readOnly: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string>();
@@ -418,7 +420,7 @@ export function CanvasSurface({
         </div>
       </div>
 
-      {!readOnly && <CanvasAddToolbar session={session} files={files} />}
+      {!readOnly && <CanvasAddToolbar session={session} onAddFile={onAddFile} />}
       <CanvasViewToolbar
         session={session}
         readOnly={readOnly}

@@ -3,11 +3,16 @@ import { Input } from "@/components/ui/input";
 import { Editor } from "@/features/documents/components/Editor";
 import { renamedMarkdownPath, type FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
+import { BacklinksSheet } from "@/features/search/components/BacklinksSheet";
+import type { ApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/error";
 import { FileHeader } from "./FileHeader";
 
 export function DocumentEditor({
   entry,
+  api,
+  vaultId,
+  files,
   vaultName,
   session,
   onRename,
@@ -15,9 +20,13 @@ export function DocumentEditor({
   onDelete,
   onNavigate,
   resolveAsset,
+  onOpenDocument,
   readOnly = false,
 }: {
   entry: FileEntry;
+  api: ApiClient;
+  vaultId: string;
+  files: FileEntry[];
   vaultName: string;
   session: WebDocument;
   onRename: (path: string) => void;
@@ -25,6 +34,7 @@ export function DocumentEditor({
   onDelete: () => void;
   onNavigate: (href: string) => void;
   resolveAsset: (href: string) => Promise<string | undefined>;
+  onOpenDocument: (fileId: string) => void;
   readOnly?: boolean;
 }) {
   const original = basename(entry.path);
@@ -55,6 +65,14 @@ export function DocumentEditor({
         vaultName={vaultName}
         path={entry.path}
         title={title}
+        actions={
+          <BacklinksSheet
+            api={api}
+            vaultId={vaultId}
+            fileId={entry.id}
+            openDocument={onOpenDocument}
+          />
+        }
         onRename={readOnly ? undefined : onRequestRename}
         onDelete={readOnly ? undefined : onDelete}
       />
@@ -79,6 +97,7 @@ export function DocumentEditor({
         </div>
         <Editor
           session={session}
+          files={files}
           onNavigate={onNavigate}
           resolveAsset={resolveAsset}
           readOnly={readOnly}

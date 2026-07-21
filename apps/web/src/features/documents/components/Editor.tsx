@@ -1,3 +1,4 @@
+import { autocompletion, type CompletionSource } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -6,26 +7,31 @@ import { EditorView, keymap } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 import { yCollab } from "y-codemirror.next";
 import { livePreview } from "../lib/live-preview";
+import { markdownLinkOptions, type FileEntry } from "../lib/files";
 import type { WebDocument } from "../lib/sync";
 
 export function Editor({
   session,
   onNavigate,
   resolveAsset,
+  files = [],
   compact = false,
   readOnly = false,
 }: {
   session: WebDocument;
   onNavigate: (href: string) => void;
   resolveAsset: (href: string) => Promise<string | undefined>;
+  files?: FileEntry[];
   compact?: boolean;
   readOnly?: boolean;
 }) {
   const parent = useRef<HTMLDivElement>(null);
   const navigate = useRef(onNavigate);
   const asset = useRef(resolveAsset);
+  const vaultFiles = useRef(files);
   navigate.current = onNavigate;
   asset.current = resolveAsset;
+  vaultFiles.current = files;
 
   useEffect(() => {
     if (!parent.current) return;
@@ -37,6 +43,9 @@ export function Editor({
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           markdown(),
+          autocompletion({
+            override: [wikiLinkCompletion(() => vaultFiles.current)],
+          }),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
           EditorView.lineWrapping,
           EditorView.editable.of(!readOnly),
@@ -59,6 +68,23 @@ export function Editor({
   }, [session]);
 
   return <div ref={parent} className={compact ? "h-full" : undefined} />;
+}
+
+function wikiLinkCompletion(files: () => FileEntry[]): CompletionSource {
+  return (context) => {
+    const match = context.matchBefore(/\[\[[^\]\n]*/);
+    if (!match) return null;
+    return {
+      from: match.from + 2,
+      validFor: /^[^\]\n]*$/,
+      options: markdownLinkOptions(files()).map((option) => ({
+        label: option.label,
+        detail: option.detail,
+        apply: `${option.target}]]`,
+        type: "text",
+      })),
+    };
+  };
 }
 
 const editorTheme = EditorView.theme(

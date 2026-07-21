@@ -11,6 +11,7 @@
     "test": "vp test run"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "catalog:",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-markdown": "catalog:",
     "@codemirror/language": "catalog:",

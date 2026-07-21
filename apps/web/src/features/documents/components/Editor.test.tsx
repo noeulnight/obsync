@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { acceptCompletion, startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vite-plus/test";
 import * as Y from "yjs";
@@ -123,5 +124,39 @@ describe("Editor", () => {
     expect(rendered.container.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe(
       "false",
     );
+  });
+
+  it("completes wiki links with Vault documents", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "[[Be");
+    const rendered = render(
+      <Editor
+        session={connected}
+        files={[
+          {
+            id: "beta",
+            kind: "markdown",
+            path: "Notes/Beta.md",
+            deleted: false,
+            version: 1,
+          },
+        ]}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    expect(startCompletion(editor)).toBe(true);
+    await waitFor(() =>
+      expect(document.querySelector(".cm-completionLabel")?.textContent).toBe("Beta"),
+    );
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    expect(acceptCompletion(editor)).toBe(true);
+    await waitFor(() => expect(connected.text.toJSON()).toBe("[[Notes/Beta]]"));
   });
 });
