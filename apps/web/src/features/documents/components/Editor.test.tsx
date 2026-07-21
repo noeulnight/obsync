@@ -108,4 +108,20 @@ describe("Editor", () => {
     expect(release).toHaveBeenCalledOnce();
     expect(destroy).not.toHaveBeenCalled();
   });
+
+  it("disables editing while the workspace is offline", () => {
+    const { connected } = session();
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        readOnly
+      />,
+    );
+
+    expect(rendered.container.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe(
+      "false",
+    );
+  });
 });

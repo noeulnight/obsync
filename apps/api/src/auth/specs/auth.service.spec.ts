@@ -36,4 +36,30 @@ describe('AuthService', () => {
     expect(passwordHash).not.toBe('password123');
     await expect(verify(passwordHash, 'password123')).resolves.toBe(true);
   });
+
+  it('approves a device for the authenticated web user', async () => {
+    let update = '';
+    const updateMany = jest.fn((args: unknown) => {
+      update = JSON.stringify(args);
+      return Promise.resolve({ count: 1 });
+    });
+    const prisma = {
+      deviceAuthorization: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'authorization-id' }),
+        updateMany,
+      },
+    } as unknown as PrismaService;
+    const service = new AuthService(
+      prisma,
+      new JwtService(),
+      new ConfigService(),
+      { deleteObject: jest.fn() } as never,
+    );
+
+    await service.approveDeviceAuthorization('user-id', 'ABCD-EFGH');
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(update).toContain('"id":"authorization-id"');
+    expect(update).toContain('"userId":"user-id"');
+  });
 });

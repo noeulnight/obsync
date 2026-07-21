@@ -56,13 +56,14 @@ export function Workspace({
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
   const [status, setStatus] = useState("연결 중");
+  const [online, setOnline] = useState(false);
   const [notice, setNotice] = useState("");
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
   const [deleteTarget, setDeleteTarget] = useState<FileEntry>();
   const [createKind, setCreateKind] = useState<CreateEntryKind>();
   const uploadInput = useRef<HTMLInputElement>(null);
   const uploadAttachment = useUploadAttachment(api, vault.id);
-  const canWrite = vault.role !== "VIEWER";
+  const canWrite = vault.role !== "VIEWER" && online;
   const open = useCallback(
     (entry: FileEntry, replace = false) => {
       setNotice("");
@@ -76,7 +77,15 @@ export function Workspace({
 
   useEffect(() => {
     setEntries([]);
-    const next = new WebVault(vault.id, api, userName, setStatus, vault.role === "VIEWER");
+    setOnline(false);
+    const next = new WebVault(
+      vault.id,
+      api,
+      userName,
+      setStatus,
+      setOnline,
+      vault.role === "VIEWER",
+    );
     const unsubscribe = next.subscribe(() => setEntries(next.entries()));
     setSync(next);
     setActive("");
@@ -108,6 +117,7 @@ export function Workspace({
       : undefined;
 
   function rename(entry: FileEntry, name: string) {
+    if (!canWrite) return "오프라인에서는 편집할 수 없습니다.";
     const path =
       entry.kind === "markdown"
         ? renamedMarkdownPath(entry.path, name)
@@ -121,6 +131,7 @@ export function Workspace({
   }
 
   function create(path: string) {
+    if (!canWrite) return "오프라인에서는 편집할 수 없습니다.";
     if (!sync || !createKind) return "동기화 연결을 기다려주세요.";
     const requested = newEntryPath(createKind, path);
     if (!requested) return "이름을 입력하세요.";
@@ -134,6 +145,10 @@ export function Workspace({
 
   async function upload(files: FileList | null) {
     if (!sync || !files?.length) return;
+    if (!canWrite) {
+      setNotice("오프라인에서는 첨부파일을 업로드할 수 없습니다.");
+      return;
+    }
     if (!sync.readyForNewEntries()) {
       setNotice("최초 동기화가 끝난 뒤 다시 시도하세요.");
       return;
@@ -158,6 +173,10 @@ export function Workspace({
   }
 
   function remove(entry: FileEntry) {
+    if (!canWrite) {
+      setNotice("오프라인에서는 편집할 수 없습니다.");
+      return;
+    }
     sync?.delete(entry);
     if (active === entry.id) {
       setActive("");
@@ -285,7 +304,7 @@ export function Workspace({
           documentSession={documentSession}
           canvasSession={canvasSession}
           canWrite={canWrite}
-          onRenamePath={(path) => activeEntry && sync?.rename(activeEntry, path)}
+          onRenamePath={(path) => canWrite && activeEntry && sync?.rename(activeEntry, path)}
           onRename={() => activeEntry && setRenameTarget(activeEntry)}
           onDelete={() => activeEntry && setDeleteTarget(activeEntry)}
           onNavigate={navigate}

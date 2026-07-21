@@ -25,6 +25,14 @@ describe("App routes", () => {
     expect(html).toContain("기기 승인");
   });
 
+  it("uses the current web session to approve a device", () => {
+    const html = render("/device?user_code=ABCD-EFGH", true);
+
+    expect(html).toContain("me@example.com 계정으로 연결합니다.");
+    expect(html).toContain("이 기기 승인");
+    expect(html).not.toContain('type="password"');
+  });
+
   it("renders file actions in the tree and header", () => {
     const tree = renderToStaticMarkup(
       <TooltipProvider>
@@ -53,7 +61,7 @@ describe("App routes", () => {
   });
 });
 
-function render(path: string) {
+function render(path: string, session = false) {
   Object.defineProperty(globalThis, "location", {
     value: new URL(path, "http://localhost:5173"),
     configurable: true,
@@ -63,7 +71,15 @@ function render(path: string) {
     configurable: true,
   });
   const client = new QueryClient();
-  client.setQueryData(queryKeys.session, false);
+  client.setQueryData(queryKeys.session, session);
+  if (session) {
+    client.setQueryData(queryKeys.account, {
+      id: "user-id",
+      email: "me@example.com",
+      displayName: null,
+      createdAt: "2026-07-21T00:00:00.000Z",
+    });
+  }
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>

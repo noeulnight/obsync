@@ -114,16 +114,11 @@ export class ApiClient {
     this.setAccessToken(value);
   }
 
-  async approveDevice(
-    userCode: string,
-    email: string,
-    password: string,
-    action: "login" | "register",
-  ) {
-    await this.publicRequest({
+  async approveDevice(userCode: string) {
+    await this.request({
       url: "/api/auth/device/approve",
       method: "POST",
-      data: { userCode, email, password, action },
+      data: { userCode },
     });
   }
 

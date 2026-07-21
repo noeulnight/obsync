@@ -170,6 +170,7 @@ export default class ObsyncPlugin extends Plugin {
       this.settings.vaultName = "";
       this.settings.vaultRole = "";
       this.settings.userName = "";
+      this.settings.initializedVaultIds = [];
       this.account = undefined;
       this.vaults = [];
       await this.saveData(this.settings);
@@ -304,7 +305,9 @@ export default class ObsyncPlugin extends Plugin {
     const view = editor.cm;
     if (!this.sync || !file || !view) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.extension(file, current, changed);
+    const binding = this.sync.extension(file, current, changed, (key) =>
+      this.editorDetached(view, key),
+    );
     this.applyEditorBinding(view, current, binding);
   }
 
@@ -314,8 +317,18 @@ export default class ObsyncPlugin extends Plugin {
     const canvasFile = info.node?.canvas?.view?.file;
     if (!this.sync || !view || !nodeId || !canvasFile) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.canvasTextExtension(canvasFile, nodeId, current, changed);
+    const binding = this.sync.canvasTextExtension(canvasFile, nodeId, current, changed, (key) =>
+      this.editorDetached(view, key),
+    );
     this.applyEditorBinding(view, current, binding);
+  }
+
+  private editorDetached(view: EditorView, key: string) {
+    if (this.boundEditors.get(view) !== key) return;
+    this.boundEditors.delete(view);
+    window.setTimeout(() => {
+      if (this.editorViews.has(view)) this.bindEditorView(view);
+    }, 0);
   }
 
   private applyEditorBinding(view: EditorView, current: string, binding: EditorBinding) {

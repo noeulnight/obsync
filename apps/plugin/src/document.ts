@@ -16,7 +16,6 @@ export class DocumentSync {
   private persistenceSynced = false;
   private providerSynced = false;
   private openEditors = 0;
-  private pendingEditorText?: string;
   private readonly readOnly: boolean;
 
   constructor(
@@ -90,11 +89,7 @@ export class DocumentSync {
   }
 
   editorChanged(content: string) {
-    if (this.destroyed || this.readOnly) return;
-    if (!this.initialized) {
-      this.pendingEditorText = content;
-      return;
-    }
+    if (this.destroyed || this.readOnly || !this.initialized) return;
     replaceText(this.text, content);
   }
 
@@ -143,10 +138,7 @@ export class DocumentSync {
   private async initialize() {
     if (this.destroyed || this.initialized || !this.persistenceSynced) return;
     if (this.seedMode !== "merge" && !this.providerSynced) return;
-    if (!this.readOnly && this.pendingEditorText !== undefined) {
-      replaceText(this.text, this.pendingEditorText);
-      this.pendingEditorText = undefined;
-    } else if (this.seedMode !== "server") await this.localChanged();
+    if (this.seedMode !== "server") await this.localChanged();
     this.initialized = true;
     this.onReady();
     await this.writeFile();

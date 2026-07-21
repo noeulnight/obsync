@@ -54,13 +54,12 @@ export class AuthController {
 
   @Post('device/approve')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async approveDevice(@Body() body: DeviceApprovalDto) {
-    await this.auth.approveDeviceAuthorization(
-      body.email,
-      body.password,
-      body.userCode,
-      body.action,
-    );
+  @UseGuards(JwtAuthGuard)
+  async approveDevice(
+    @Body() body: DeviceApprovalDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.auth.approveDeviceAuthorization(request.user.id, body.userCode);
   }
 
   @Post('device/token')

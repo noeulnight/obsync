@@ -162,6 +162,11 @@ describe('Authentication (e2e)', () => {
   });
 
   it('authorizes an Obsidian device without exposing tokens in the browser', async () => {
+    const webLogin = await request(app.getHttpServer())
+      .post('/api/auth/web/login')
+      .send({ email, password: 'password123' })
+      .expect(200);
+    const webAccessToken = parseWebAccess(webLogin.text).accessToken;
     const started = await request(app.getHttpServer())
       .post('/api/auth/device/code')
       .send({})
@@ -181,12 +186,8 @@ describe('Authentication (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/api/auth/device/approve')
-      .send({
-        action: 'login',
-        email,
-        password: 'password123',
-        userCode: authorization.userCode,
-      })
+      .set('authorization', `Bearer ${webAccessToken}`)
+      .send({ userCode: authorization.userCode })
       .expect(204)
       .expect((response) => {
         expect(response.text).not.toContain('accessToken');

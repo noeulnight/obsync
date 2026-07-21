@@ -37,7 +37,6 @@ export function useSession() {
 
 export function useApproveDevice(userCode: string) {
   return useMutation({
-    mutationFn: ({ email, password, action }: Credentials) =>
-      api.approveDevice(userCode, email, password, action),
+    mutationFn: () => api.approveDevice(userCode),
   });
 }

@@ -39,6 +39,7 @@ export class WebVault {
     private readonly api: ApiClient,
     private readonly userName: string,
     private readonly setStatus: (status: string) => void,
+    private readonly setOnline: (online: boolean) => void,
     private readonly readOnly = false,
   ) {
     this.cachePersistence = new IndexeddbPersistence(
@@ -60,6 +61,7 @@ export class WebVault {
       maxDelay: 5_000,
       maxAttempts: 0,
       onStatus: ({ status }) => {
+        if (status !== "connected") this.setOnline(false);
         if (status === "disconnected") {
           this.manifestSynced = false;
           this.outbox.setConnected(false);
@@ -105,9 +107,13 @@ export class WebVault {
         });
         this.notify();
         setStatus("동기화됨");
+        this.setOnline(true);
         this.outbox.setConnected(true);
       },
-      onAuthenticationFailed: () => setStatus("인증 실패"),
+      onAuthenticationFailed: () => {
+        this.setOnline(false);
+        setStatus("인증 실패");
+      },
     });
     this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", { name: userName });

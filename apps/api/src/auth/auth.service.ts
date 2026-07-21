@@ -86,10 +86,8 @@ export class AuthService {
   }
 
   async approveDeviceAuthorization(
-    email: string,
-    password: string,
+    userId: string,
     userCode: string,
-    action: 'login' | 'register',
   ): Promise<void> {
     const authorization = await this.prisma.deviceAuthorization.findFirst({
       where: {
@@ -103,13 +101,9 @@ export class AuthService {
     if (!authorization)
       throw new BadRequestException('Device code is invalid or expired');
 
-    const user =
-      action === 'register'
-        ? await this.register(email, password)
-        : await this.authenticate(email, password);
     const approved = await this.prisma.deviceAuthorization.updateMany({
       where: { id: authorization.id, userId: null, consumedAt: null },
-      data: { userId: user.id, approvedAt: new Date() },
+      data: { userId, approvedAt: new Date() },
     });
     if (approved.count !== 1)
       throw new BadRequestException('Device code is unavailable');

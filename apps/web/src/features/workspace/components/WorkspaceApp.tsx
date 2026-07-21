@@ -83,6 +83,9 @@ export function WorkspaceApp() {
             </CardHeader>
             <CardContent className="grid gap-3">
               <Button onClick={() => setSettings("vaults")}>첫 Vault 만들기</Button>
+              <Button variant="outline" onClick={() => setSettings("members")}>
+                받은 초대 확인
+              </Button>
               <Button variant="ghost" onClick={() => void signOut()}>
                 로그아웃
               </Button>

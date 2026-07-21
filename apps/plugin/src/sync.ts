@@ -139,6 +139,7 @@ export class VaultSync {
     file: TFile,
     editorText: string,
     changed = false,
+    onDetached?: (key: string) => void,
   ): { key?: string; extension: Extension; text: string; ready: boolean } {
     const existing = this.files.findPath(file.path);
     if (!existing && !this.manifestLoaded) {
@@ -151,7 +152,7 @@ export class VaultSync {
           ? undefined
           : this.files.ensureMarkdown(file.path);
     if (!entry) return { extension: [], text: editorText, ready: false };
-    return this.sessions.extension(entry, editorText, changed);
+    return this.sessions.extension(entry, editorText, changed, onDetached);
   }
 
   listFiles() {
@@ -166,12 +167,18 @@ export class VaultSync {
     this.sessions.refreshCanvases();
   }
 
-  canvasTextExtension(canvasFile: TFile, nodeId: string, editorText: string, changed = false) {
+  canvasTextExtension(
+    canvasFile: TFile,
+    nodeId: string,
+    editorText: string,
+    changed = false,
+    onDetached?: (key: string) => void,
+  ) {
     const entry = this.files.findPath(canvasFile.path);
     if (entry?.kind !== "canvas" || entry.deleted) {
       return { extension: [] as Extension, text: editorText, ready: false };
     }
-    return this.sessions.canvasTextExtension(entry, nodeId, editorText, changed);
+    return this.sessions.canvasTextExtension(entry, nodeId, editorText, changed, onDetached);
   }
 
   async created(file: TAbstractFile) {
