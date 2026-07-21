@@ -88,7 +88,7 @@ export function DocumentEditor({
       <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="mx-auto w-[min(700px,calc(100%_-_64px))] pt-8">
           <Input
-            className="mb-4 h-auto rounded-none border-0 bg-transparent px-0 py-0 !text-[2rem] !leading-[1.2] font-bold tracking-[-0.015em] shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+            className="mb-4 h-auto rounded-none border-0 bg-transparent px-0 py-0 !text-[2rem] !leading-[1.2] font-semibold tracking-[-0.015em] shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
             aria-label="Document title"
             value={title}
             readOnly={readOnly}

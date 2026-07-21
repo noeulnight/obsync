@@ -26,7 +26,7 @@ export function FileHeader({
   const name = title ?? displayName(path);
   const parts = [vaultName, ...path.split("/").slice(0, -1), name];
   return (
-    <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3">
+    <header className="grid h-10 shrink-0 grid-cols-[1fr_auto] items-center px-3">
       <nav className="min-w-0 justify-self-start" aria-label="Document path">
         <ol className="flex min-w-0 items-center gap-1 text-[13px] text-muted-foreground">
           {parts.map((part, index) => (
@@ -42,7 +42,6 @@ export function FileHeader({
           ))}
         </ol>
       </nav>
-      <div className="max-w-[40vw] truncate text-[13px] text-foreground">{name}</div>
       {(actions || (onRename && onDelete)) && (
         <div className="flex items-center justify-self-end gap-1">
           {actions}

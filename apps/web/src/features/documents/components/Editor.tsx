@@ -115,25 +115,29 @@ const editorTheme = EditorView.theme(
     ".cm-live-heading-1": {
       fontSize: "2em",
       lineHeight: "1.3",
-      fontWeight: "750",
+      fontWeight: "700",
       paddingTop: "0.7em !important",
     },
     ".cm-live-heading-2": {
       fontSize: "1.6em",
       lineHeight: "1.35",
-      fontWeight: "720",
+      fontWeight: "600",
       paddingTop: "0.6em !important",
     },
     ".cm-live-heading-3": {
       fontSize: "1.3em",
-      fontWeight: "700",
+      fontWeight: "600",
       paddingTop: "0.45em !important",
     },
     ".cm-live-heading-4, .cm-live-heading-5, .cm-live-heading-6": {
-      fontWeight: "700",
+      fontWeight: "600",
       paddingTop: "0.3em !important",
     },
-    ".cm-live-strong": { fontWeight: "750" },
+    ".cm-live-heading-1 *, .cm-live-heading-2 *, .cm-live-heading-3 *, .cm-live-heading-4 *, .cm-live-heading-5 *, .cm-live-heading-6 *":
+      {
+        textDecoration: "none",
+      },
+    ".cm-live-strong": { fontWeight: "700" },
     ".cm-live-em": { fontStyle: "italic" },
     ".cm-live-strike": { textDecoration: "line-through", color: "var(--muted-foreground)" },
     ".cm-live-link, .cm-live-embed": {
