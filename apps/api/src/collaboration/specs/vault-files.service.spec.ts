@@ -16,6 +16,7 @@ import {
   type FileOperationDto,
 } from '../dto/file-operation.dto';
 import { VaultFilesService } from '../vault-files.service';
+import { VaultLinksService } from '../vault-links.service';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const vaultId = '22222222-2222-4222-8222-222222222222';
@@ -91,6 +92,9 @@ describe('VaultFilesService', () => {
       version: 5,
     });
     const transaction = transactionMock();
+    transaction.vaultFileVersion.findFirst
+      .mockResolvedValueOnce({ version: 2 })
+      .mockResolvedValueOnce({ version: 4 });
     transaction.vaultFile.findFirst
       .mockResolvedValueOnce(root)
       .mockResolvedValueOnce(null);
@@ -155,6 +159,9 @@ describe('VaultFilesService', () => {
       activePathKey: null,
     });
     const transaction = transactionMock();
+    transaction.vaultFileVersion.findFirst
+      .mockResolvedValueOnce({ version: 1 })
+      .mockResolvedValueOnce({ version: 3 });
     transaction.vaultFile.findFirst.mockResolvedValue(root);
     transaction.vaultFile.findMany.mockResolvedValue([root, child]);
     const updates: Prisma.VaultFileUpdateArgs[] = [];
@@ -203,6 +210,7 @@ describe('VaultFilesService', () => {
       size: attachment.size,
     });
     const transaction = transactionMock();
+    transaction.vaultFileVersion.findFirst.mockResolvedValue({ version: 2 });
     transaction.vaultFile.findFirst.mockResolvedValue(current);
     transaction.attachment.findFirst.mockResolvedValue(attachment);
     let updatedWith: Prisma.VaultFileUpdateArgs | undefined;
@@ -272,14 +280,62 @@ describe('VaultFilesService', () => {
     expect(publishFiles).toHaveBeenCalledWith(vaultId, [root, child]);
   });
 
+  it('returns decoded content for a version in the requested Vault', async () => {
+    const transaction = transactionMock();
+    const { service, prisma } = setup(transaction);
+    const state = documentRecord(fileId, 'Earlier content').state;
+    prisma.vaultFileVersion.findFirst.mockResolvedValue({
+      id: operationId,
+      version: 2,
+      path: 'Note.md',
+      deletedAt: null,
+      createdAt: new Date('2026-07-21T10:00:00.000Z'),
+      state,
+      createdBy: null,
+    });
+
+    await expect(
+      service.version(userId, vaultId, fileId, operationId),
+    ).resolves.toMatchObject({ content: 'Earlier content', state: undefined });
+    expect(prisma.vaultFileVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: operationId, fileId, file: { vaultId } },
+      }),
+    );
+  });
+
+  it('restores a saved Markdown state through the collaboration document', async () => {
+    const transaction = transactionMock();
+    const { service, prisma, restoreDocument, requireWrite } =
+      setup(transaction);
+    const state = documentRecord(fileId, 'Earlier content').state;
+    prisma.vaultFileVersion.findFirst.mockResolvedValue({ state });
+
+    await expect(
+      service.restoreVersion(userId, vaultId, fileId, operationId),
+    ).resolves.toEqual({ restored: true });
+    expect(requireWrite).toHaveBeenCalledWith(userId, vaultId);
+    expect(restoreDocument).toHaveBeenCalledWith(
+      vaultId,
+      fileId,
+      state,
+      userId,
+    );
+  });
+
   it('searches document text and resolves wiki backlinks', async () => {
     const project = file({ path: 'Projects/Roadmap.md' });
     const daily = file({ id: childId, path: 'Daily/Today.md' });
-    const { service, prisma, requireRead } = setup(transactionMock());
+    const { service, prisma, requireRead, backlinks } =
+      setup(transactionMock());
     prisma.vaultFile.findMany.mockResolvedValue([daily, project]);
+    prisma.vaultFile.findFirst.mockResolvedValue({ path: project.path });
     prisma.yDocument.findMany.mockResolvedValue([
       documentRecord(project.id, '# Roadmap\nAlpha release'),
       documentRecord(daily.id, 'Continue [[Roadmap]] after the alpha review.'),
+    ]);
+    backlinks.mockResolvedValue([
+      { source: { id: daily.id, path: daily.path } },
     ]);
 
     await expect(service.search(userId, vaultId, 'alpha')).resolves.toEqual([
@@ -392,6 +448,15 @@ function transactionMock() {
           ) => Promise<VaultFileOperation>
         >(),
     },
+    vaultFileVersion: {
+      findFirst: jest
+        .fn<
+          (
+            input: Prisma.VaultFileVersionFindFirstArgs,
+          ) => Promise<{ version: number } | null>
+        >()
+        .mockResolvedValue(null),
+    },
     attachment: {
       findFirst:
         jest.fn<
@@ -416,7 +481,8 @@ function setup(
     vaultFileOperation: {
       findUnique: jest.fn().mockResolvedValue(completed),
     },
-    vaultFile: { findMany: jest.fn() },
+    vaultFile: { findMany: jest.fn(), findFirst: jest.fn() },
+    vaultFileVersion: { findMany: jest.fn(), findFirst: jest.fn() },
     yDocument: { findMany: jest.fn() },
     $transaction: jest.fn(
       (callback: (client: Prisma.TransactionClient) => Promise<VaultFile[]>) =>
@@ -426,12 +492,31 @@ function setup(
   const requireRead = jest.fn().mockResolvedValue(undefined);
   const requireWrite = jest.fn().mockResolvedValue(undefined);
   const publishFiles = jest.fn().mockResolvedValue(undefined);
+  const restoreDocument = jest.fn().mockResolvedValue(undefined);
+  const refreshTargets = jest.fn().mockResolvedValue(undefined);
+  const backlinks = jest.fn().mockResolvedValue([]);
+  const graph = jest.fn().mockResolvedValue({ nodes: [], edges: [] });
   const service = new VaultFilesService(
     prisma as unknown as PrismaService,
     { requireRead, requireWrite } as unknown as VaultAccessService,
-    { publishFiles } as unknown as CollaborationServerService,
+    { publishFiles, restoreDocument } as unknown as CollaborationServerService,
+    {
+      refreshTargets,
+      backlinks,
+      graph,
+    } as unknown as VaultLinksService,
   );
-  return { service, prisma, publishFiles, requireRead };
+  return {
+    service,
+    prisma,
+    publishFiles,
+    restoreDocument,
+    refreshTargets,
+    backlinks,
+    graph,
+    requireRead,
+    requireWrite,
+  };
 }
 
 function documentRecord(id: string, content: string) {

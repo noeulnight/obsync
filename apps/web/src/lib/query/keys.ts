@@ -9,6 +9,11 @@ export const queryKeys = {
   vaultSearch: (vaultId: string, query: string) => ["vaults", vaultId, "search", query] as const,
   backlinks: (vaultId: string, fileId: string) =>
     ["vaults", vaultId, "files", fileId, "backlinks"] as const,
+  vaultGraph: (vaultId: string) => ["vaults", vaultId, "graph"] as const,
+  fileVersions: (vaultId: string, fileId: string) =>
+    ["vaults", vaultId, "files", fileId, "versions"] as const,
+  fileVersion: (vaultId: string, fileId: string, versionId: string) =>
+    ["vaults", vaultId, "files", fileId, "versions", versionId] as const,
   attachment: (vaultId: string, attachmentId: string) =>
     ["attachments", vaultId, attachmentId] as const,
 };

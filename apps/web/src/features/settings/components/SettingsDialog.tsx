@@ -75,33 +75,36 @@ export function SettingsDialog({
         <div className="grid min-h-0 grid-cols-[180px_minmax(0,1fr)] sm:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col bg-muted/40 px-2 py-4">
             <div className="px-2 pb-3 text-sm font-semibold">Settings</div>
-            <SettingsButton
-              active={section === "account"}
-              icon={<UserRound />}
-              onClick={() => onSectionChange("account")}
-            >
-              My account
-            </SettingsButton>
-            <SettingsButton
-              active={section === "vaults"}
-              icon={<Database />}
-              onClick={() => onSectionChange("vaults")}
-            >
-              Vault
-            </SettingsButton>
-            <SettingsButton
-              active={section === "members"}
-              icon={<Users />}
-              onClick={() => onSectionChange("members")}
-            >
-              Members
-            </SettingsButton>
-            <div className="mt-auto">
-              <Separator className="mb-2" />
-              <SettingsButton icon={<LogOut />} onClick={onLogout}>
-                Sign out
+            {section === "account" ? (
+              <SettingsButton active icon={<UserRound />} onClick={() => undefined}>
+                My account
               </SettingsButton>
-            </div>
+            ) : (
+              <>
+                <SettingsButton
+                  active={section === "vaults"}
+                  icon={<Database />}
+                  onClick={() => onSectionChange("vaults")}
+                >
+                  Vault
+                </SettingsButton>
+                <SettingsButton
+                  active={section === "members"}
+                  icon={<Users />}
+                  onClick={() => onSectionChange("members")}
+                >
+                  Members
+                </SettingsButton>
+              </>
+            )}
+            {section === "account" && (
+              <div className="mt-auto">
+                <Separator className="mb-2" />
+                <SettingsButton icon={<LogOut />} onClick={onLogout}>
+                  Sign out
+                </SettingsButton>
+              </div>
+            )}
           </aside>
 
           <main className="min-h-0 overflow-y-auto px-6 py-8 sm:px-10">

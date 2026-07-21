@@ -4,6 +4,7 @@ import type { WebCanvas } from "@/features/canvas/lib/sync";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
 import type { ApiClient } from "@/lib/api/client";
+import { VaultGraphView } from "@/features/graph/components/VaultGraphView";
 import { AttachmentPreview } from "./AttachmentPreview";
 
 const DocumentEditor = lazy(() =>
@@ -26,6 +27,7 @@ export function WorkspaceContent({
   documentSession,
   canvasSession,
   canWrite,
+  graph,
   onRenamePath,
   onRename,
   onDelete,
@@ -48,6 +50,7 @@ export function WorkspaceContent({
   documentSession?: WebDocument;
   canvasSession?: WebCanvas;
   canWrite: boolean;
+  graph: boolean;
   onRenamePath: (path: string) => void;
   onRename: () => void;
   onDelete: () => void;
@@ -63,7 +66,15 @@ export function WorkspaceContent({
   return (
     <SidebarInset className="h-svh min-w-0 overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden">
-        {notice ? (
+        {graph ? (
+          <VaultGraphView
+            api={api}
+            vaultId={vaultId}
+            vaultName={vaultName}
+            entries={entries}
+            open={onOpenEntry}
+          />
+        ) : notice ? (
           <EmptyState>{notice}</EmptyState>
         ) : documentSession && activeEntry ? (
           <Suspense fallback={<EditorLoading />}>

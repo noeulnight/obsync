@@ -15,6 +15,8 @@ import {
   FileOperationType,
 } from './dto/file-operation.dto';
 import { CollaborationServerService } from './collaboration-server.service';
+import { nextFileRevision } from './vault-file-version';
+import { VaultLinksService } from './vault-links.service';
 
 @Injectable()
 export class VaultFilesService {
@@ -22,6 +24,7 @@ export class VaultFilesService {
     private readonly prisma: PrismaService,
     private readonly access: VaultAccessService,
     private readonly collaboration: CollaborationServerService,
+    private readonly links: VaultLinksService,
   ) {}
 
   async list(userId: string, vaultId: string) {
@@ -67,22 +70,28 @@ export class VaultFilesService {
 
   async backlinks(userId: string, vaultId: string, fileId: string) {
     await this.access.requireRead(userId, vaultId);
-    const documents = await this.markdownDocuments(vaultId);
-    const target = documents.find((document) => document.id === fileId);
+    const target = await this.prisma.vaultFile.findFirst({
+      where: { id: fileId, vaultId, kind: 'MARKDOWN', deletedAt: null },
+      select: { path: true },
+    });
     if (!target) throw new NotFoundException('File not found');
-    return documents
-      .filter(
-        (document) =>
-          document.id !== fileId &&
-          markdownLinks(document.content).some((link) =>
-            resolvesMarkdownLink(document.path, link, target.path),
-          ),
-      )
-      .map((document) => ({
-        id: document.id,
-        path: document.path,
-        excerpt: linkExcerpt(document.content, target.path),
-      }));
+    const sources = (await this.links.backlinks(vaultId, fileId)).map(
+      (link) => link.source,
+    );
+    const documents = await this.markdownDocuments(
+      vaultId,
+      sources.map((source) => source.id),
+    );
+    const byId = new Map(documents.map((document) => [document.id, document]));
+    return sources.map((source) => ({
+      ...source,
+      excerpt: linkExcerpt(byId.get(source.id)?.content ?? '', target.path),
+    }));
+  }
+
+  async graph(userId: string, vaultId: string) {
+    await this.access.requireRead(userId, vaultId);
+    return this.links.graph(vaultId);
   }
 
   async apply(userId: string, vaultId: string, input: FileOperationDto) {
@@ -107,6 +116,7 @@ export class VaultFilesService {
             })
           : [completed.file];
       await this.collaboration.publishFiles(vaultId, files);
+      await this.links.refreshTargets(vaultId);
       return { files: files.map(fileResponse) };
     }
 
@@ -117,6 +127,7 @@ export class VaultFilesService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
       await this.collaboration.publishFiles(vaultId, files);
+      await this.links.refreshTargets(vaultId);
       return { files: files.map(fileResponse) };
     } catch (error) {
       if (
@@ -136,7 +147,7 @@ export class VaultFilesService {
       select: { id: true },
     });
     if (!file) throw new NotFoundException('File not found');
-    return this.prisma.vaultFileVersion.findMany({
+    const versions = await this.prisma.vaultFileVersion.findMany({
       where: { fileId },
       select: {
         id: true,
@@ -144,11 +155,69 @@ export class VaultFilesService {
         path: true,
         deletedAt: true,
         attachmentId: true,
+        state: true,
         createdAt: true,
         createdBy: { select: { id: true, displayName: true, email: true } },
       },
       orderBy: { version: 'desc' },
     });
+    return versions.map(({ state, ...version }) => ({
+      ...version,
+      hasContent: state !== null,
+    }));
+  }
+
+  async version(
+    userId: string,
+    vaultId: string,
+    fileId: string,
+    versionId: string,
+  ) {
+    await this.access.requireRead(userId, vaultId);
+    const version = await this.prisma.vaultFileVersion.findFirst({
+      where: { id: versionId, fileId, file: { vaultId } },
+      select: {
+        id: true,
+        version: true,
+        path: true,
+        deletedAt: true,
+        createdAt: true,
+        state: true,
+        createdBy: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+    return {
+      ...version,
+      state: undefined,
+      content: documentContent(version.state),
+    };
+  }
+
+  async restoreVersion(
+    userId: string,
+    vaultId: string,
+    fileId: string,
+    versionId: string,
+  ) {
+    await this.access.requireWrite(userId, vaultId);
+    const version = await this.prisma.vaultFileVersion.findFirst({
+      where: {
+        id: versionId,
+        fileId,
+        state: { not: null },
+        file: { vaultId, kind: 'MARKDOWN', deletedAt: null },
+      },
+      select: { state: true },
+    });
+    if (!version?.state) throw new NotFoundException('Version not found');
+    await this.collaboration.restoreDocument(
+      vaultId,
+      fileId,
+      version.state,
+      userId,
+    );
+    return { restored: true };
   }
 
   private async applyTransaction(
@@ -402,11 +471,16 @@ export class VaultFilesService {
     return attachment;
   }
 
-  private async markdownDocuments(vaultId: string) {
+  private async markdownDocuments(vaultId: string, ids?: string[]) {
     // ponytail: A linear scan is enough for personal Vaults. Add a persisted
     // search index only after measured latency shows this path is too slow.
     const files = await this.prisma.vaultFile.findMany({
-      where: { vaultId, kind: 'MARKDOWN', deletedAt: null },
+      where: {
+        vaultId,
+        kind: 'MARKDOWN',
+        deletedAt: null,
+        ...(ids ? { id: { in: ids } } : {}),
+      },
       select: { id: true, path: true },
       orderBy: { path: 'asc' },
     });
@@ -447,56 +521,6 @@ function excerpt(content: string, index: number, length: number) {
   return `${start ? '…' : ''}${compact.slice(start, end)}${end < compact.length ? '…' : ''}`;
 }
 
-function markdownLinks(content: string) {
-  return [
-    ...[...content.matchAll(/!?\[\[([^\]]+)\]\]/g)].map((match) => match[1]),
-    ...[...content.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)].map(
-      (match) => match[1],
-    ),
-  ];
-}
-
-function resolvesMarkdownLink(
-  sourcePath: string,
-  href: string,
-  targetPath: string,
-) {
-  const raw = decodeLink(href).split('|')[0].split('#')[0].trim();
-  if (!raw || /^[a-z][a-z\d+.-]*:/i.test(raw)) return false;
-  const target = normalizedMarkdownPath(targetPath.split('/'));
-  const folder = sourcePath.split('/').slice(0, -1);
-  const link = raw.replace(/^\/+/, '');
-  const candidates = link.startsWith('.')
-    ? [normalizedMarkdownPath([...folder, ...link.split('/')])]
-    : [
-        normalizedMarkdownPath(link.split('/')),
-        normalizedMarkdownPath([...folder, ...link.split('/')]),
-      ];
-  return (
-    candidates.includes(target) ||
-    (!link.includes('/') &&
-      target.split('/').at(-1) === normalizedMarkdownPath([link]))
-  );
-}
-
-function normalizedMarkdownPath(parts: string[]) {
-  const path: string[] = [];
-  for (const part of parts) {
-    if (!part || part === '.') continue;
-    if (part === '..') path.pop();
-    else path.push(part);
-  }
-  return path.join('/').replace(/\.md$/i, '').normalize('NFC').toLowerCase();
-}
-
-function decodeLink(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
 function linkExcerpt(content: string, targetPath: string) {
   const target =
     targetPath.split('/').at(-1)?.replace(/\.md$/i, '') ?? targetPath;
@@ -529,14 +553,27 @@ async function versionSnapshot(
     attachmentId?: string | null;
   },
 ) {
+  const state = await documentState(
+    transaction,
+    vaultId,
+    file.fileId,
+    file.kind,
+  );
   return {
-    version: file.version,
+    version: await nextFileRevision(transaction, file.fileId),
     path: file.path,
-    deletedAt: file.deletedAt,
     attachmentId: file.attachmentId,
     createdById: userId,
-    state: await documentState(transaction, vaultId, file.fileId, file.kind),
+    ...(file.deletedAt ? { deletedAt: file.deletedAt } : {}),
+    ...(state ? { state } : {}),
   };
+}
+
+function documentContent(state: Uint8Array | null) {
+  if (!state) return '';
+  const document = new Y.Doc();
+  Y.applyUpdate(document, state);
+  return document.getText('content').toJSON();
 }
 
 async function documentState(

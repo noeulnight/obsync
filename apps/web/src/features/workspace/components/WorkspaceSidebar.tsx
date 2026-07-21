@@ -3,6 +3,7 @@ import {
   FilePlus2,
   FolderPlus,
   LayoutDashboard,
+  Network,
   LogOut,
   Plus,
   Settings2,
@@ -10,6 +11,7 @@ import {
   Upload,
 } from "lucide-react";
 import type { RefObject } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -47,36 +49,38 @@ export function WorkspaceSidebar({
   vaults,
   entries,
   active,
-  status,
   canWrite,
   uploadInput,
   onSelectVault,
   onCreateVault,
   onSearch,
+  graph,
   onOpen,
   onRename,
   onDelete,
   onCreateEntry,
   onUpload,
   onSettings,
+  onVaultSettings,
   onLogout,
 }: {
   vault: Vault;
   vaults: Vault[];
   entries: FileEntry[];
   active: string;
-  status: string;
   canWrite: boolean;
   uploadInput: RefObject<HTMLInputElement | null>;
   onSelectVault: (id: string) => void;
   onCreateVault: () => void;
   onSearch: () => void;
+  graph: boolean;
   onOpen: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   onCreateEntry: (kind: CreateEntryKind) => void;
   onUpload: (files: FileList | null) => void;
   onSettings: () => void;
+  onVaultSettings: () => void;
   onLogout: () => void;
 }) {
   return (
@@ -104,6 +108,9 @@ export function WorkspaceSidebar({
           <Button variant="ghost" size="icon" aria-label="New Vault" onClick={onCreateVault}>
             <Plus />
           </Button>
+          <Button variant="ghost" size="icon" aria-label="Vault settings" onClick={onVaultSettings}>
+            <Settings2 />
+          </Button>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -115,6 +122,14 @@ export function WorkspaceSidebar({
                   <Search />
                   <span>Search</span>
                   <kbd className="ml-auto text-[10px] text-muted-foreground">⌘⇧F</kbd>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Graph" isActive={graph}>
+                  <Link to={`/vaults/${vault.id}/graph`}>
+                    <Network />
+                    <span>Graph</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -180,11 +195,6 @@ export function WorkspaceSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t">
-        <div className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          <span className={status === "Synced" ? "text-emerald-500" : undefined}>
-            ● {vault.role === "VIEWER" ? "Read only" : status}
-          </span>
-        </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -201,7 +211,7 @@ export function WorkspaceSidebar({
               >
                 <DropdownMenuItem onSelect={onSettings}>
                   <Settings2 />
-                  Settings
+                  Account settings
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onLogout}>
                   <LogOut />

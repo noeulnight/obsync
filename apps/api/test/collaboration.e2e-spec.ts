@@ -136,9 +136,9 @@ describe('Collaboration WebSocket (e2e)', () => {
     });
   }
 
-  async function waitFor(check: () => boolean) {
+  async function waitFor(check: () => boolean | Promise<boolean>) {
     const deadline = Date.now() + 3000;
-    while (!check()) {
+    while (!(await check())) {
       if (Date.now() >= deadline) throw new Error('update timeout');
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
@@ -178,6 +178,90 @@ describe('Collaboration WebSocket (e2e)', () => {
     [manifestA, manifestB, contentA, contentB, canvas].forEach((document) =>
       document.destroy(),
     );
+  });
+
+  it('saves and restores document history through the live collaboration room', async () => {
+    const fileId = '98bf1227-8707-4a13-921f-bf7258084893';
+    const room = `vault:${vaultId}:doc:${fileId}`;
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    await request(app.getHttpServer())
+      .post(`/api/vaults/${vaultId}/files/operations`)
+      .set(headers)
+      .send({
+        operationId: crypto.randomUUID(),
+        fileId,
+        type: 'create',
+        kind: 'markdown',
+        path: 'History.md',
+      })
+      .expect(201);
+
+    const first = new Y.Doc();
+    const firstClient = provider(room, first);
+    await waitForSync(firstClient);
+    first.getText('content').insert(0, 'Earlier content');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    firstClient.destroy();
+    first.destroy();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const current = new Y.Doc();
+    const currentClient = provider(room, current);
+    await waitForSync(currentClient);
+    const textValue = current.getText('content');
+    textValue.delete(0, textValue.length);
+    textValue.insert(0, 'Current content');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const versions = await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/${fileId}/versions`)
+      .set(headers)
+      .expect(200);
+    const versionList = versions.body as Array<{
+      id: string;
+      hasContent: boolean;
+    }>;
+    const earlier = versionList.find(
+      (version: { hasContent: boolean }) => version.hasContent,
+    );
+    expect(earlier).toBeDefined();
+    const preview = await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/${fileId}/versions/${earlier?.id}`)
+      .set(headers)
+      .expect(200);
+    expect((preview.body as { content: string }).content).toBe(
+      'Earlier content',
+    );
+
+    await request(app.getHttpServer())
+      .post(
+        `/api/vaults/${vaultId}/files/${fileId}/versions/${earlier?.id}/restore`,
+      )
+      .set(headers)
+      .expect(201);
+    await waitFor(() => text(current) === 'Earlier content');
+
+    const savedCurrent = await prisma.vaultFileVersion.findFirst({
+      where: { fileId },
+      orderBy: { version: 'desc' },
+      select: { state: true },
+    });
+    const saved = new Y.Doc();
+    Y.applyUpdate(saved, savedCurrent?.state ?? new Uint8Array());
+    expect(text(saved)).toBe('Current content');
+    await request(app.getHttpServer())
+      .post(`/api/vaults/${vaultId}/files/operations`)
+      .set(headers)
+      .send({
+        operationId: crypto.randomUUID(),
+        fileId,
+        type: 'delete',
+        baseVersion: 1,
+      })
+      .expect(201);
+    currentClient.destroy();
+    current.destroy();
+    saved.destroy();
   });
 
   it('converges three simultaneous editors and removes stale presence', async () => {
@@ -452,11 +536,57 @@ describe('Collaboration WebSocket (e2e)', () => {
       expect.objectContaining({ id: sourceId, path: 'Source.md' }),
     ]);
 
+    const graph = await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/graph`)
+      .set(headers)
+      .expect(200);
+    const graphBody = graph.body as {
+      nodes: Array<{ id: string; path: string }>;
+      edges: Array<{ source: string; target: string }>;
+    };
+    expect(graphBody.nodes).toEqual(
+      expect.arrayContaining([
+        { id: sourceId, path: 'Source.md' },
+        { id: targetId, path: 'Notes/Target.md' },
+      ]),
+    );
+    expect(graphBody.edges).toEqual(
+      expect.arrayContaining([{ source: sourceId, target: targetId }]),
+    );
+
+    const liveSource = new Y.Doc();
+    const liveSourceClient = provider(
+      `vault:${vaultId}:doc:${sourceId}`,
+      liveSource,
+    );
+    await waitForSync(liveSourceClient);
+    const liveText = liveSource.getText('content');
+    liveText.delete(0, liveText.length);
+    liveText.insert(0, 'No links remain.');
+    await waitFor(async () => {
+      const count = await prisma.vaultFileLink.count({
+        where: { sourceFileId: sourceId },
+      });
+      return count === 0;
+    });
+
+    const updatedGraph = await request(app.getHttpServer())
+      .get(`/api/vaults/${vaultId}/files/graph`)
+      .set(headers)
+      .expect(200);
+    expect(
+      (updatedGraph.body as { edges: Array<{ source: string }> }).edges.some(
+        (edge) => edge.source === sourceId,
+      ),
+    ).toBe(false);
+
     await request(app.getHttpServer())
       .get(`/api/vaults/${vaultId}/files/search`)
       .query({ query: 'uniquely searchable' })
       .set({ Authorization: `Bearer ${otherAccessToken}` })
       .expect(404);
+    liveSourceClient.destroy();
+    liveSource.destroy();
     source.destroy();
     target.destroy();
   });

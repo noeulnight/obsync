@@ -20,8 +20,11 @@ import { VaultAccessService } from '../vaults/vault-access.service';
 import type { CollaborationContext } from './types/collaboration-context.type';
 import { parseCollaborationRoom } from './types/collaboration-room.type';
 import type { ManifestEntry } from './types/manifest.type';
+import { nextFileRevision } from './vault-file-version';
+import { VaultLinksService } from './vault-links.service';
 
 const collaborationPath = '/collaboration';
+const versionCheckpointInterval = 5 * 60 * 1_000;
 
 @Injectable()
 export class CollaborationServerService
@@ -39,6 +42,7 @@ export class CollaborationServerService
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly access: VaultAccessService,
+    private readonly links: VaultLinksService,
   ) {
     this.hocuspocus = new Hocuspocus<CollaborationContext>({
       quiet: true,
@@ -47,8 +51,18 @@ export class CollaborationServerService
       onAuthenticate: ({ documentName, token, connectionConfig }) =>
         this.authenticate(documentName, token, connectionConfig),
       onLoadDocument: ({ documentName }) => this.load(documentName),
-      onStoreDocument: ({ documentName, document }) =>
-        this.trackStore(documentName, document),
+      onStoreDocument: ({
+        documentName,
+        document,
+        lastContext,
+        clientsCount,
+      }) =>
+        this.trackStore(
+          documentName,
+          document,
+          lastContext.userId ?? 'server',
+          clientsCount,
+        ),
     });
   }
 
@@ -134,8 +148,18 @@ export class CollaborationServerService
     return record?.state ?? new Y.Doc();
   }
 
-  private async persist(roomName: string, document: Y.Doc): Promise<void> {
-    await this.store(roomName, Y.encodeStateAsUpdate(document));
+  private async persist(
+    roomName: string,
+    document: Y.Doc,
+    userId: string,
+    clientsCount: number,
+  ): Promise<void> {
+    await this.store(
+      roomName,
+      Y.encodeStateAsUpdate(document),
+      userId,
+      clientsCount,
+    );
   }
 
   async publishFiles(vaultId: string, files: VaultFile[]): Promise<void> {
@@ -150,6 +174,35 @@ export class CollaborationServerService
     await connection.disconnect({ unloadImmediately: false });
   }
 
+  async restoreDocument(
+    vaultId: string,
+    fileId: string,
+    state: Uint8Array,
+    userId: string,
+  ) {
+    const roomName = `vault:${vaultId}:doc:${fileId}`;
+    const connection = await this.hocuspocus.openDirectConnection(roomName, {
+      vaultId,
+      userId,
+      role: 'OWNER',
+    });
+    try {
+      const restored = new Y.Doc();
+      Y.applyUpdate(restored, state);
+      const content = restored.getText('content').toJSON();
+      let currentState = Y.encodeStateAsUpdate(new Y.Doc());
+      await connection.transact((document) => {
+        currentState = Y.encodeStateAsUpdate(document);
+        const text = document.getText('content');
+        text.delete(0, text.length);
+        text.insert(0, content);
+      });
+      await this.createVersion(vaultId, fileId, currentState, userId, true);
+    } finally {
+      await connection.disconnect({ unloadImmediately: true });
+    }
+  }
+
   private async manifestDocument(vaultId: string): Promise<Y.Doc> {
     const files = await this.prisma.vaultFile.findMany({
       where: { vaultId },
@@ -161,8 +214,13 @@ export class CollaborationServerService
     return document;
   }
 
-  private trackStore(roomName: string, document: Y.Doc): Promise<void> {
-    const pending = this.persist(roomName, document);
+  private trackStore(
+    roomName: string,
+    document: Y.Doc,
+    userId: string,
+    clientsCount: number,
+  ): Promise<void> {
+    const pending = this.persist(roomName, document, userId, clientsCount);
     this.pendingStores.add(pending);
     void pending.then(
       () => this.pendingStores.delete(pending),
@@ -171,7 +229,12 @@ export class CollaborationServerService
     return pending;
   }
 
-  private async store(roomName: string, state: Uint8Array): Promise<void> {
+  private async store(
+    roomName: string,
+    state: Uint8Array,
+    userId: string,
+    clientsCount: number,
+  ): Promise<void> {
     const room = parseCollaborationRoom(roomName);
     if (!room) throw new Error('Invalid collaboration room');
 
@@ -180,6 +243,56 @@ export class CollaborationServerService
       where: { roomName },
       create: { roomName, vaultId: room.vaultId, state: storedState },
       update: { state: storedState },
+    });
+    if (room.kind === 'document') {
+      await this.createVersion(
+        room.vaultId,
+        room.documentId,
+        storedState,
+        userId,
+        clientsCount === 0,
+      );
+      await this.links.reindex(
+        room.vaultId,
+        room.documentId,
+        documentText(storedState),
+      );
+    }
+  }
+
+  private async createVersion(
+    vaultId: string,
+    fileId: string,
+    state: Uint8Array,
+    userId: string,
+    force: boolean,
+  ) {
+    await this.prisma.$transaction(async (transaction) => {
+      const file = await transaction.vaultFile.findFirst({
+        where: { id: fileId, vaultId, kind: 'MARKDOWN', deletedAt: null },
+        select: { id: true, path: true },
+      });
+      if (!file) return;
+      const latest = await transaction.vaultFileVersion.findFirst({
+        where: { fileId },
+        select: { createdAt: true, state: true },
+        orderBy: { version: 'desc' },
+      });
+      const unchanged =
+        latest?.state && Buffer.from(latest.state).equals(Buffer.from(state));
+      const recent =
+        latest?.state &&
+        Date.now() - latest.createdAt.getTime() < versionCheckpointInterval;
+      if (unchanged || (!force && recent)) return;
+      await transaction.vaultFileVersion.create({
+        data: {
+          fileId,
+          version: await nextFileRevision(transaction, fileId),
+          path: file.path,
+          state: Uint8Array.from(state),
+          createdById: userId === 'server' ? null : userId,
+        },
+      });
     });
   }
 
@@ -231,4 +344,10 @@ function manifestEntry(file: VaultFile): ManifestEntry {
     ...(file.sha256 ? { sha256: file.sha256 } : {}),
     ...(file.size !== null ? { size: Number(file.size) } : {}),
   };
+}
+
+function documentText(state: Uint8Array) {
+  const document = new Y.Doc();
+  Y.applyUpdate(document, state);
+  return document.getText('content').toJSON();
 }

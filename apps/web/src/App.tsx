@@ -8,6 +8,7 @@ export function App() {
       <Route path="/device" element={<DeviceApprovalPage />} />
       <Route path="/" element={<WorkspaceApp />} />
       <Route path="/vaults/:vaultId" element={<WorkspaceApp />} />
+      <Route path="/vaults/:vaultId/graph" element={<WorkspaceApp />} />
       <Route path="/vaults/:vaultId/files/:fileId" element={<WorkspaceApp />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

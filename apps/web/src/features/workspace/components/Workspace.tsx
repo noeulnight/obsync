@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useMatch, useNavigate, useParams } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useUploadAttachment } from "@/features/attachments/queries/use-attachments";
 import {
@@ -35,6 +35,7 @@ export function Workspace({
   onSelect,
   onCreate,
   onSettings,
+  onVaultSettings,
   onLogout,
 }: {
   api: ApiClient;
@@ -44,6 +45,7 @@ export function Workspace({
   onSelect: (id: string) => void;
   onCreate: () => void;
   onSettings: () => void;
+  onVaultSettings: () => void;
   onLogout: () => void;
 }) {
   const navigateRoute = useNavigate();
@@ -51,12 +53,13 @@ export function Workspace({
     vaultId: string;
     fileId: string;
   }>();
+  const graphRoute = useMatch("/vaults/:vaultId/graph");
+  const graph = graphRoute?.params.vaultId === vault.id;
   const [sync, setSync] = useState<WebVault>();
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [active, setActive] = useState(() =>
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
-  const [status, setStatus] = useState("Connecting");
   const [online, setOnline] = useState(false);
   const [notice, setNotice] = useState("");
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
@@ -85,7 +88,7 @@ export function Workspace({
       vault.id,
       api,
       userName,
-      setStatus,
+      () => undefined,
       setOnline,
       vault.role === "VIEWER",
     );
@@ -116,10 +119,11 @@ export function Workspace({
   }, [activeEntry?.kind, canWrite]);
 
   useEffect(() => {
+    if (graph) return;
     if (active && entries.some((entry) => entry.id === active)) return;
     const first = entries.find((entry) => entry.kind === "markdown");
     if (first) open(first, true);
-  }, [entries, active, open]);
+  }, [entries, active, graph, open]);
 
   useEffect(() => {
     if (routeVaultId === vault.id) setActive(routeFileId ?? "");
@@ -298,18 +302,19 @@ export function Workspace({
           vaults={vaults}
           entries={entries}
           active={active}
-          status={status}
           canWrite={canWrite}
           uploadInput={uploadInput}
           onSelectVault={onSelect}
           onCreateVault={onCreate}
           onSearch={() => setSearchMode("search")}
+          graph={graph}
           onOpen={open}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
           onCreateEntry={setCreateKind}
           onUpload={(files) => void upload(files)}
           onSettings={onSettings}
+          onVaultSettings={onVaultSettings}
           onLogout={onLogout}
         />
         <WorkspaceContent
@@ -323,6 +328,7 @@ export function Workspace({
           documentSession={documentSession}
           canvasSession={canvasSession}
           canWrite={canWrite}
+          graph={graph}
           onRenamePath={(path) => canWrite && activeEntry && sync?.rename(activeEntry, path)}
           onRename={() => activeEntry && setRenameTarget(activeEntry)}
           onDelete={() => activeEntry && setDeleteTarget(activeEntry)}

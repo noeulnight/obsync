@@ -65,6 +65,7 @@ model Vault {
   invitations VaultInvitation[]
   files       VaultFile[]
   fileOperations VaultFileOperation[]
+  fileLinks   VaultFileLink[]
 
   @@index([ownerId])
   @@map("vaults")
@@ -91,14 +92,34 @@ model VaultFile {
   deletedAt     DateTime?     @map("deleted_at")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+  linksIndexedAt DateTime?     @map("links_indexed_at")
   vault         Vault         @relation(fields: [vaultId], references: [id], onDelete: Cascade)
   attachment    Attachment?   @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
   versions      VaultFileVersion[]
   operations    VaultFileOperation[]
+  outgoingLinks VaultFileLink[] @relation("VaultFileLinkSource")
+  incomingLinks VaultFileLink[] @relation("VaultFileLinkTarget")
 
   @@unique([vaultId, activePathKey])
   @@index([vaultId, deletedAt])
   @@map("vault_files")
+}
+
+model VaultFileLink {
+  id           String     @id @default(uuid()) @db.Uuid
+  vaultId      String     @map("vault_id") @db.Uuid
+  sourceFileId String     @map("source_file_id") @db.Uuid
+  targetFileId String?    @map("target_file_id") @db.Uuid
+  rawTarget    String     @map("raw_target")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  vault        Vault      @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  source       VaultFile  @relation("VaultFileLinkSource", fields: [sourceFileId], references: [id], onDelete: Cascade)
+  target       VaultFile? @relation("VaultFileLinkTarget", fields: [targetFileId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceFileId, rawTarget])
+  @@index([vaultId])
+  @@index([targetFileId])
+  @@map("vault_file_links")
 }
 
 model VaultFileVersion {

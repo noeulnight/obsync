@@ -159,4 +159,28 @@ describe("Editor", () => {
     expect(acceptCompletion(editor)).toBe(true);
     await waitFor(() => expect(connected.text.toJSON()).toBe("[[Notes/Beta]]"));
   });
+
+  it("opens a rendered wiki link before CodeMirror turns it back into source", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "[[Notes/Beta]]\nEnd");
+    const onNavigate = vi.fn();
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={onNavigate}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    const link = await waitFor(() => rendered.container.querySelector(".cm-live-link"));
+    if (!link) throw new Error("Wiki link was not rendered");
+    fireEvent.mouseDown(link, { button: 0 });
+
+    expect(onNavigate).toHaveBeenCalledWith("Notes/Beta");
+  });
 });

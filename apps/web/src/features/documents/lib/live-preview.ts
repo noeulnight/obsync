@@ -30,7 +30,8 @@ export function livePreview(onNavigate: (href: string) => void, resolveAsset: As
       { decorations: (plugin) => plugin.decorations },
     ),
     EditorView.domEventHandlers({
-      click(event) {
+      mousedown(event) {
+        if (event.button !== 0) return false;
         const target = (event.target as HTMLElement).closest<HTMLElement>("[data-href]");
         const href = target?.dataset.href;
         if (!href) return false;

@@ -37,6 +37,14 @@ export class VaultFilesController {
     return this.files.search(request.user.id, vaultId, query.query);
   }
 
+  @Get('graph')
+  graph(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+  ) {
+    return this.files.graph(request.user.id, vaultId);
+  }
+
   @Post('operations')
   apply(
     @Req() request: AuthenticatedRequest,
@@ -53,6 +61,31 @@ export class VaultFilesController {
     @Param('fileId', new ParseUUIDPipe()) fileId: string,
   ) {
     return this.files.versions(request.user.id, vaultId, fileId);
+  }
+
+  @Get(':fileId/versions/:versionId')
+  version(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+    @Param('versionId', new ParseUUIDPipe()) versionId: string,
+  ) {
+    return this.files.version(request.user.id, vaultId, fileId, versionId);
+  }
+
+  @Post(':fileId/versions/:versionId/restore')
+  restoreVersion(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+    @Param('versionId', new ParseUUIDPipe()) versionId: string,
+  ) {
+    return this.files.restoreVersion(
+      request.user.id,
+      vaultId,
+      fileId,
+      versionId,
+    );
   }
 
   @Get(':fileId/backlinks')

@@ -64,6 +64,26 @@ export type DocumentSearchResult = {
   excerpt: string;
 };
 
+export type FileVersion = {
+  id: string;
+  version: number;
+  path: string;
+  deletedAt: string | null;
+  attachmentId: string | null;
+  createdAt: string;
+  hasContent: boolean;
+  createdBy: { id: string; displayName: string | null; email: string } | null;
+};
+
+export type FileVersionDetail = Omit<FileVersion, "attachmentId" | "hasContent"> & {
+  content: string;
+};
+
+export type VaultGraph = {
+  nodes: Array<{ id: string; path: string }>;
+  edges: Array<{ source: string; target: string }>;
+};
+
 type UploadApproval = {
   attachment: { id: string };
   uploadUrl: string | null;
@@ -274,6 +294,31 @@ export class ApiClient {
   backlinks(vaultId: string, fileId: string) {
     return this.request<DocumentSearchResult[]>({
       url: `/api/vaults/${vaultId}/files/${fileId}/backlinks`,
+    });
+  }
+
+  vaultGraph(vaultId: string) {
+    return this.request<VaultGraph>({
+      url: `/api/vaults/${vaultId}/files/graph`,
+    });
+  }
+
+  fileVersions(vaultId: string, fileId: string) {
+    return this.request<FileVersion[]>({
+      url: `/api/vaults/${vaultId}/files/${fileId}/versions`,
+    });
+  }
+
+  fileVersion(vaultId: string, fileId: string, versionId: string) {
+    return this.request<FileVersionDetail>({
+      url: `/api/vaults/${vaultId}/files/${fileId}/versions/${versionId}`,
+    });
+  }
+
+  async restoreFileVersion(vaultId: string, fileId: string, versionId: string) {
+    await this.request({
+      url: `/api/vaults/${vaultId}/files/${fileId}/versions/${versionId}/restore`,
+      method: "POST",
     });
   }
 

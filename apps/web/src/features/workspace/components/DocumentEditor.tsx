@@ -4,6 +4,7 @@ import { Editor } from "@/features/documents/components/Editor";
 import { renamedMarkdownPath, type FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
 import { BacklinksSheet } from "@/features/search/components/BacklinksSheet";
+import { VersionHistorySheet } from "@/features/history/components/VersionHistorySheet";
 import type { ApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/error";
 import { FileHeader } from "./FileHeader";
@@ -66,12 +67,20 @@ export function DocumentEditor({
         path={entry.path}
         title={title}
         actions={
-          <BacklinksSheet
-            api={api}
-            vaultId={vaultId}
-            fileId={entry.id}
-            openDocument={onOpenDocument}
-          />
+          <>
+            <BacklinksSheet
+              api={api}
+              vaultId={vaultId}
+              fileId={entry.id}
+              openDocument={onOpenDocument}
+            />
+            <VersionHistorySheet
+              api={api}
+              vaultId={vaultId}
+              fileId={entry.id}
+              readOnly={readOnly}
+            />
+          </>
         }
         onRename={readOnly ? undefined : onRequestRename}
         onDelete={readOnly ? undefined : onDelete}
