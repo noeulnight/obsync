@@ -1,49 +1,11 @@
-import {
-  CircleUserRound,
-  FilePlus2,
-  FolderPlus,
-  LayoutDashboard,
-  LogOut,
-  Plus,
-  Settings2,
-  Upload,
-} from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarRail,
-} from "@/components/ui/sidebar";
-import { FileTree } from "@/features/documents/components/FileTree";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { useUploadAttachment } from "@/features/attachments/queries/use-attachments";
 import {
   renamedFilePath,
   renamedMarkdownPath,
+  newEntryPath,
   resolveFileLink,
   resolveMarkdownLink,
   validVaultPath,
@@ -52,24 +14,17 @@ import {
 import { WebVault } from "@/features/documents/lib/sync";
 import type { Vault } from "@/features/vaults/types/vault";
 import type { ApiClient } from "@/lib/api/client";
+import { errorMessage } from "@/lib/error";
 import { queryClient } from "@/lib/query/client";
 import { queryKeys } from "@/lib/query/keys";
-import { AttachmentPreview } from "./AttachmentPreview";
 import {
   CreateEntryDialog,
   type CreateEntryKind,
   DeleteFileDialog,
   RenameFileDialog,
 } from "./FileDialogs";
-
-const DocumentEditor = lazy(() =>
-  import("./DocumentEditor").then((module) => ({ default: module.DocumentEditor })),
-);
-const CanvasEditor = lazy(() =>
-  import("@/features/canvas/components/CanvasEditor").then((module) => ({
-    default: module.CanvasEditor,
-  })),
-);
+import { WorkspaceContent } from "./WorkspaceContent";
+import { WorkspaceSidebar } from "./WorkspaceSidebar";
 
 export function Workspace({
   api,
@@ -161,20 +116,19 @@ export function Workspace({
     try {
       sync?.rename(entry, path);
     } catch (reason) {
-      return message(reason);
+      return errorMessage(reason);
     }
   }
 
   function create(path: string) {
     if (!sync || !createKind) return "동기화 연결을 기다려주세요.";
-    let requested = path.trim();
-    if (createKind === "markdown" && !/\.md$/i.test(requested)) requested += ".md";
-    if (createKind === "canvas" && !/\.canvas$/i.test(requested)) requested += ".canvas";
+    const requested = newEntryPath(createKind, path);
+    if (!requested) return "이름을 입력하세요.";
     try {
       const entry = sync.create(createKind, requested);
       if (entry.kind !== "folder") open(entry);
     } catch (reason) {
-      return message(reason);
+      return errorMessage(reason);
     }
   }
 
@@ -197,7 +151,7 @@ export function Workspace({
       }
       setNotice("");
     } catch (reason) {
-      setNotice(`첨부파일 업로드 실패: ${message(reason)}`);
+      setNotice(`첨부파일 업로드 실패: ${errorMessage(reason)}`);
     } finally {
       if (uploadInput.current) uploadInput.current.value = "";
     }
@@ -302,181 +256,45 @@ export function Workspace({
   return (
     <>
       <SidebarProvider>
-        <Sidebar collapsible="icon">
-          <SidebarHeader className="px-2 py-2">
-            <div className="flex gap-1">
-              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                <Select value={vault.id} onValueChange={onSelect}>
-                  <SelectTrigger
-                    className="w-full border-0 bg-transparent px-2 font-medium shadow-none hover:bg-sidebar-accent focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent dark:hover:bg-sidebar-accent"
-                    aria-label="Vault 선택"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vaults.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                        {item.role === "VIEWER" ? " (읽기 전용)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button variant="ghost" size="icon" aria-label="새 Vault" onClick={onCreate}>
-                <Plus />
-              </Button>
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupLabel className="justify-between pr-1">
-                <span>파일</span>
-                {canWrite && (
-                  <span className="flex items-center gap-0.5">
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="새 문서"
-                      onClick={() => setCreateKind("markdown")}
-                    >
-                      <FilePlus2 />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="새 폴더"
-                      onClick={() => setCreateKind("folder")}
-                    >
-                      <FolderPlus />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="새 Canvas"
-                      onClick={() => setCreateKind("canvas")}
-                    >
-                      <LayoutDashboard />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="첨부파일 업로드"
-                      onClick={() => uploadInput.current?.click()}
-                    >
-                      <Upload />
-                    </Button>
-                  </span>
-                )}
-              </SidebarGroupLabel>
-              <input
-                ref={uploadInput}
-                className="hidden"
-                type="file"
-                multiple
-                onChange={(event) => void upload(event.target.files)}
-              />
-              <SidebarGroupContent>
-                <FileTree
-                  entries={entries}
-                  active={active}
-                  open={open}
-                  rename={setRenameTarget}
-                  remove={setDeleteTarget}
-                  canManage={canWrite}
-                />
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-          <SidebarFooter className="border-t">
-            <div className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-              <span className={status === "동기화됨" ? "text-emerald-500" : undefined}>
-                ● {vault.role === "VIEWER" ? "읽기 전용" : status}
-              </span>
-            </div>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton aria-label="계정 메뉴">
-                      <CircleUserRound />
-                      <span>계정</span>
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    side="top"
-                    align="start"
-                    className="w-(--radix-dropdown-menu-trigger-width)"
-                  >
-                    <DropdownMenuItem onSelect={onSettings}>
-                      <Settings2 />
-                      설정
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={onLogout}>
-                      <LogOut />
-                      로그아웃
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
-          <SidebarRail />
-        </Sidebar>
-        <SidebarInset className="h-svh min-w-0 overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {notice ? (
-              <div className="grid h-full place-items-center text-sm text-muted-foreground">
-                {notice}
-              </div>
-            ) : documentSession && activeEntry ? (
-              <Suspense fallback={<EditorLoading />}>
-                <DocumentEditor
-                  key={active}
-                  entry={activeEntry}
-                  vaultName={vault.name}
-                  session={documentSession}
-                  onRename={(path) => sync?.rename(activeEntry, path)}
-                  onRequestRename={() => setRenameTarget(activeEntry)}
-                  onDelete={() => setDeleteTarget(activeEntry)}
-                  onNavigate={navigate}
-                  resolveAsset={resolveAsset}
-                  readOnly={!canWrite}
-                />
-              </Suspense>
-            ) : canvasSession && activeEntry ? (
-              <Suspense fallback={<EditorLoading />}>
-                <CanvasEditor
-                  key={active}
-                  session={canvasSession}
-                  vaultName={vault.name}
-                  path={activeEntry.path}
-                  onRename={() => setRenameTarget(activeEntry)}
-                  onDelete={() => setDeleteTarget(activeEntry)}
-                  openDocument={openCanvasDocument}
-                  onNavigate={navigateFromCanvas}
-                  resolveAsset={resolveCanvasAsset}
-                  resolveFileAsset={resolveCanvasFileAsset}
-                  files={entries}
-                  readOnly={!canWrite}
-                />
-              </Suspense>
-            ) : activeEntry?.kind === "attachment" ? (
-              <AttachmentPreview
-                api={api}
-                vaultId={vault.id}
-                vaultName={vault.name}
-                entry={activeEntry}
-                onRename={canWrite ? () => setRenameTarget(activeEntry) : undefined}
-                onDelete={canWrite ? () => setDeleteTarget(activeEntry) : undefined}
-              />
-            ) : (
-              <div className="grid h-full place-items-center text-sm text-muted-foreground">
-                왼쪽에서 문서를 선택하세요.
-              </div>
-            )}
-          </div>
-        </SidebarInset>
+        <WorkspaceSidebar
+          vault={vault}
+          vaults={vaults}
+          entries={entries}
+          active={active}
+          status={status}
+          canWrite={canWrite}
+          uploadInput={uploadInput}
+          onSelectVault={onSelect}
+          onCreateVault={onCreate}
+          onOpen={open}
+          onRename={setRenameTarget}
+          onDelete={setDeleteTarget}
+          onCreateEntry={setCreateKind}
+          onUpload={(files) => void upload(files)}
+          onSettings={onSettings}
+          onLogout={onLogout}
+        />
+        <WorkspaceContent
+          api={api}
+          vaultId={vault.id}
+          vaultName={vault.name}
+          entries={entries}
+          active={active}
+          activeEntry={activeEntry}
+          notice={notice}
+          documentSession={documentSession}
+          canvasSession={canvasSession}
+          canWrite={canWrite}
+          onRenamePath={(path) => activeEntry && sync?.rename(activeEntry, path)}
+          onRename={() => activeEntry && setRenameTarget(activeEntry)}
+          onDelete={() => activeEntry && setDeleteTarget(activeEntry)}
+          onNavigate={navigate}
+          resolveAsset={resolveAsset}
+          openCanvasDocument={openCanvasDocument}
+          navigateFromCanvas={navigateFromCanvas}
+          resolveCanvasAsset={resolveCanvasAsset}
+          resolveCanvasFileAsset={resolveCanvasFileAsset}
+        />
       </SidebarProvider>
       <RenameFileDialog
         entry={renameTarget}
@@ -490,17 +308,5 @@ export function Workspace({
         remove={() => deleteTarget && remove(deleteTarget)}
       />
     </>
-  );
-}
-
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : String(reason);
-}
-
-function EditorLoading() {
-  return (
-    <div className="grid h-full place-items-center text-sm text-muted-foreground">
-      편집기 불러오는 중…
-    </div>
   );
 }

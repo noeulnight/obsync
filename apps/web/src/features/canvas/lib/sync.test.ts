@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Y from "yjs";
-import { replaceCanvasText } from "./sync";
+import { replaceText } from "@obsync/sync-core";
 
-describe("replaceCanvasText", () => {
+describe("replaceText", () => {
   it("changes only the differing range and converges through Yjs", () => {
     const first = new Y.Doc();
     const second = new Y.Doc();
@@ -11,7 +11,7 @@ describe("replaceCanvasText", () => {
 
     firstText.insert(0, "hello canvas");
     Y.applyUpdate(second, Y.encodeStateAsUpdate(first));
-    replaceCanvasText(secondText, "hello shared canvas");
+    replaceText(secondText, "hello shared canvas");
     Y.applyUpdate(first, Y.encodeStateAsUpdate(second));
 
     expect(firstText.toJSON()).toBe("hello shared canvas");

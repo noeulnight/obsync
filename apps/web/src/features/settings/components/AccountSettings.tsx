@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { errorMessage } from "@/lib/error";
 import {
   useAccount,
   useAccountSessions,
@@ -250,7 +251,7 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
         </AlertDialog>
       </div>
 
-      {error && <p className="pb-4 text-sm text-destructive">{message(error)}</p>}
+      {error && <p className="pb-4 text-sm text-destructive">{errorMessage(error)}</p>}
     </section>
   );
 }
@@ -286,8 +287,4 @@ function sessionName(userAgent: string | null) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
-}
-
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : String(reason);
 }

@@ -22,6 +22,7 @@ import {
 } from "../queries/use-vault-members";
 import type { Vault } from "../types/vault";
 import type { VaultRole } from "@/lib/api/client";
+import { errorMessage } from "@/lib/error";
 
 export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boolean }) {
   const vaultId = vault?.id ?? "";
@@ -173,7 +174,7 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
           ) : null}
         </>
       )}
-      {error && <p className="mt-5 text-sm text-destructive">{message(error)}</p>}
+      {error && <p className="mt-5 text-sm text-destructive">{errorMessage(error)}</p>}
     </section>
   );
 }
@@ -209,8 +210,4 @@ function RolePill({ role }: { role: "OWNER" | VaultRole }) {
 function roleLabel(role: "OWNER" | VaultRole) {
   if (role === "OWNER") return "소유자";
   return role === "EDITOR" ? "편집자" : "뷰어";
-}
-
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : String(reason);
 }

@@ -1,4 +1,5 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { errorMessage } from "@/lib/error";
 import { CredentialsPage } from "./CredentialsPage";
 import { useApproveDevice } from "../queries/use-session";
 
@@ -30,13 +31,10 @@ export function DeviceApprovalPage() {
     <CredentialsPage
       title="기기 승인"
       description={`Obsidian 기기 코드 ${userCode}`}
-      error={message(approval.error)}
+      error={errorMessage(approval.error)}
       onSubmit={(credentials) => approval.mutateAsync(credentials)}
     />
   );
 }
 
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : "";
-}
 import { useSearchParams } from "react-router-dom";

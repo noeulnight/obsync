@@ -221,6 +221,9 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.16.3
+      prisma:
+        specifier: 'catalog:'
+        version: 7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -288,9 +291,6 @@ importers:
       prettier:
         specifier: ^3.4.2
         version: 3.9.5
-      prisma:
-        specifier: 'catalog:'
-        version: 7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
       source-map-support:
         specifier: ^0.5.21
         version: 0.5.21
@@ -321,6 +321,9 @@ importers:
       '@hocuspocus/provider':
         specifier: 'catalog:'
         version: 4.4.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      '@obsync/sync-core':
+        specifier: workspace:*
+        version: link:../../packages/sync-core
       y-codemirror.next:
         specifier: 'catalog:'
         version: 0.3.5(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)(yjs@13.6.31)
@@ -379,6 +382,9 @@ importers:
       '@hocuspocus/provider':
         specifier: 'catalog:'
         version: 4.4.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      '@obsync/sync-core':
+        specifier: workspace:*
+        version: link:../../packages/sync-core
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.2(react@19.2.7)
@@ -455,6 +461,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@voidzero-dev/vite-plus-core@0.2.5(@types/node@26.1.1)(jiti@2.7.0)(terser@5.49.0)(typescript@5.9.3)(yaml@2.9.0))(happy-dom@20.11.0)
+
+  packages/sync-core:
+    dependencies:
+      yjs:
+        specifier: 'catalog:'
+        version: 13.6.31
+    devDependencies:
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.5(@types/node@26.1.1)(happy-dom@20.11.0)(jiti@2.7.0)(terser@5.49.0)(typescript@6.0.3)(vite@8.1.5(@types/node@26.1.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))(yaml@2.9.0)
 
 packages:
 

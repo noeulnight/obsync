@@ -4,6 +4,7 @@ import {
   fileTree,
   isWithin,
   moveWithin,
+  newEntryPath,
   imagePath,
   renamedFilePath,
   renamedMarkdownPath,
@@ -13,7 +14,7 @@ import {
   type FileEntry,
 } from "./files";
 import { fileId, randomUuid } from "@/lib/file-id";
-import { vaultPathKey } from "@/lib/vault-path";
+import { pathKey } from "@obsync/sync-core";
 
 describe("fileTree", () => {
   it("groups implicit folders and ignores deleted entries", () => {
@@ -89,7 +90,16 @@ describe("Vault paths", () => {
     expect(fileId("434fca61-f9de-461c-8b93-40d3be30b5f7", "NOTES/한글.md")).toBe(
       fileId("434fca61-f9de-461c-8b93-40d3be30b5f7", "notes/한글.md"),
     );
-    expect(vaultPathKey("NOTES/한글.md")).toBe(vaultPathKey("notes/한글.md"));
+    expect(pathKey("NOTES/한글.md")).toBe(pathKey("notes/한글.md"));
+  });
+
+  it("requires a visible name before adding document extensions", () => {
+    expect(newEntryPath("markdown", "   ")).toBeUndefined();
+    expect(newEntryPath("markdown", ".md")).toBeUndefined();
+    expect(newEntryPath("markdown", "notes/ .md")).toBeUndefined();
+    expect(newEntryPath("markdown", "notes/My Note")).toBe("notes/My Note.md");
+    expect(newEntryPath("canvas", "Board")).toBe("Board.canvas");
+    expect(newEntryPath("folder", "notes")).toBe("notes");
   });
 
   it("creates random UUIDs without randomUUID", () => {

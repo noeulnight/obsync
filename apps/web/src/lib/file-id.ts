@@ -1,4 +1,4 @@
-import { vaultPathKey } from "./vault-path";
+import { pathKey } from "@obsync/sync-core";
 
 export function randomUuid() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -9,7 +9,7 @@ export function randomUuid() {
 }
 
 export function fileId(vaultId: string, path: string) {
-  const input = new TextEncoder().encode(`${vaultId}\0${vaultPathKey(path)}`);
+  const input = new TextEncoder().encode(`${vaultId}\0${pathKey(path)}`);
   let first = 0x811c9dc5;
   let second = 0x9e3779b9;
   for (const byte of input) {

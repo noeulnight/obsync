@@ -11,6 +11,7 @@ import {
 } from "@/features/settings/components/SettingsDialog";
 import { useVaults } from "@/features/vaults/queries/use-vaults";
 import { api } from "@/lib/api/client";
+import { errorMessage } from "@/lib/error";
 
 const Workspace = lazy(() =>
   import("./Workspace").then((module) => ({ default: module.Workspace })),
@@ -62,7 +63,7 @@ export function WorkspaceApp() {
       <CredentialsPage
         title="Obsync"
         description="계정으로 로그인해 Vault를 편집하세요."
-        error={message(authenticate.error)}
+        error={errorMessage(authenticate.error)}
         onSubmit={(credentials) => authenticate.mutateAsync(credentials)}
       />
     );
@@ -85,7 +86,9 @@ export function WorkspaceApp() {
               <Button variant="ghost" onClick={() => void signOut()}>
                 로그아웃
               </Button>
-              {vaults.error && <p className="text-sm text-destructive">{message(vaults.error)}</p>}
+              {vaults.error && (
+                <p className="text-sm text-destructive">{errorMessage(vaults.error)}</p>
+              )}
             </CardContent>
           </Card>
         </main>
@@ -131,8 +134,4 @@ export function WorkspaceApp() {
       />
     </>
   );
-}
-
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : "";
 }

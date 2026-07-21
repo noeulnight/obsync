@@ -2,6 +2,8 @@
 
 실행 단위와 진행 상태는 [백엔드 구현 체크리스트](./backend-implementation-checklist.md)에서 관리한다.
 
+> 현재 상태 (2026-07-21): Step 00~17A가 완료됐다. 계정·Device Auth·Web session·여러 Vault·멤버 역할·Yjs 영속화·파일 버전 이력·S3 첨부파일까지 구현됐으며 MCP(Step 18~19)는 범위에서 제외한다. 아래 Phase 설명은 구현 순서를 보존한 history이며 현재 완료 여부는 체크리스트를 기준으로 한다.
+
 ## 1. 목표
 
 NestJS 단일 서버에서 다음 기능을 단계적으로 제공한다.
@@ -21,15 +23,16 @@ NestJS 단일 서버에서 다음 기능을 단계적으로 제공한다.
 - 이메일·비밀번호 기반 개인 계정
 - access token과 refresh token
 - 사용자당 여러 Vault
-- Vault owner 권한 검사
+- Vault owner/editor/viewer 권한과 초대 관리
+- Obsidian Device Auth와 Web cookie session
 - `/collaboration` WebSocket endpoint
 - manifest 및 문서별 Yjs snapshot 저장
 - 상태 확인 API와 구조화 로그
 - S3 presigned URL 기반 첨부파일 업로드·다운로드
 
-### 초기 제외
+### 현재 제외
 
-- 조직·팀·역할 관리
+- 별도 조직·팀 모델
 - 공개 문서 링크
 - 서버 측 Markdown 검색·인덱싱
 - 자체 S3 proxy 및 동영상 스트리밍 서버
@@ -156,7 +159,7 @@ vault:<vaultId>:canvas:<documentId>
 | `name` | 클라이언트 식별 이름 |
 | `last_used_at`, `expires_at`, `revoked_at` | 수명 관리 |
 
-공동 편집 요구가 생기기 전에는 `vault_members` 테이블을 만들지 않는다.
+현재 `vault_members`와 `vault_invitations`가 owner/editor/viewer 권한과 초대를 관리한다. 별도 조직 모델은 만들지 않는다.
 
 ## 6. HTTP API
 
@@ -239,7 +242,7 @@ apps/api/src/
   vaults/
   collaboration/
   attachments/
-  mcp/
+  mcp/                 # Step 18 시작 전까지 생성하지 않음
   database/
 ```
 
@@ -343,7 +346,7 @@ LOG_LEVEL
 - 오프라인 재시도에도 같은 object가 중복 생성되지 않는다.
 - 다른 Vault의 첨부파일을 받을 수 없다.
 
-### Phase 5 — MCP
+### Phase 5 — MCP (미구현·현재 범위 제외)
 
 - Streamable HTTP endpoint `/mcp`
 - 별도 폐기 가능한 MCP token
@@ -391,7 +394,7 @@ LOG_LEVEL
 - 연결 종료 후 offline update 재병합
 - 파일 생성·이름변경·삭제
 - 사용자 간 Vault 격리
-- MCP 쓰기 후 Obsidian 반영
+- MCP 쓰기 후 Obsidian 반영 (Step 19에서 추가)
 
 테스트는 각 Phase의 완료 조건에 필요한 것만 추가한다.
 
@@ -406,9 +409,9 @@ LOG_LEVEL
 - 로그에서 Authorization, cookie, password, token을 제거한다.
 - 운영 환경에서는 개발용 token fallback을 허용하지 않는다.
 
-## 12. 첫 구현 단위
+## 12. 최초 구현 단위 기록 (완료)
 
-다음 개발 작업은 Phase 0과 Phase 1까지만 진행한다.
+초기 수직 슬라이스에서 다음 작업을 먼저 진행했으며 모두 완료됐다. 이후 구현 상태는 체크리스트의 Step 09~17A 기록을 따른다.
 
 1. `health` 구현
 2. room parser 구현 및 단위 테스트
@@ -417,4 +420,4 @@ LOG_LEVEL
 5. 로컬 Yjs snapshot 저장
 6. 두 Node client를 사용한 WebSocket E2E 테스트
 
-계정, PostgreSQL, S3, MCP는 이 수직 슬라이스가 통과한 후 순서대로 추가한다.
+계정, PostgreSQL, S3는 이후 Step에서 완료됐고 MCP는 현재 제외했다.

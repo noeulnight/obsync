@@ -4,11 +4,11 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { yCollab } from "y-codemirror.next";
 import { TFile, type App } from "obsidian";
 import * as Y from "yjs";
+import { canvasNodeTextName, presenceColor, replaceText } from "@obsync/sync-core";
 import { type CanvasController, observeCanvas, renderCanvas } from "./canvas-controller";
 import { parseCanvas, type CanvasData, type CanvasItem } from "./canvas-data";
 import { bindCanvasPresence } from "./canvas-presence";
-import { nodeTextName, syncMap, syncNodes } from "./canvas-yjs";
-import { replaceText } from "./text";
+import { syncMap, syncNodes } from "./canvas-yjs";
 
 type SeedMode = "local" | "server" | "merge";
 
@@ -67,7 +67,7 @@ export class CanvasSync {
     this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {
       name: connection.userName,
-      color: cursorColor(this.document.clientID),
+      color: presenceColor(this.document.clientID),
     });
     this.persistence.once("synced", () => {
       this.persistenceSynced = true;
@@ -141,7 +141,6 @@ export class CanvasSync {
     if (this.seedMode !== "merge" && !this.providerSynced) return;
     if (this.seedMode !== "server") await this.localChanged();
     this.document.transact(() => {
-      migrateNodeText(this.document, this.nodes);
       if (this.zOrder.size === 0) syncZOrder(this.zOrder, currentNodes(this.nodes));
       this.applyPendingText();
     }, localOrigin);
@@ -235,7 +234,7 @@ export class CanvasSync {
 
   private nodeText(nodeId: string) {
     if (this.nodes.get(nodeId)?.get("type") !== "text") return;
-    return this.document.getText(nodeTextName(nodeId));
+    return this.document.getText(canvasNodeTextName(nodeId));
   }
 
   private applyPendingText() {
@@ -269,23 +268,6 @@ function syncZOrder(order: Y.Map<number>, nodes: CanvasItem[]) {
   });
 }
 
-function migrateNodeText(document: Y.Doc, nodes: Y.Map<Y.Map<unknown>>) {
-  for (const node of nodes.values()) {
-    const value = node.get("text");
-    const content =
-      value instanceof Y.Text
-        ? value.toJSON()
-        : value?.constructor === String
-          ? (value as string)
-          : undefined;
-    const idValue = node.get("id");
-    const id = idValue?.constructor === String ? (idValue as string) : undefined;
-    if (!id || content === undefined) continue;
-    replaceText(document.getText(nodeTextName(id)), content);
-    node.delete("text");
-  }
-}
-
 function snapshot(
   document: Y.Doc,
   meta: Y.Map<unknown>,
@@ -302,7 +284,9 @@ function snapshot(
   return {
     meta: meta.toJSON() as Record<string, unknown>,
     nodes: nodeData.map((data) => {
-      if (data.type === "text") data.text = document.getText(nodeTextName(data.id)).toJSON();
+      if (data.type === "text") {
+        data.text = document.getText(canvasNodeTextName(data.id)).toJSON();
+      }
       return data;
     }),
     edges: [...edges.values()].map((item) => item.toJSON() as CanvasItem),
@@ -319,9 +303,4 @@ function toJson(data: CanvasData) {
 
 function sameCanvas(left: CanvasData, right: CanvasData) {
   return JSON.stringify(toJson(left)) === JSON.stringify(toJson(right));
-}
-
-function cursorColor(clientId: number) {
-  const colors = ["#30bced", "#6eeb83", "#ffbc42", "#ee6352", "#9ac2c9"];
-  return colors[clientId % colors.length];
 }

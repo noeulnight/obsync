@@ -7,6 +7,7 @@ import {
 import { Prisma, type VaultFile, type VaultFileKind } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
+import { vaultPath, vaultPathKey } from '../vaults/utils/vault-path';
 import {
   FileKind,
   FileOperationDto,
@@ -149,24 +150,19 @@ export class VaultFilesService {
         vaultId,
         kind: databaseKind(input.kind),
         path,
-        activePathKey: pathKey(path),
+        activePathKey: vaultPathKey(path),
         attachmentId: attachment?.id,
         mimeType: attachment?.mimeType,
         sha256: attachment?.sha256,
         size: attachment?.size,
         versions: {
-          create: {
+          create: await versionSnapshot(transaction, userId, vaultId, {
+            fileId: input.fileId,
+            kind: input.kind,
             version: 1,
             path,
             attachmentId: attachment?.id,
-            createdById: userId,
-            state: await documentState(
-              transaction,
-              vaultId,
-              input.fileId,
-              input.kind,
-            ),
-          },
+          }),
         },
       },
     });
@@ -209,7 +205,7 @@ export class VaultFilesService {
         vaultId,
         deletedAt: null,
         id: { notIn: ids },
-        activePathKey: { in: paths.map(pathKey) },
+        activePathKey: { in: paths.map(vaultPathKey) },
       },
       select: { id: true },
     });
@@ -225,21 +221,16 @@ export class VaultFilesService {
           where: { id: entry.id },
           data: {
             path: nextPath,
-            activePathKey: pathKey(nextPath),
+            activePathKey: vaultPathKey(nextPath),
             version,
             versions: {
-              create: {
+              create: await versionSnapshot(transaction, userId, vaultId, {
+                fileId: entry.id,
+                kind: clientKind(entry.kind),
                 version,
                 path: nextPath,
                 attachmentId: entry.attachmentId,
-                createdById: userId,
-                state: await documentState(
-                  transaction,
-                  vaultId,
-                  entry.id,
-                  clientKind(entry.kind),
-                ),
-              },
+              }),
             },
           },
         }),
@@ -283,19 +274,14 @@ export class VaultFilesService {
             deletedAt: now,
             version,
             versions: {
-              create: {
+              create: await versionSnapshot(transaction, userId, vaultId, {
+                fileId: entry.id,
+                kind: clientKind(entry.kind),
                 version,
                 path: entry.path,
                 deletedAt: now,
                 attachmentId: entry.attachmentId,
-                createdById: userId,
-                state: await documentState(
-                  transaction,
-                  vaultId,
-                  entry.id,
-                  clientKind(entry.kind),
-                ),
-              },
+              }),
             },
           },
         }),
@@ -332,12 +318,13 @@ export class VaultFilesService {
         sha256: attachment.sha256,
         size: attachment.size,
         versions: {
-          create: {
+          create: await versionSnapshot(transaction, userId, vaultId, {
+            fileId: file.id,
+            kind: FileKind.ATTACHMENT,
             version,
             path: file.path,
             attachmentId: attachment.id,
-            createdById: userId,
-          },
+          }),
         },
       },
     });
@@ -362,23 +349,6 @@ export class VaultFilesService {
   }
 }
 
-function vaultPath(input: string) {
-  const path = input.trim().normalize('NFC');
-  if (
-    !path ||
-    path.startsWith('/') ||
-    path.includes('\0') ||
-    path.split('/').some((part) => !part || part === '.' || part === '..')
-  ) {
-    throw new BadRequestException('올바른 Vault 경로를 입력하세요.');
-  }
-  return path;
-}
-
-function pathKey(path: string) {
-  return path.normalize('NFC').toLowerCase();
-}
-
 function movePath(path: string, from: string, to: string) {
   return path === from ? to : `${to}${path.slice(from.length)}`;
 }
@@ -389,6 +359,29 @@ function databaseKind(kind: FileKind): VaultFileKind {
 
 function clientKind(kind: VaultFileKind): FileKind {
   return kind.toLowerCase() as FileKind;
+}
+
+async function versionSnapshot(
+  transaction: Prisma.TransactionClient,
+  userId: string,
+  vaultId: string,
+  file: {
+    fileId: string;
+    kind: FileKind;
+    version: number;
+    path: string;
+    deletedAt?: Date;
+    attachmentId?: string | null;
+  },
+) {
+  return {
+    version: file.version,
+    path: file.path,
+    deletedAt: file.deletedAt,
+    attachmentId: file.attachmentId,
+    createdById: userId,
+    state: await documentState(transaction, vaultId, file.fileId, file.kind),
+  };
 }
 
 async function documentState(

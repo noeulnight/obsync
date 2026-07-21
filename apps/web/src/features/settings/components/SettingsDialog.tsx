@@ -21,6 +21,7 @@ import {
   useUpdateVault,
 } from "@/features/vaults/queries/use-vaults";
 import type { Vault } from "@/features/vaults/types/vault";
+import { errorMessage } from "@/lib/error";
 import { cn } from "@/lib/utils";
 import { AccountSettings } from "./AccountSettings";
 import { VaultMembers } from "@/features/vaults/components/VaultMembers";
@@ -151,7 +152,9 @@ export function SettingsDialog({
               />
             )}
             {error && (
-              <p className="mx-auto mt-6 max-w-xl text-sm text-destructive">{message(error)}</p>
+              <p className="mx-auto mt-6 max-w-xl text-sm text-destructive">
+                {errorMessage(error)}
+              </p>
             )}
           </main>
         </div>
@@ -271,8 +274,4 @@ function VaultRow({
       )}
     </div>
   );
-}
-
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : String(reason);
 }

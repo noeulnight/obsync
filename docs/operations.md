@@ -2,6 +2,27 @@
 
 이 문서는 단일 NestJS 배포를 기준으로 한다. API와 `/collaboration` WebSocket을 분리 배포하지 않는다.
 
+## Docker Compose
+
+로컬 또는 단일 서버에서는 Web, API, PostgreSQL, MinIO를 함께 실행한다.
+
+```bash
+cp .env.docker.example .env
+# .env의 빈 secret 값을 채운다.
+docker compose up --build -d
+docker compose ps
+curl http://localhost:8080/api/ready
+```
+
+Web은 `http://localhost:8080`에서 정적 파일로 제공되며 같은 origin의 `/api`와 `/collaboration`을 API 컨테이너로 전달한다. API 시작 전에 Prisma migration이 자동 적용된다. 운영에서는 `WEB_URL`과 `S3_PUBLIC_ENDPOINT`를 외부에서 접근 가능한 HTTPS 주소로 설정한다.
+
+```bash
+docker compose logs -f api web
+docker compose down
+```
+
+`docker compose down`은 데이터를 보존한다. PostgreSQL과 MinIO 데이터까지 삭제하는 `docker compose down -v`는 복구할 수 있으리라는 검증된 백업이 있을 때만 사용한다.
+
 ## 배포 전 환경변수
 
 - `NODE_ENV=production`

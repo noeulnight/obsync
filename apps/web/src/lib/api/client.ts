@@ -1,6 +1,9 @@
 import axios, { type AxiosRequestConfig } from "axios";
+import type { FileOperationRequest, RemoteFile } from "@obsync/sync-core";
 import type { Vault } from "@/features/vaults/types/vault";
 import { fileId } from "@/lib/file-id";
+
+export type { FileOperationRequest, RemoteFile } from "@obsync/sync-core";
 
 export type Account = {
   id: string;
@@ -51,25 +54,8 @@ export type UploadedAttachment = {
   size: number;
 };
 
-export type FileOperationRequest = {
-  operationId: string;
-  fileId: string;
-  type: "create" | "rename" | "delete" | "updateAttachment";
-  kind?: "markdown" | "attachment" | "folder" | "canvas";
-  path?: string;
-  baseVersion?: number;
-  attachmentId?: string;
-};
-
 export type FileOperationResult = {
   files: Array<{ id: string; version: number }>;
-};
-
-export type RemoteFile = {
-  id: string;
-  path: string;
-  deleted: boolean;
-  version: number;
 };
 
 type UploadApproval = {
@@ -263,13 +249,6 @@ export class ApiClient {
       url: `/api/vaults/${vaultId}/attachments/${attachmentId}/download`,
     });
     return value.downloadUrl;
-  }
-
-  async deleteAttachment(vaultId: string, attachmentId: string) {
-    await this.request({
-      url: `/api/vaults/${vaultId}/attachments/${attachmentId}`,
-      method: "DELETE",
-    });
   }
 
   applyFileOperation(vaultId: string, operation: FileOperationRequest) {

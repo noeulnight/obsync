@@ -1,19 +1,14 @@
-import type { ApiClient, FileOperationRequest } from "./api";
+import type { FileEntry as BaseFileEntry, FileOperation } from "@obsync/sync-core";
+import type { ApiClient } from "./api";
 
-export type MarkdownEntry = {
-  id: string;
+export type MarkdownEntry = BaseFileEntry & {
   kind: "markdown";
-  path: string;
-  deleted: boolean;
   updatedAt: number;
   version: number;
 };
 
-export type AttachmentEntry = {
-  id: string;
+export type AttachmentEntry = BaseFileEntry & {
   kind: "attachment";
-  path: string;
-  deleted: boolean;
   updatedAt: number;
   attachmentId: string;
   mimeType: string;
@@ -22,20 +17,14 @@ export type AttachmentEntry = {
   version: number;
 };
 
-export type FolderEntry = {
-  id: string;
+export type FolderEntry = BaseFileEntry & {
   kind: "folder";
-  path: string;
-  deleted: boolean;
   updatedAt: number;
   version: number;
 };
 
-export type CanvasEntry = {
-  id: string;
+export type CanvasEntry = BaseFileEntry & {
   kind: "canvas";
-  path: string;
-  deleted: boolean;
   updatedAt: number;
   version: number;
 };
@@ -58,12 +47,4 @@ export type SyncConnection = {
   initialMode?: InitialSyncMode;
 };
 
-export type FileOperation = FileOperationRequest & {
-  fromPath?: string;
-  mimeType?: string;
-  sha256?: string;
-  size?: number;
-  createdAt: number;
-  failed?: boolean;
-  confirmedVersions?: Record<string, number>;
-};
+export type { FileOperation };

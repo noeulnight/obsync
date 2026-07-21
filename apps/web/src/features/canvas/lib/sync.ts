@@ -1,4 +1,5 @@
 import { HocuspocusProvider, type HocuspocusProviderWebsocket } from "@hocuspocus/provider";
+import { canvasNodeTextName, presenceColor, replaceText } from "@obsync/sync-core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import type { ApiClient } from "@/lib/api/client";
@@ -84,7 +85,7 @@ export class WebCanvas {
     this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {
       name: userName,
-      color: color(this.document.clientID),
+      color: presenceColor(this.document.clientID),
     });
     this.document.on("update", this.notify);
     this.provider.awareness?.on("change", this.notifyPresence);
@@ -180,7 +181,7 @@ export class WebCanvas {
       }
       this.nodesMap.set(id, node);
       this.zOrder.set(id, this.zOrder.size);
-      this.document.getText(textName(id)).insert(0, "새 노트");
+      this.document.getText(canvasNodeTextName(id)).insert(0, "새 노트");
     });
     return id;
   }
@@ -231,7 +232,7 @@ export class WebCanvas {
   }
 
   text(id: string) {
-    return this.document.getText(textName(id));
+    return this.document.getText(canvasNodeTextName(id));
   }
 
   bringToFront(id: string) {
@@ -268,7 +269,7 @@ export class WebCanvas {
     this.document.transact(() => {
       this.nodesMap.delete(id);
       this.zOrder.delete(id);
-      replaceCanvasText(this.document.getText(textName(id)), "");
+      replaceText(this.document.getText(canvasNodeTextName(id)), "");
       for (const edge of this.edges()) {
         if (edge.fromNode === id || edge.toNode === id) this.edgesMap.delete(edge.id);
       }
@@ -311,36 +312,13 @@ function readNode(item: Y.Map<unknown>, document: Y.Doc): CanvasNode {
     y: value.y,
     width: value.width,
     height: value.height,
-    ...(value.type === "text" ? { text: document.getText(textName(value.id)).toJSON() } : {}),
+    ...(value.type === "text"
+      ? { text: document.getText(canvasNodeTextName(value.id)).toJSON() }
+      : {}),
   };
 }
 
 function readEdge(item: Y.Map<unknown>): CanvasEdge {
   const value = item.toJSON() as CanvasEdge;
   return { ...value, id: value.id, fromNode: value.fromNode, toNode: value.toNode };
-}
-
-export function replaceCanvasText(text: Y.Text, next: string) {
-  const current = text.toJSON();
-  let start = 0;
-  while (start < current.length && start < next.length && current[start] === next[start]) start++;
-  let currentEnd = current.length;
-  let nextEnd = next.length;
-  while (currentEnd > start && nextEnd > start && current[currentEnd - 1] === next[nextEnd - 1]) {
-    currentEnd--;
-    nextEnd--;
-  }
-  text.doc?.transact(() => {
-    if (currentEnd > start) text.delete(start, currentEnd - start);
-    if (nextEnd > start) text.insert(start, next.slice(start, nextEnd));
-  });
-}
-
-function textName(nodeId: string) {
-  return `canvas-node:${nodeId}:text`;
-}
-
-function color(clientId: number) {
-  const colors = ["#7c6cff", "#e06c75", "#56b6c2", "#98c379", "#d19a66", "#c678dd"];
-  return colors[clientId % colors.length];
 }

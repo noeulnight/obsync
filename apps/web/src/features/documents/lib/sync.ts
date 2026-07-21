@@ -1,30 +1,30 @@
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
-import axios from "axios";
+import {
+  conflictPath,
+  isWithin,
+  moveWithin,
+  pathKey,
+  projectEntries,
+  type FileOperation,
+} from "@obsync/sync-core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
-import type {
-  ApiClient,
-  FileOperationRequest,
-  RemoteFile,
-  UploadedAttachment,
-} from "@/lib/api/client";
+import type { ApiClient, UploadedAttachment } from "@/lib/api/client";
 import { WebCanvas } from "@/features/canvas/lib/sync";
 import { randomUuid } from "@/lib/file-id";
-import { vaultPathKey } from "@/lib/vault-path";
-import { conflictPath, isWithin, moveWithin, validVaultPath, type FileEntry } from "./files";
+import { validVaultPath, type FileEntry } from "./files";
 import { WebDocument } from "./document";
+import { BrowserFileOutbox } from "./file-outbox";
 
 export { WebDocument } from "./document";
 
 export class WebVault {
-  private readonly document = new Y.Doc();
-  private readonly manifest = this.document.getMap<FileEntry>("files");
-  private readonly cacheDocument = new Y.Doc();
-  private readonly cacheManifest = this.cacheDocument.getMap<FileEntry>("files");
+  private readonly serverManifestDocument = new Y.Doc();
+  private readonly serverManifest = this.serverManifestDocument.getMap<FileEntry>("files");
+  private readonly cachedManifestDocument = new Y.Doc();
+  private readonly cachedManifest = this.cachedManifestDocument.getMap<FileEntry>("files");
   private readonly cachePersistence: IndexeddbPersistence;
-  private readonly operationsDocument = new Y.Doc();
-  private readonly operations = this.operationsDocument.getArray<FileOperation>("operations");
-  private readonly operationsPersistence: IndexeddbPersistence;
+  private readonly outbox: BrowserFileOutbox;
   private readonly socket: HocuspocusProviderWebsocket;
   private readonly provider: HocuspocusProvider;
   private readonly documents = new Map<string, WebDocument>();
@@ -32,9 +32,6 @@ export class WebVault {
   private readonly listeners = new Set<() => void>();
   private manifestLoaded = false;
   private manifestSynced = false;
-  private flushing = false;
-  private retryTimer?: ReturnType<typeof setTimeout>;
-  private retryDelay = 1_000;
   private readonly preservingDeletes = new Set<string>();
 
   constructor(
@@ -44,65 +41,71 @@ export class WebVault {
     private readonly setStatus: (status: string) => void,
     private readonly readOnly = false,
   ) {
+    this.cachePersistence = new IndexeddbPersistence(
+      `obsync:${vaultId}:manifest-cache:v1${readOnly ? ":readonly" : ""}`,
+      this.cachedManifestDocument,
+    );
+    this.outbox = new BrowserFileOutbox(
+      vaultId,
+      api,
+      readOnly,
+      (fileId) => this.serverManifest.get(fileId)?.version ?? 0,
+      () => this.entries().map((entry) => entry.path),
+      setStatus,
+      () => this.notify(),
+    );
     this.socket = new HocuspocusProviderWebsocket({
       url: api.websocketUrl(),
       delay: 1_000,
       maxDelay: 5_000,
       maxAttempts: 0,
       onStatus: ({ status }) => {
-        if (status === "disconnected") this.manifestSynced = false;
+        if (status === "disconnected") {
+          this.manifestSynced = false;
+          this.outbox.setConnected(false);
+        }
         setStatus(connectionStatus(status));
       },
     });
-    this.cachePersistence = new IndexeddbPersistence(
-      `obsync:${vaultId}:manifest-cache:v1${readOnly ? ":readonly" : ""}`,
-      this.cacheDocument,
-    );
-    this.operationsPersistence = new IndexeddbPersistence(
-      `obsync:${vaultId}:file-operations:v2${readOnly ? ":readonly" : ""}`,
-      this.operationsDocument,
-    );
-    this.manifest.observe((event, transaction) => {
+    this.serverManifest.observe((event, transaction) => {
       if (this.manifestSynced) {
-        this.cacheDocument.transact(() => {
+        this.cachedManifestDocument.transact(() => {
           for (const id of event.keysChanged) {
-            const entry = this.manifest.get(id);
-            if (entry) this.cacheManifest.set(id, entry);
-            else this.cacheManifest.delete(id);
+            const entry = this.serverManifest.get(id);
+            if (entry) this.cachedManifest.set(id, entry);
+            else this.cachedManifest.delete(id);
           }
         });
       }
       if (!transaction.local) {
         for (const id of event.keysChanged) {
-          const entry = this.manifest.get(id);
+          const entry = this.serverManifest.get(id);
           if (entry?.deleted) this.preserveDeletedChanges(entry);
         }
       }
-      this.cleanupConfirmed();
+      this.outbox.cleanupConfirmed();
       this.notify();
     });
-    this.operations.observe(() => this.notify());
-    this.operationsPersistence.once("synced", () => void this.flush());
     this.cachePersistence.once("synced", () => {
       this.manifestLoaded = true;
       this.notify();
     });
     this.provider = new HocuspocusProvider({
       name: `vault:${vaultId}:manifest`,
-      document: this.document,
+      document: this.serverManifestDocument,
       websocketProvider: this.socket,
       token: () => api.token(),
       onSynced: ({ state }) => {
         if (!state) return;
         this.manifestSynced = true;
         this.manifestLoaded = true;
-        this.cacheDocument.transact(() => {
-          this.cacheManifest.clear();
-          for (const [id, entry] of this.manifest) this.cacheManifest.set(id, entry);
+        this.cachedManifestDocument.transact(() => {
+          this.cachedManifest.clear();
+          for (const [id, entry] of this.serverManifest) this.cachedManifest.set(id, entry);
         });
         this.notify();
         setStatus("동기화됨");
-        void this.flush();
+        this.outbox.setConnected(true);
       },
       onAuthenticationFailed: () => setStatus("인증 실패"),
     });
@@ -261,18 +264,16 @@ export class WebVault {
   }
 
   destroy() {
-    if (this.retryTimer) clearTimeout(this.retryTimer);
     for (const document of this.documents.values()) document.destroy();
     this.documents.clear();
     for (const canvas of this.canvases.values()) canvas.destroy();
     this.canvases.clear();
     this.provider.destroy();
     void this.cachePersistence.destroy();
-    void this.operationsPersistence.destroy();
+    this.outbox.destroy();
     this.socket.destroy();
-    this.document.destroy();
-    this.cacheDocument.destroy();
-    this.operationsDocument.destroy();
+    this.serverManifestDocument.destroy();
+    this.cachedManifestDocument.destroy();
   }
 
   private notify() {
@@ -310,219 +311,13 @@ export class WebVault {
     }
   }
 
-  private enqueue(operation: FileOperation) {
-    this.operations.push([operation]);
-    void this.flush();
-  }
-
-  private async flush() {
-    if (this.flushing || !this.manifestSynced || this.readOnly) return;
-    this.flushing = true;
-    try {
-      while (true) {
-        const operations = this.operations.toArray();
-        const index = operations.findIndex((operation) => !operation.confirmedVersions);
-        if (index < 0) return;
-        const operation = operations[index];
-        try {
-          const result = await this.api.applyFileOperation(
-            this.vaultId,
-            operationRequest(operation),
-          );
-          this.retryDelay = 1_000;
-          this.confirm(index, operation, result.files);
-        } catch (error) {
-          if (axios.isAxiosError(error) && error.response?.status === 409) {
-            try {
-              await this.recoverConflict(index, operation);
-              continue;
-            } catch {
-              this.scheduleRetry();
-              return;
-            }
-          }
-          this.scheduleRetry();
-          return;
-        }
-      }
-    } catch {
-      this.scheduleRetry();
-    } finally {
-      this.flushing = false;
-    }
-  }
-
-  private async recoverConflict(index: number, operation: FileOperation) {
-    const files = await this.api.listFiles(this.vaultId);
-    const current = files.find((file) => file.id === operation.fileId && !file.deleted);
-    if (operation.type === "create") {
-      if (current) {
-        this.confirm(index, operation, [current]);
-        return;
-      }
-      const path = conflictPath(operation.path!, operation.fileId, this.occupiedPaths(files));
-      this.rewritePendingPaths(operation.path!, path);
-      this.replaceOperation(index, { ...operation, operationId: randomUuid(), path });
-      this.setStatus("충돌 사본 생성 중");
-      return;
-    }
-    if (!current) {
-      this.operations.delete(index, 1);
-      this.setStatus("서버 변경 적용됨");
-      return;
-    }
-    let path = operation.path;
-    if (
-      operation.type === "rename" &&
-      path &&
-      files.some(
-        (file) => !file.deleted && file.id !== operation.fileId && samePath(file.path, path!),
-      )
-    ) {
-      const nextPath = conflictPath(path, operation.fileId, this.occupiedPaths(files));
-      this.rewritePendingPaths(path, nextPath);
-      path = nextPath;
-      this.setStatus("충돌 사본 생성 중");
-    }
-    this.replaceOperation(index, {
-      ...operation,
-      operationId: randomUuid(),
-      baseVersion: current.version,
-      fromPath:
-        operation.type === "rename" || operation.type === "delete"
-          ? current.path
-          : operation.fromPath,
-      path,
-    });
-  }
-
-  private replaceOperation(index: number, operation: FileOperation) {
-    this.operations.delete(index, 1);
-    this.operations.insert(index, [operation]);
-  }
-
-  private occupiedPaths(files: RemoteFile[]) {
-    return [...activePaths(files), ...this.entries().map((entry) => entry.path)];
-  }
-
-  private rewritePendingPaths(from: string, to: string) {
-    this.operationsDocument.transact(() => {
-      this.operations.toArray().forEach((operation, index) => {
-        const path =
-          operation.path && isWithin(operation.path, from)
-            ? moveWithin(operation.path, from, to)
-            : operation.path;
-        const fromPath =
-          operation.fromPath && isWithin(operation.fromPath, from)
-            ? moveWithin(operation.fromPath, from, to)
-            : operation.fromPath;
-        if (path === operation.path && fromPath === operation.fromPath) return;
-        this.replaceOperation(index, { ...operation, path, fromPath });
-      });
-    });
-  }
-
-  private scheduleRetry() {
-    if (this.retryTimer || this.readOnly) return;
-    const delay = this.retryDelay;
-    this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
-    this.setStatus("재연결 대기");
-    this.retryTimer = setTimeout(() => {
-      this.retryTimer = undefined;
-      void this.flush();
-    }, delay);
-  }
-
-  private confirm(
-    index: number,
-    operation: FileOperation,
-    files: Array<{ id: string; version: number }>,
-  ) {
-    const versions = Object.fromEntries(files.map((file) => [file.id, file.version]));
-    this.operationsDocument.transact(() => {
-      this.operations.delete(index, 1);
-      this.operations.insert(index, [{ ...operation, confirmedVersions: versions }]);
-      const pending = this.operations.toArray();
-      pending.forEach((item, itemIndex) => {
-        const version = versions[item.fileId];
-        if (version === undefined || item.baseVersion === undefined) return;
-        this.operations.delete(itemIndex, 1);
-        this.operations.insert(itemIndex, [{ ...item, baseVersion: version }]);
-      });
-    });
-    this.cleanupConfirmed();
-  }
-
-  private cleanupConfirmed() {
-    for (let index = this.operations.length - 1; index >= 0; index -= 1) {
-      const operation = this.operations.get(index);
-      const versions = operation.confirmedVersions;
-      if (
-        versions &&
-        Object.entries(versions).every(
-          ([id, version]) => (this.manifest.get(id)?.version ?? 0) >= version,
-        )
-      ) {
-        this.operations.delete(index, 1);
-      }
-    }
+  private enqueue(operation: Omit<FileOperation, "createdAt">) {
+    this.outbox.enqueue(operation);
   }
 
   private projectedEntries() {
-    const source = this.manifestSynced ? this.manifest : this.cacheManifest;
-    const entries = new Map([...source].map(([id, entry]) => [id, { ...entry }]));
-    for (const operation of this.operations.toArray()) {
-      if (operation.type === "create") {
-        entries.set(operation.fileId, {
-          id: operation.fileId,
-          kind: operation.kind!,
-          path: operation.path!,
-          deleted: false,
-          version: 0,
-          attachmentId: operation.attachmentId,
-          mimeType: operation.mimeType,
-          sha256: operation.sha256,
-          size: operation.size,
-        });
-        continue;
-      }
-      const target = entries.get(operation.fileId);
-      if (!target) continue;
-      if (operation.type === "rename") {
-        for (const [id, entry] of entries) {
-          if (
-            id === target.id ||
-            (target.kind === "folder" && isWithin(entry.path, operation.fromPath!))
-          ) {
-            entries.set(id, {
-              ...entry,
-              path:
-                id === target.id
-                  ? operation.path!
-                  : moveWithin(entry.path, operation.fromPath!, operation.path!),
-            });
-          }
-        }
-      } else if (operation.type === "delete") {
-        for (const [id, entry] of entries) {
-          if (
-            id === target.id ||
-            (target.kind === "folder" && isWithin(entry.path, operation.fromPath!))
-          ) {
-            entries.set(id, { ...entry, deleted: true });
-          }
-        }
-      } else {
-        entries.set(target.id, {
-          ...target,
-          attachmentId: operation.attachmentId,
-          mimeType: operation.mimeType,
-          sha256: operation.sha256,
-          size: operation.size,
-        });
-      }
-    }
-    return [...entries.values()];
+    const source = this.manifestSynced ? this.serverManifest : this.cachedManifest;
+    return projectEntries(source, this.outbox.entries());
   }
 
   private requireAvailablePath(path: string) {
@@ -536,32 +331,6 @@ export class WebVault {
   }
 }
 
-type FileOperation = FileOperationRequest & {
-  fromPath?: string;
-  mimeType?: string;
-  sha256?: string;
-  size?: number;
-  failed?: boolean;
-  confirmedVersions?: Record<string, number>;
-};
-
-function operationRequest(operation: FileOperation): FileOperationRequest {
-  const {
-    failed: _failed,
-    fromPath: _fromPath,
-    mimeType: _mimeType,
-    sha256: _sha256,
-    size: _size,
-    confirmedVersions: _confirmedVersions,
-    ...request
-  } = operation;
-  return request;
-}
-
-function activePaths(files: RemoteFile[]) {
-  return files.filter((file) => !file.deleted).map((file) => file.path);
-}
-
 function connectionStatus(status: string) {
   if (status === "connected") return "동기화 중";
   if (status === "disconnected") return "오프라인";
@@ -569,5 +338,5 @@ function connectionStatus(status: string) {
 }
 
 function samePath(left: string, right: string) {
-  return vaultPathKey(left) === vaultPathKey(right);
+  return pathKey(left) === pathKey(right);
 }

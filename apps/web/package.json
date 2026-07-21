@@ -20,6 +20,7 @@
     "@headless-tree/core": "catalog:",
     "@headless-tree/react": "catalog:",
     "@hocuspocus/provider": "catalog:",
+    "@obsync/sync-core": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "axios": "catalog:",
     "class-variance-authority": "catalog:",

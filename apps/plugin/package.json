@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hocuspocus/provider": "catalog:",
+    "@obsync/sync-core": "workspace:*",
     "y-codemirror.next": "catalog:",
     "y-indexeddb": "catalog:",
     "yjs": "catalog:"

@@ -2,8 +2,8 @@ import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/pro
 import { IndexeddbPersistence } from "y-indexeddb";
 import { MarkdownView, TFile, type App } from "obsidian";
 import * as Y from "yjs";
+import { presenceColor, replaceText } from "@obsync/sync-core";
 import type { SeedMode, SyncConnection } from "./sync-types";
-import { replaceText } from "./text";
 
 export class DocumentSync {
   readonly document = new Y.Doc();
@@ -50,7 +50,7 @@ export class DocumentSync {
     this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {
       name: connection.userName,
-      color: color(this.document.clientID),
+      color: presenceColor(this.document.clientID),
     });
     this.persistence.once("synced", () => {
       this.persistenceSynced = true;
@@ -151,9 +151,4 @@ export class DocumentSync {
     this.onReady();
     await this.writeFile();
   }
-}
-
-function color(clientId: number) {
-  const colors = ["#30bced", "#6eeb83", "#ffbc42", "#ee6352", "#9ac2c9"];
-  return colors[clientId % colors.length];
 }

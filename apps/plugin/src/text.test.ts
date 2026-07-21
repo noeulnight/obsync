@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Y from "yjs";
+import { replaceText } from "@obsync/sync-core";
 import { type CanvasItemController, observeCanvas, renderCanvas } from "./canvas-controller";
 import { parseCanvas } from "./canvas-data";
 import { readCanvasPresence } from "./canvas-presence";
 import { syncNodes } from "./canvas-yjs";
 import { mimeType } from "./mime";
 import { fileId, isWithin, moveWithin, parentPath, pathKey } from "./path";
-import { replaceText } from "./text";
 import { editorBindingKey } from "./sync-types";
 
 describe("parentPath", () => {

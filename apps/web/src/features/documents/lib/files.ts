@@ -1,15 +1,7 @@
-export type FileEntry = {
-  id: string;
-  kind: "markdown" | "attachment" | "folder" | "canvas";
-  path: string;
-  deleted: boolean;
-  attachmentId?: string;
-  mimeType?: string;
-  sha256?: string;
-  size?: number;
-  version?: number;
-  updatedAt?: number;
-};
+import { normalizeVaultPath, type FileEntry } from "@obsync/sync-core";
+
+export { conflictPath, isWithin, moveWithin } from "@obsync/sync-core";
+export type { FileEntry } from "@obsync/sync-core";
 
 export type TreeNode = {
   name: string;
@@ -95,37 +87,17 @@ export function renamedFilePath(path: string, fileName: string) {
 }
 
 export function validVaultPath(path: string) {
-  const value = path.trim().normalize("NFC");
-  if (!value || value.startsWith("/") || value.includes("\0")) return undefined;
-  const parts = value.split("/");
-  if (parts.some((part) => !part || part === "." || part === "..")) return undefined;
-  return parts.join("/");
+  return normalizeVaultPath(path);
 }
 
-export function isWithin(path: string, folder: string) {
-  const value = vaultPathKey(path);
-  const parent = vaultPathKey(folder);
-  return value === parent || value.startsWith(`${parent}/`);
-}
-
-export function moveWithin(path: string, from: string, to: string) {
-  return path === from ? to : `${to}${path.slice(from.length)}`;
-}
-
-export function conflictPath(path: string, id: string, occupied: Iterable<string>) {
-  const used = new Set([...occupied].map(vaultPathKey));
-  const separator = path.lastIndexOf("/");
-  const folder = separator < 0 ? "" : path.slice(0, separator + 1);
-  const name = separator < 0 ? path : path.slice(separator + 1);
-  const extension = name.lastIndexOf(".");
-  const stem = extension > 0 ? name.slice(0, extension) : name;
-  const suffix = extension > 0 ? name.slice(extension) : "";
-  const base = `${folder}${stem} (conflict ${id.slice(0, 8)})`;
-  let candidate = `${base}${suffix}`;
-  for (let number = 2; used.has(vaultPathKey(candidate)); number += 1) {
-    candidate = `${base} ${number}${suffix}`;
-  }
-  return candidate;
+export function newEntryPath(kind: "markdown" | "folder" | "canvas", input: string) {
+  const extension = kind === "markdown" ? ".md" : kind === "canvas" ? ".canvas" : "";
+  let path = input.trim();
+  if (!path) return undefined;
+  if (extension && !path.toLocaleLowerCase().endsWith(extension)) path += extension;
+  const valid = validVaultPath(path);
+  const name = valid?.split("/").at(-1);
+  return valid && (!extension || name?.slice(0, -extension.length).trim()) ? valid : undefined;
 }
 
 function normalizePath(parts: string[]) {
@@ -155,4 +127,3 @@ function finish(nodes: Map<string, MutableNode>): TreeNode[] {
     })
     .map((node) => ({ ...node, children: finish(node.children) }));
 }
-import { vaultPathKey } from "@/lib/vault-path";

@@ -1,4 +1,5 @@
 import { HocuspocusProvider, type HocuspocusProviderWebsocket } from "@hocuspocus/provider";
+import { presenceColor } from "@obsync/sync-core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import type { ApiClient } from "@/lib/api/client";
@@ -34,7 +35,7 @@ export class WebDocument {
     this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {
       name: userName,
-      color: color(this.document.clientID),
+      color: presenceColor(this.document.clientID),
     });
   }
 
@@ -73,9 +74,4 @@ export class WebDocument {
     this.document.destroy();
     this.remove();
   }
-}
-
-function color(clientId: number) {
-  const colors = ["#7c6cff", "#e06c75", "#56b6c2", "#98c379", "#d19a66", "#c678dd"];
-  return colors[clientId % colors.length];
 }

@@ -1,4 +1,7 @@
 import { requestUrl, type RequestUrlParam } from "obsidian";
+import type { FileOperationRequest, RemoteFile } from "@obsync/sync-core";
+
+export type { FileOperationRequest, RemoteFile } from "@obsync/sync-core";
 
 export type VaultSummary = {
   id: string;
@@ -19,25 +22,8 @@ export type UploadApproval = {
   alreadyReady: boolean;
 };
 
-export type FileOperationRequest = {
-  operationId: string;
-  fileId: string;
-  type: "create" | "rename" | "delete" | "updateAttachment";
-  kind?: "markdown" | "attachment" | "folder" | "canvas";
-  path?: string;
-  baseVersion?: number;
-  attachmentId?: string;
-};
-
 export type FileOperationResult = {
   files: Array<{ id: string; version: number }>;
-};
-
-export type RemoteFile = {
-  id: string;
-  path: string;
-  deleted: boolean;
-  version: number;
 };
 
 export class ApiRequestError extends Error {
@@ -186,10 +172,6 @@ export class ApiClient {
       `/api/vaults/${vaultId}/attachments/${attachmentId}/download`,
     );
     return value.downloadUrl;
-  }
-
-  async deleteAttachment(vaultId: string, attachmentId: string) {
-    await this.request(`/api/vaults/${vaultId}/attachments/${attachmentId}`, { method: "DELETE" });
   }
 
   async applyFileOperation(

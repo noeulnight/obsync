@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Editor } from "@/features/documents/components/Editor";
 import { renamedMarkdownPath, type FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
+import { errorMessage } from "@/lib/error";
 import { FileHeader } from "./FileHeader";
 
 export function DocumentEditor({
@@ -43,7 +44,7 @@ export function DocumentEditor({
       onRename(path);
       setError("");
     } catch (reason) {
-      setError(message(reason));
+      setError(errorMessage(reason));
       setTitle(original);
     }
   }
@@ -89,8 +90,4 @@ export function DocumentEditor({
 
 function basename(path: string) {
   return (path.split("/").at(-1) ?? path).replace(/\.md$/i, "");
-}
-
-function message(reason: unknown) {
-  return reason instanceof Error ? reason.message : String(reason);
 }

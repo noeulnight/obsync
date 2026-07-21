@@ -8,7 +8,7 @@ Obsidian Markdown 편집기를 Yjs + Hocuspocus에 연결하고, 로컬 IndexedD
 pnpm --filter obsync-plugin build
 ```
 
-생성된 `main.js`, `manifest.json`, `styles.css`를 Vault의 다음 경로에 둡니다.
+빌드 산출물은 먼저 `dist/main.js`에 생성된 뒤 배포용 `main.js`로 복사됩니다. 플러그인 루트의 `main.js`, `manifest.json`, `styles.css`를 Vault의 다음 경로에 둡니다.
 
 ```text
 .obsidian/plugins/obsync/

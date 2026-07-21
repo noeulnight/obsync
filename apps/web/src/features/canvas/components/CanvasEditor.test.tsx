@@ -170,6 +170,54 @@ describe("CanvasEditor", () => {
     expect(connect).toHaveBeenCalledWith("one", "two", "right", "left");
   });
 
+  it("covers image attachment nodes", async () => {
+    const canvas = {
+      nodes: () => [
+        {
+          id: "image",
+          type: "file",
+          x: 100,
+          y: 100,
+          width: 280,
+          height: 160,
+          file: "photo.png",
+        },
+      ],
+      edges: () => [],
+      presence: () => [],
+      subscribe: () => () => undefined,
+      subscribePresence: () => () => undefined,
+      destroy: () => undefined,
+      setPresence: () => undefined,
+    } as unknown as WebCanvas;
+
+    render(
+      <CanvasEditor
+        session={canvas}
+        vaultName="Vault"
+        path="Test.canvas"
+        onRename={() => undefined}
+        onDelete={() => undefined}
+        openDocument={() => undefined}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        resolveFileAsset={() => Promise.resolve("https://example.com/photo.png")}
+        files={[
+          {
+            id: "attachment",
+            kind: "attachment",
+            path: "photo.png",
+            deleted: false,
+          },
+        ]}
+      />,
+    );
+
+    const image = await screen.findByRole("img", { name: "photo.png" });
+    expect(image.className).toContain("object-cover");
+    expect(image.className).not.toContain("object-contain");
+  });
+
   it("changes color, zooms to, and edits a selected node", async () => {
     HTMLElement.prototype.setPointerCapture = vi.fn();
     Object.defineProperties(HTMLElement.prototype, {

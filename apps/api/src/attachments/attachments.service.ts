@@ -12,10 +12,10 @@ import {
 import { Prisma, type Attachment } from '@prisma/client';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
-import { posix } from 'node:path';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
+import { vaultPath } from '../vaults/utils/vault-path';
 import type {
   AttachmentResponseDto,
   DownloadResponseDto,
@@ -40,7 +40,7 @@ export class AttachmentsService {
     input: PresignUploadDto,
   ): Promise<PresignUploadResponseDto> {
     await this.access.requireWrite(ownerId, vaultId);
-    const path = this.normalizedPath(input.path);
+    const path = vaultPath(input.path);
     const sha256 = input.sha256.toLowerCase();
     let attachment = await this.prisma.attachment.findFirst({
       where: {
@@ -132,7 +132,7 @@ export class AttachmentsService {
     attachmentId: string,
   ): Promise<AttachmentResponseDto> {
     await this.access.requireWrite(ownerId, vaultId);
-    const attachment = await this.findOwned(ownerId, vaultId, attachmentId);
+    const attachment = await this.findOwned(vaultId, attachmentId);
     if (attachment.status === 'READY') return this.response(attachment);
 
     let head;
@@ -166,7 +166,7 @@ export class AttachmentsService {
     attachmentId: string,
   ): Promise<DownloadResponseDto> {
     await this.access.requireRead(ownerId, vaultId);
-    const attachment = await this.findOwned(ownerId, vaultId, attachmentId);
+    const attachment = await this.findOwned(vaultId, attachmentId);
     if (attachment.status !== 'READY') throw new NotFoundException();
     return {
       downloadUrl: await getSignedUrl(
@@ -187,7 +187,7 @@ export class AttachmentsService {
     attachmentId: string,
   ): Promise<void> {
     await this.access.requireWrite(ownerId, vaultId);
-    const attachment = await this.findAnyOwned(ownerId, vaultId, attachmentId);
+    const attachment = await this.findAnyOwned(vaultId, attachmentId);
     if (attachment.status === 'DELETED') return;
     await this.prisma.attachment.updateMany({
       where: { id: attachment.id, vaultId },
@@ -195,11 +195,7 @@ export class AttachmentsService {
     });
   }
 
-  private async findOwned(
-    ownerId: string,
-    vaultId: string,
-    attachmentId: string,
-  ) {
+  private async findOwned(vaultId: string, attachmentId: string) {
     const attachment = await this.prisma.attachment.findFirst({
       where: {
         id: attachmentId,
@@ -211,31 +207,12 @@ export class AttachmentsService {
     return attachment;
   }
 
-  private async findAnyOwned(
-    ownerId: string,
-    vaultId: string,
-    attachmentId: string,
-  ) {
+  private async findAnyOwned(vaultId: string, attachmentId: string) {
     const attachment = await this.prisma.attachment.findFirst({
       where: { id: attachmentId, vaultId },
     });
     if (!attachment) throw new NotFoundException('Attachment not found');
     return attachment;
-  }
-
-  private normalizedPath(path: string): string {
-    if (
-      path.includes('\\') ||
-      path.includes('\0') ||
-      path.startsWith('/') ||
-      path.endsWith('/') ||
-      posix.normalize(path) !== path ||
-      path === '.' ||
-      path.startsWith('../')
-    ) {
-      throw new BadRequestException('Invalid Vault path');
-    }
-    return path;
   }
 
   private response(attachment: Attachment): AttachmentResponseDto {

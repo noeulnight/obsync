@@ -1,0 +1,17 @@
+{
+  "name": "@obsync/sync-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "check": "vp check src package.json",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "yjs": "catalog:"
+  },
+  "devDependencies": {
+    "vite-plus": "catalog:"
+  }
+}
