@@ -16,6 +16,16 @@ pnpm --filter obsync-plugin build
 
 Obsidian 커뮤니티 플러그인 설정에서 **Obsync**를 활성화한 다음 API URL, 계정, 동기화할 Vault를 선택합니다. 로컬 개발 기본 API 주소는 `http://localhost:3000`이며 WebSocket 주소는 자동으로 `/collaboration`으로 변환됩니다.
 
+## BRAT 설치
+
+BRAT의 **Add Beta Plugin**에 다음 저장소를 입력합니다.
+
+```text
+https://github.com/noeulnight/obsync
+```
+
+버전 태그가 push되면 GitHub Actions가 BRAT에 필요한 `main.js`, `manifest.json`, `styles.css`를 Release에 첨부합니다. 태그는 `manifest.json`의 버전과 같아야 합니다.
+
 ## 동기화 범위
 
 - Markdown: 문자 단위 CRDT, 실시간 커서, IndexedDB 오프라인 큐
