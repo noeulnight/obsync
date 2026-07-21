@@ -9,6 +9,7 @@ import {
   Patch,
   Param,
   ParseUUIDPipe,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -28,13 +29,68 @@ import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import type { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OidcService, type OidcTransaction } from './oidc.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: ConfigService,
+    private readonly oidc: OidcService,
   ) {}
+
+  @Get('oidc/config')
+  oidcConfig() {
+    return {
+      enabled: this.oidc.enabled(),
+      registrationEnabled: this.config.getOrThrow<boolean>(
+        'auth.registrationEnabled',
+      ),
+    };
+  }
+
+  @Get('oidc/start')
+  async oidcStart(
+    @Query('return_to') returnTo: string | undefined,
+    @Res() response: Response,
+  ) {
+    const { url, transaction } = await this.oidc.start();
+    response.cookie(
+      oidcCookieName,
+      encodeTransaction({ ...transaction, returnTo: localPath(returnTo) }),
+      {
+        ...this.oidcCookieOptions(),
+        maxAge: oidcCookieTtlMs,
+      },
+    );
+    response.redirect(url.toString());
+  }
+
+  @Get('oidc/callback')
+  async oidcCallback(@Req() request: Request, @Res() response: Response) {
+    const transaction = decodeTransaction(cookie(request, oidcCookieName));
+    response.clearCookie(oidcCookieName, this.oidcCookieOptions());
+    if (!transaction) throw new UnauthorizedException('Sign-in expired');
+
+    const callbackUrl = new URL(
+      this.config.getOrThrow<string>('auth.oidc.redirectUri'),
+    );
+    callbackUrl.search = new URL(
+      request.originalUrl,
+      'http://localhost',
+    ).search;
+    const profile = await this.oidc.callback(callbackUrl, transaction);
+    this.webTokens(
+      response,
+      await this.auth.loginOidc(profile, userAgent(request)),
+    );
+    response.redirect(
+      new URL(
+        transaction.returnTo ?? '/',
+        this.config.getOrThrow<string>('app.webUrl'),
+      ).toString(),
+    );
+  }
 
   @Post('register')
   register(@Body() body: RegisterDto) {
@@ -214,21 +270,55 @@ export class AuthController {
       path: '/api/auth/web',
     };
   }
+
+  private oidcCookieOptions() {
+    return {
+      httpOnly: true,
+      sameSite: 'lax' as const,
+      secure: this.config.getOrThrow<string>('app.nodeEnv') === 'production',
+      path: '/api/auth/oidc',
+    };
+  }
 }
 
 const refreshCookieName = 'obsync_refresh';
+const oidcCookieName = 'obsync_oidc';
+const oidcCookieTtlMs = 10 * 60 * 1000;
 
 function refreshCookie(request: Request) {
+  return cookie(request, refreshCookieName);
+}
+
+function cookie(request: Request, cookieName: string) {
   const pair = request.headers.cookie
     ?.split(';')
     .map((value) => value.trim().split('='))
-    .find(([name]) => name === refreshCookieName);
+    .find(([name]) => name === cookieName);
   if (!pair) return undefined;
   try {
     return decodeURIComponent(pair.slice(1).join('='));
   } catch {
     return undefined;
   }
+}
+
+function encodeTransaction(transaction: OidcTransaction) {
+  return Buffer.from(JSON.stringify(transaction)).toString('base64url');
+}
+
+function decodeTransaction(value?: string): OidcTransaction | undefined {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as OidcTransaction;
+  } catch {
+    return undefined;
+  }
+}
+
+function localPath(value?: string) {
+  return value?.startsWith('/') && !value.startsWith('//') ? value : undefined;
 }
 
 function userAgent(request: Request) {

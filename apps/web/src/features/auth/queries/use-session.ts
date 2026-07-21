@@ -35,6 +35,14 @@ export function useSession() {
   return { session, authenticate, logout };
 }
 
+export function useOidcConfig() {
+  return useQuery({
+    queryKey: ["auth", "oidc"],
+    queryFn: () => api.oidcConfig(),
+    staleTime: Infinity,
+  });
+}
+
 export function useApproveDevice(userCode: string) {
   return useMutation({
     mutationFn: () => api.approveDevice(userCode),

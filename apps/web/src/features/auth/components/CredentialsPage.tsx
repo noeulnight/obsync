@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import type { AuthAction, Credentials } from "../queries/use-session";
 
 export function CredentialsPage({
@@ -9,11 +10,17 @@ export function CredentialsPage({
   description,
   error,
   onSubmit,
+  oidcEnabled,
+  registrationEnabled = true,
+  onOidc,
 }: {
   title: string;
   description: string;
   error?: string;
   onSubmit: (credentials: Credentials) => Promise<unknown>;
+  oidcEnabled?: boolean;
+  registrationEnabled?: boolean;
+  onOidc?: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,14 +74,28 @@ export function CredentialsPage({
             <Button type="submit" disabled={submitting}>
               Sign in
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={submitting}
-              onClick={() => void submit("register")}
-            >
-              Create account
-            </Button>
+            {registrationEnabled && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={submitting}
+                onClick={() => void submit("register")}
+              >
+                Create account
+              </Button>
+            )}
+            {oidcEnabled && (
+              <>
+                <div className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
+                  <Separator className="flex-1" />
+                  <span>or</span>
+                  <Separator className="flex-1" />
+                </div>
+                <Button type="button" variant="outline" onClick={onOidc}>
+                  Continue with SSO
+                </Button>
+              </>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
           </form>
         </CardContent>

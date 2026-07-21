@@ -71,6 +71,20 @@ describe('Authentication (e2e)', () => {
       .expect(409);
   });
 
+  it('exposes public authentication capabilities', async () => {
+    await request(app.getHttpServer())
+      .get('/api/auth/oidc/config')
+      .expect(200)
+      .expect((response) => {
+        const body = response.body as {
+          enabled: unknown;
+          registrationEnabled: boolean;
+        };
+        expect(body).toMatchObject({ registrationEnabled: true });
+        expect(typeof body.enabled).toBe('boolean');
+      });
+  });
+
   it('protects me and rotates, expires, and revokes refresh tokens', async () => {
     await request(app.getHttpServer()).get('/api/auth/me').expect(401);
 

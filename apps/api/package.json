@@ -38,6 +38,7 @@
     "class-transformer": "catalog:",
     "class-validator": "catalog:",
     "joi": "catalog:",
+    "openid-client": "catalog:",
     "pg": "catalog:",
     "prisma": "catalog:",
     "reflect-metadata": "^0.2.2",

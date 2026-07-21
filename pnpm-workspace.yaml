@@ -62,6 +62,7 @@ catalog:
   '@codemirror/autocomplete': 6.20.3
   d3-force: ^3.0.0
   '@types/d3-force': ^3.0.10
+  openid-client: ^6.8.4
 overrides:
   vite: "catalog:"
 peerDependencyRules:

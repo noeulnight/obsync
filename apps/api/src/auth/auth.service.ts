@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import type {
   UserResponseDto,
 } from './dto/auth-response.dto';
 import type { JwtPayload } from './types/jwt-payload.type';
+import type { OidcProfile } from './oidc.service';
 
 const deviceCodeTtlMs = 10 * 60 * 1000;
 const devicePollIntervalSeconds = 2;
@@ -26,6 +28,7 @@ const userSelect = {
   email: true,
   displayName: true,
   createdAt: true,
+  passwordHash: true,
 } as const;
 
 @Injectable()
@@ -38,6 +41,9 @@ export class AuthService {
   ) {}
 
   async register(email: string, password: string): Promise<UserResponseDto> {
+    if (!this.registrationEnabled()) {
+      throw new ForbiddenException('Account registration is disabled');
+    }
     try {
       const user = await this.prisma.user.create({
         data: {
@@ -46,7 +52,7 @@ export class AuthService {
         },
         select: userSelect,
       });
-      return user;
+      return this.userResponse(user);
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -61,6 +67,70 @@ export class AuthService {
   async login(email: string, password: string, userAgent?: string) {
     const user = await this.authenticate(email, password);
     return this.issueTokens(user.id, userAgent);
+  }
+
+  async loginOidc(profile: OidcProfile, userAgent?: string) {
+    const identity = await this.prisma.authIdentity.findUnique({
+      where: {
+        issuer_subject: {
+          issuer: profile.issuer,
+          subject: profile.subject,
+        },
+      },
+      select: { userId: true },
+    });
+    if (identity) return this.issueTokens(identity.userId, userAgent);
+
+    const email = this.normalizeEmail(profile.email);
+    let userId: string;
+    try {
+      userId = await this.prisma.$transaction(async (prisma) => {
+        const existing = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true },
+        });
+        if (!existing && !this.registrationEnabled()) {
+          throw new ForbiddenException('Account registration is disabled');
+        }
+        const user =
+          existing ??
+          (await prisma.user.create({
+            data: {
+              email,
+              passwordHash: null,
+              displayName: profile.displayName?.trim().slice(0, 100) || null,
+            },
+            select: { id: true },
+          }));
+        await prisma.authIdentity.create({
+          data: {
+            userId: user.id,
+            issuer: profile.issuer,
+            subject: profile.subject,
+          },
+        });
+        return user.id;
+      });
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2002'
+      ) {
+        throw error;
+      }
+      const concurrent = await this.prisma.authIdentity.findUnique({
+        where: {
+          issuer_subject: {
+            issuer: profile.issuer,
+            subject: profile.subject,
+          },
+        },
+        select: { userId: true },
+      });
+      if (!concurrent) throw error;
+      userId = concurrent.userId;
+    }
+    return this.issueTokens(userId, userAgent);
   }
 
   async startDeviceAuthorization() {
@@ -174,7 +244,7 @@ export class AuthService {
       select: userSelect,
     });
     if (!user) throw new UnauthorizedException();
-    return user;
+    return this.userResponse(user);
   }
 
   async updateAccount(
@@ -188,6 +258,7 @@ export class AuthService {
     if (email && email !== user.email) {
       if (
         !input.currentPassword ||
+        !user.passwordHash ||
         !(await verify(user.passwordHash, input.currentPassword))
       ) {
         throw new UnauthorizedException('Current password is incorrect');
@@ -195,7 +266,7 @@ export class AuthService {
     }
 
     try {
-      return await this.prisma.user.update({
+      const updated = await this.prisma.user.update({
         where: { id: userId },
         data: {
           ...(input.displayName === undefined
@@ -205,6 +276,7 @@ export class AuthService {
         },
         select: userSelect,
       });
+      return this.userResponse(updated);
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -222,7 +294,10 @@ export class AuthService {
     newPassword: string,
   ): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !(await verify(user.passwordHash, currentPassword))) {
+    if (
+      !user?.passwordHash ||
+      !(await verify(user.passwordHash, currentPassword))
+    ) {
       throw new UnauthorizedException('Current password is incorrect');
     }
     const passwordHash = await this.hashSecret(newPassword);
@@ -264,7 +339,7 @@ export class AuthService {
 
   async deleteAccount(userId: string, password: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !(await verify(user.passwordHash, password))) {
+    if (!user?.passwordHash || !(await verify(user.passwordHash, password))) {
       throw new UnauthorizedException('Current password is incorrect');
     }
     const attachments = await this.prisma.attachment.findMany({
@@ -280,7 +355,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: this.normalizeEmail(email) },
     });
-    if (!user || !(await verify(user.passwordHash, password))) {
+    if (!user?.passwordHash || !(await verify(user.passwordHash, password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
     return user;
@@ -352,6 +427,21 @@ export class AuthService {
 
   private normalizeEmail(email: string) {
     return email.trim().toLowerCase();
+  }
+
+  private registrationEnabled() {
+    return this.config.get<boolean>('auth.registrationEnabled') !== false;
+  }
+
+  private userResponse(user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    createdAt: Date;
+    passwordHash: string | null;
+  }): UserResponseDto {
+    const { passwordHash, ...account } = user;
+    return { ...account, canManageCredentials: passwordHash !== null };
   }
 
   private async hashSecret(value: string): Promise<string> {

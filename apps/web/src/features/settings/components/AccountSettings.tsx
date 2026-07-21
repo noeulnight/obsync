@@ -113,68 +113,82 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
         </Button>
       </SettingForm>
 
-      <Separator className="my-6" />
-      <SettingForm
-        title="Email"
-        description="Your current password is required to change your email."
-        onSubmit={saveEmail}
-      >
-        <div className="grid flex-1 gap-2">
-          <Input
-            type="email"
-            aria-label="Account email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <Input
-            type="password"
-            aria-label="Current password for email change"
-            placeholder="Current password"
-            value={emailPassword}
-            onChange={(event) => setEmailPassword(event.target.value)}
-          />
-        </div>
-        <Button
-          variant="secondary"
-          disabled={
-            updateAccount.isPending || email === account.data.email || emailPassword.length < 8
-          }
-        >
-          Change
-        </Button>
-      </SettingForm>
+      {account.data.canManageCredentials ? (
+        <>
+          <Separator className="my-6" />
+          <SettingForm
+            title="Email"
+            description="Your current password is required to change your email."
+            onSubmit={saveEmail}
+          >
+            <div className="grid flex-1 gap-2">
+              <Input
+                type="email"
+                aria-label="Account email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <Input
+                type="password"
+                aria-label="Current password for email change"
+                placeholder="Current password"
+                value={emailPassword}
+                onChange={(event) => setEmailPassword(event.target.value)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              disabled={
+                updateAccount.isPending || email === account.data.email || emailPassword.length < 8
+              }
+            >
+              Change
+            </Button>
+          </SettingForm>
 
-      <Separator className="my-6" />
-      <SettingForm
-        title="Password"
-        description="Changing it signs you out on every device."
-        onSubmit={savePassword}
-      >
-        <div className="grid flex-1 gap-2">
-          <Input
-            type="password"
-            aria-label="Current password"
-            placeholder="Current password"
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-          />
-          <Input
-            type="password"
-            aria-label="New password"
-            placeholder="New password (8+ characters)"
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-          />
-        </div>
-        <Button
-          variant="secondary"
-          disabled={
-            changePassword.isPending || currentPassword.length < 8 || newPassword.length < 8
-          }
-        >
-          Change
-        </Button>
-      </SettingForm>
+          <Separator className="my-6" />
+          <SettingForm
+            title="Password"
+            description="Changing it signs you out on every device."
+            onSubmit={savePassword}
+          >
+            <div className="grid flex-1 gap-2">
+              <Input
+                type="password"
+                aria-label="Current password"
+                placeholder="Current password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+              />
+              <Input
+                type="password"
+                aria-label="New password"
+                placeholder="New password (8+ characters)"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              disabled={
+                changePassword.isPending || currentPassword.length < 8 || newPassword.length < 8
+              }
+            >
+              Change
+            </Button>
+          </SettingForm>
+        </>
+      ) : (
+        <>
+          <Separator className="my-6" />
+          <div>
+            <h3 className="font-medium">Single sign-on</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your email and sign-in method are managed by your identity provider.
+            </p>
+          </div>
+        </>
+      )}
 
       <Separator className="my-6" />
       <div>
@@ -211,45 +225,47 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
         </div>
       </div>
 
-      <Separator className="my-6" />
-      <div className="pb-4">
-        <h3 className="font-medium text-destructive">Delete account</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Permanently delete every Vault, document history, and attachment.
-        </p>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="mt-3" variant="destructive">
-              <Trash2 /> Delete account
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Permanently delete your account?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This cannot be undone. Enter your current password to continue.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <Input
-              type="password"
-              aria-label="Password for account deletion"
-              placeholder="Current password"
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-            />
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={deletePassword.length < 8 || deleteAccount.isPending}
-                onClick={() => void removeAccount()}
-              >
-                Delete permanently
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      {account.data.canManageCredentials && <Separator className="my-6" />}
+      {account.data.canManageCredentials && (
+        <div className="pb-4">
+          <h3 className="font-medium text-destructive">Delete account</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Permanently delete every Vault, document history, and attachment.
+          </p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button className="mt-3" variant="destructive">
+                <Trash2 /> Delete account
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Permanently delete your account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This cannot be undone. Enter your current password to continue.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Input
+                type="password"
+                aria-label="Password for account deletion"
+                placeholder="Current password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={deletePassword.length < 8 || deleteAccount.isPending}
+                  onClick={() => void removeAccount()}
+                >
+                  Delete permanently
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
 
       {error && <p className="pb-4 text-sm text-destructive">{errorMessage(error)}</p>}
     </section>

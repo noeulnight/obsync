@@ -3,13 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccount } from "@/features/auth/queries/use-account";
 import { errorMessage } from "@/lib/error";
+import { api } from "@/lib/api/client";
 import { CredentialsPage } from "./CredentialsPage";
-import { useApproveDevice, useSession } from "../queries/use-session";
+import { useApproveDevice, useOidcConfig, useSession } from "../queries/use-session";
 
 export function DeviceApprovalPage() {
   const [search] = useSearchParams();
   const userCode = search.get("user_code") ?? "";
   const { session, authenticate } = useSession();
+  const oidc = useOidcConfig();
   const account = useAccount(session.data === true);
   const approval = useApproveDevice(userCode);
 
@@ -42,6 +44,9 @@ export function DeviceApprovalPage() {
         description={`Obsidian device code ${userCode}`}
         error={errorMessage(authenticate.error)}
         onSubmit={(credentials) => authenticate.mutateAsync(credentials)}
+        oidcEnabled={oidc.data?.enabled}
+        registrationEnabled={oidc.data?.registrationEnabled ?? false}
+        onOidc={() => window.location.assign(api.oidcUrl(location.pathname + location.search))}
       />
     );
   }

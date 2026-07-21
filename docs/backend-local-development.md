@@ -43,3 +43,23 @@ pnpm --filter api start:prod
 ```
 
 API는 기본 `http://localhost:3000`, WebSocket은 같은 서버의 `ws://localhost:3000/collaboration`을 사용한다.
+
+## OpenID Connect 로그인 (선택)
+
+웹에 SSO를 추가하려면 identity provider에 confidential web client를 등록하고 아래 값을 설정한다. Callback URL은 provider에도 동일하게 등록해야 한다.
+
+```bash
+OIDC_ISSUER=https://id.example.com
+OIDC_CLIENT_ID=obsync
+OIDC_CLIENT_SECRET=change-me
+OIDC_REDIRECT_URI=http://localhost:3000/api/auth/oidc/callback
+OIDC_SCOPES="openid email profile"
+```
+
+설정하지 않으면 기존 이메일과 비밀번호 로그인만 노출된다. Obsidian은 별도의 provider token을 보관하지 않고 기존 device approval 흐름으로 웹에서 승인받는다. 처음 SSO 로그인할 때 provider가 반환한 이메일과 기존 계정 이메일이 같으면 두 로그인 방식이 같은 계정에 연결된다. 따라서 신뢰하는 OIDC provider만 설정해야 한다.
+
+신규 이메일 회원가입과 신규 SSO 계정 생성을 닫으려면 아래 값을 사용한다. 기존 계정 로그인과 기존 이메일에 대한 SSO 연결은 유지된다.
+
+```bash
+REGISTRATION_ENABLED=false
+```

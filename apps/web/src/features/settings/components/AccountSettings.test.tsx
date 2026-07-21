@@ -19,6 +19,7 @@ describe("account settings", () => {
       email: "user@example.com",
       displayName: "Old name",
       createdAt: "2026-07-20T00:00:00.000Z",
+      canManageCredentials: true,
     };
     const accountSessions = [
       {

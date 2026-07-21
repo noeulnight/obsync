@@ -10,6 +10,7 @@ export type Account = {
   email: string;
   displayName: string | null;
   createdAt: string;
+  canManageCredentials: boolean;
 };
 
 export type AccountSession = {
@@ -138,6 +139,17 @@ export class ApiClient {
       data: { email, password },
     });
     this.setAccessToken(value);
+  }
+
+  oidcConfig() {
+    return this.publicRequest<{ enabled: boolean; registrationEnabled: boolean }>({
+      url: "/api/auth/oidc/config",
+    });
+  }
+
+  oidcUrl(returnTo: string) {
+    const path = `/api/auth/oidc/start?return_to=${encodeURIComponent(returnTo)}`;
+    return `${this.baseUrl}${path}`;
   }
 
   async approveDevice(userCode: string) {

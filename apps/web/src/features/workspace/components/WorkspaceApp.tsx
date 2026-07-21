@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CredentialsPage } from "@/features/auth/components/CredentialsPage";
 import { useAccount } from "@/features/auth/queries/use-account";
-import { useSession } from "@/features/auth/queries/use-session";
+import { useOidcConfig, useSession } from "@/features/auth/queries/use-session";
 import {
   SettingsDialog,
   type SettingsSection,
@@ -19,6 +19,7 @@ const Workspace = lazy(() =>
 
 export function WorkspaceApp() {
   const { session, authenticate, logout } = useSession();
+  const oidc = useOidcConfig();
   const account = useAccount(session.data === true);
   const vaults = useVaults(session.data === true);
   const navigate = useNavigate();
@@ -65,6 +66,9 @@ export function WorkspaceApp() {
         description="Sign in to edit your Vaults."
         error={errorMessage(authenticate.error)}
         onSubmit={(credentials) => authenticate.mutateAsync(credentials)}
+        oidcEnabled={oidc.data?.enabled}
+        registrationEnabled={oidc.data?.registrationEnabled ?? false}
+        onOidc={() => window.location.assign(api.oidcUrl(location.pathname + location.search))}
       />
     );
   }

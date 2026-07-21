@@ -3,6 +3,7 @@ export class UserResponseDto {
   email!: string;
   displayName!: string | null;
   createdAt!: Date;
+  canManageCredentials!: boolean;
 }
 
 export class SessionResponseDto {

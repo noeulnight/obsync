@@ -6,6 +6,21 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuthService } from '../auth.service';
 
 describe('AuthService', () => {
+  it('blocks account creation when registration is disabled', async () => {
+    const create = jest.fn();
+    const service = new AuthService(
+      { user: { create } } as unknown as PrismaService,
+      new JwtService(),
+      new ConfigService({ auth: { registrationEnabled: false } }),
+      { deleteObject: jest.fn() } as never,
+    );
+
+    await expect(
+      service.register('user@example.com', 'password123'),
+    ).rejects.toThrow('Account registration is disabled');
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('normalizes email, hashes the password, and returns no hash', async () => {
     const createdAt = new Date();
     const create = jest.fn((args: Prisma.UserCreateArgs) =>
@@ -14,6 +29,7 @@ describe('AuthService', () => {
         email: String(args.data.email),
         displayName: null,
         createdAt,
+        passwordHash: String(args.data.passwordHash),
       }),
     );
     const prisma = { user: { create } } as unknown as PrismaService;
@@ -32,6 +48,7 @@ describe('AuthService', () => {
       email: 'user@example.com',
       displayName: null,
       createdAt,
+      canManageCredentials: true,
     });
     expect(passwordHash).not.toBe('password123');
     await expect(verify(passwordHash, 'password123')).resolves.toBe(true);

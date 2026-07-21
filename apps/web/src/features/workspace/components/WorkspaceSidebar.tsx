@@ -108,7 +108,13 @@ export function WorkspaceSidebar({
           <Button variant="ghost" size="icon" aria-label="New Vault" onClick={onCreateVault}>
             <Plus />
           </Button>
-          <Button variant="ghost" size="icon" aria-label="Vault settings" onClick={onVaultSettings}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Vault settings"
+            className="group-data-[collapsible=icon]:hidden"
+            onClick={onVaultSettings}
+          >
             <Settings2 />
           </Button>
         </div>

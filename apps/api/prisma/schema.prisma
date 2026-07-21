@@ -10,16 +10,30 @@ model User {
   id                   String                @id @default(uuid()) @db.Uuid
   email                String                @unique
   displayName          String?               @map("display_name")
-  passwordHash         String                @map("password_hash")
+  passwordHash         String?               @map("password_hash")
   createdAt            DateTime              @default(now()) @map("created_at")
   deviceAuthorizations DeviceAuthorization[]
   sessions             Session[]
   vaults               Vault[]
   vaultMemberships     VaultMember[]
-  vaultInvitationsSent VaultInvitation[]    @relation("VaultInvitationInviter")
+  vaultInvitationsSent VaultInvitation[]     @relation("VaultInvitationInviter")
   fileVersions         VaultFileVersion[]
+  authIdentities       AuthIdentity[]
 
   @@map("users")
+}
+
+model AuthIdentity {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  issuer    String
+  subject   String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([issuer, subject])
+  @@index([userId])
+  @@map("auth_identities")
 }
 
 model DeviceAuthorization {
@@ -53,19 +67,19 @@ model Session {
 }
 
 model Vault {
-  id          String       @id @default(uuid()) @db.Uuid
-  ownerId     String       @map("owner_id") @db.Uuid
-  name        String
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  documents   YDocument[]
-  attachments Attachment[]
-  members     VaultMember[]
-  invitations VaultInvitation[]
-  files       VaultFile[]
+  id             String               @id @default(uuid()) @db.Uuid
+  ownerId        String               @map("owner_id") @db.Uuid
+  name           String
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  owner          User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documents      YDocument[]
+  attachments    Attachment[]
+  members        VaultMember[]
+  invitations    VaultInvitation[]
+  files          VaultFile[]
   fileOperations VaultFileOperation[]
-  fileLinks   VaultFileLink[]
+  fileLinks      VaultFileLink[]
 
   @@index([ownerId])
   @@map("vaults")
@@ -79,26 +93,26 @@ enum VaultFileKind {
 }
 
 model VaultFile {
-  id            String        @id @db.Uuid
-  vaultId       String        @map("vault_id") @db.Uuid
-  kind          VaultFileKind
-  path          String
-  activePathKey String?       @map("active_path_key")
-  version       Int           @default(1)
-  attachmentId  String?       @map("attachment_id") @db.Uuid
-  mimeType      String?       @map("mime_type")
-  sha256        String?
-  size          BigInt?
-  deletedAt     DateTime?     @map("deleted_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  linksIndexedAt DateTime?     @map("links_indexed_at")
-  vault         Vault         @relation(fields: [vaultId], references: [id], onDelete: Cascade)
-  attachment    Attachment?   @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
-  versions      VaultFileVersion[]
-  operations    VaultFileOperation[]
-  outgoingLinks VaultFileLink[] @relation("VaultFileLinkSource")
-  incomingLinks VaultFileLink[] @relation("VaultFileLinkTarget")
+  id             String               @id @db.Uuid
+  vaultId        String               @map("vault_id") @db.Uuid
+  kind           VaultFileKind
+  path           String
+  activePathKey  String?              @map("active_path_key")
+  version        Int                  @default(1)
+  attachmentId   String?              @map("attachment_id") @db.Uuid
+  mimeType       String?              @map("mime_type")
+  sha256         String?
+  size           BigInt?
+  deletedAt      DateTime?            @map("deleted_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  linksIndexedAt DateTime?            @map("links_indexed_at")
+  vault          Vault                @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  attachment     Attachment?          @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  versions       VaultFileVersion[]
+  operations     VaultFileOperation[]
+  outgoingLinks  VaultFileLink[]      @relation("VaultFileLinkSource")
+  incomingLinks  VaultFileLink[]      @relation("VaultFileLinkTarget")
 
   @@unique([vaultId, activePathKey])
   @@index([vaultId, deletedAt])
@@ -123,18 +137,18 @@ model VaultFileLink {
 }
 
 model VaultFileVersion {
-  id           String    @id @default(uuid()) @db.Uuid
-  fileId       String    @map("file_id") @db.Uuid
+  id           String      @id @default(uuid()) @db.Uuid
+  fileId       String      @map("file_id") @db.Uuid
   version      Int
   path         String
-  deletedAt    DateTime? @map("deleted_at")
+  deletedAt    DateTime?   @map("deleted_at")
   state        Bytes?
-  attachmentId String?   @map("attachment_id") @db.Uuid
-  createdById  String?   @map("created_by_id") @db.Uuid
-  createdAt    DateTime  @default(now()) @map("created_at")
-  file         VaultFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  attachmentId String?     @map("attachment_id") @db.Uuid
+  createdById  String?     @map("created_by_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at")
+  file         VaultFile   @relation(fields: [fileId], references: [id], onDelete: Cascade)
   attachment   Attachment? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
-  createdBy    User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy    User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([fileId, version])
   @@index([fileId, createdAt])
@@ -195,20 +209,20 @@ enum AttachmentStatus {
 }
 
 model Attachment {
-  id             String           @id @default(uuid()) @db.Uuid
-  vaultId        String           @map("vault_id") @db.Uuid
+  id             String             @id @default(uuid()) @db.Uuid
+  vaultId        String             @map("vault_id") @db.Uuid
   path           String
-  objectKey      String           @unique @map("object_key")
+  objectKey      String             @unique @map("object_key")
   size           BigInt
-  mimeType       String           @map("mime_type")
+  mimeType       String             @map("mime_type")
   sha256         String
   etag           String?
-  idempotencyKey String           @map("idempotency_key") @db.Uuid
-  status         AttachmentStatus @default(PENDING)
-  deletedAt      DateTime?        @map("deleted_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  vault          Vault            @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  idempotencyKey String             @map("idempotency_key") @db.Uuid
+  status         AttachmentStatus   @default(PENDING)
+  deletedAt      DateTime?          @map("deleted_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  vault          Vault              @relation(fields: [vaultId], references: [id], onDelete: Cascade)
   files          VaultFile[]
   fileVersions   VaultFileVersion[]
 

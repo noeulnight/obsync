@@ -47,6 +47,25 @@ describe('environment validation', () => {
     );
   });
 
+  it('enables OIDC only with a complete client configuration', () => {
+    const result = environmentValidationSchema.validate({
+      OIDC_ISSUER: 'https://accounts.example.com',
+      OIDC_CLIENT_ID: 'obsync',
+      OIDC_CLIENT_SECRET: 'secret',
+      OIDC_REDIRECT_URI: 'https://sync.example.com/api/auth/oidc/callback',
+    });
+
+    expect(result.error).toBeUndefined();
+  });
+
+  it('rejects an incomplete OIDC configuration', () => {
+    const { error } = environmentValidationSchema.validate({
+      OIDC_ISSUER: 'https://accounts.example.com',
+    });
+
+    expect(error).toBeDefined();
+  });
+
   it('requires explicit secrets in production', () => {
     const { error } = environmentValidationSchema.validate({
       NODE_ENV: 'production',

@@ -8,6 +8,12 @@ export type Environment = {
   DATABASE_URL?: string;
   JWT_ACCESS_SECRET?: string;
   JWT_REFRESH_SECRET?: string;
+  OIDC_ISSUER?: string;
+  OIDC_CLIENT_ID?: string;
+  OIDC_CLIENT_SECRET?: string;
+  OIDC_REDIRECT_URI?: string;
+  OIDC_SCOPES: string;
+  REGISTRATION_ENABLED: boolean;
   S3_ENDPOINT?: string;
   S3_PUBLIC_ENDPOINT?: string;
   S3_REGION: string;
@@ -53,6 +59,33 @@ export const environmentValidationSchema = Joi.object<Environment>({
       .min(32)
       .default('dev-refresh-secret-change-before-production'),
   }),
+  OIDC_ISSUER: Joi.string()
+    .empty('')
+    .uri({ scheme: ['https', 'http'] })
+    .optional(),
+  OIDC_CLIENT_ID: Joi.string().empty('').when('OIDC_ISSUER', {
+    is: Joi.exist(),
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  OIDC_CLIENT_SECRET: Joi.string().empty('').when('OIDC_ISSUER', {
+    is: Joi.exist(),
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  OIDC_REDIRECT_URI: Joi.string()
+    .empty('')
+    .uri({ scheme: ['https', 'http'] })
+    .when('OIDC_ISSUER', {
+      is: Joi.exist(),
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }),
+  OIDC_SCOPES: Joi.string().default('openid email profile'),
+  REGISTRATION_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(true),
   S3_ENDPOINT: Joi.when('NODE_ENV', {
     is: 'production',
     then: Joi.string()
