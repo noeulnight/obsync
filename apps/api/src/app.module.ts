@@ -13,6 +13,8 @@ import { HealthModule } from './health/health.module';
 import { HttpModule } from './http/http.module';
 import { VaultsModule } from './vaults/vaults.module';
 import { StorageModule } from './storage/storage.module';
+import { McpModule } from './mcp/mcp.module';
+import { mcpConfig } from './config/configs/mcp.config';
 
 @Module({
   imports: [
@@ -25,11 +27,12 @@ import { StorageModule } from './storage/storage.module';
     ConfigModule.forRoot({
       cache: true,
       isGlobal: true,
-      load: [appConfig, authConfig, databaseConfig, storageConfig],
+      load: [appConfig, authConfig, databaseConfig, storageConfig, mcpConfig],
       validationSchema: environmentValidationSchema,
     }),
     HealthModule,
     HttpModule,
+    McpModule,
   ],
 })
 export class AppModule {}

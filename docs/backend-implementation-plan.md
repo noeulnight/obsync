@@ -149,15 +149,14 @@ vault:<vaultId>:canvas:<documentId>
 | `invited_by_id` | 초대한 owner |
 | `expires_at`, `created_at` | 7일 만료와 생성 시각 |
 
-### `mcp_tokens`
+### `mcp_oauth_clients`, `mcp_oauth_authorizations`, `mcp_oauth_refresh_tokens`
 
 | 필드 | 설명 |
 |---|---|
-| `id` | UUID PK |
-| `user_id` | users FK |
-| `token_hash` | 원문을 저장하지 않는 token hash |
-| `name` | 클라이언트 식별 이름 |
-| `last_used_at`, `expires_at`, `revoked_at` | 수명 관리 |
+| `client_id`, `metadata` | 동적으로 등록된 public MCP client |
+| `user_id`, `code_hash`, `code_challenge` | 사용자 승인과 PKCE authorization code |
+| `resource`, `scopes` | MCP audience와 Vault 권한 범위 |
+| `token_hash`, `expires_at`, `revoked_at` | 회전 refresh token 수명 관리 |
 
 현재 `vault_members`와 `vault_invitations`가 owner/editor/viewer 권한과 초대를 관리한다. 별도 조직 모델은 만들지 않는다.
 
@@ -346,17 +345,16 @@ LOG_LEVEL
 - 오프라인 재시도에도 같은 object가 중복 생성되지 않는다.
 - 다른 Vault의 첨부파일을 받을 수 없다.
 
-### Phase 5 — MCP (미구현·현재 범위 제외)
+### Phase 5 — MCP
 
 - Streamable HTTP endpoint `/mcp`
-- 별도 폐기 가능한 MCP token
+- OAuth Authorization Code + PKCE와 동적 client 등록
 - Vault 목록, 파일 목록, Markdown 읽기·쓰기 tools
 - 모든 tool에서 사용자와 Vault owner 검사
-- tool 호출 audit log
 
 완료 조건:
 
-- token 범위를 벗어난 Vault를 읽거나 수정할 수 없다.
+- OAuth scope와 사용자 권한 범위를 벗어난 Vault를 읽거나 수정할 수 없다.
 - Markdown 쓰기가 Yjs document update로 반영되어 열린 Obsidian에 전달된다.
 
 ### Phase 6 — 운영 안정화
@@ -401,7 +399,7 @@ LOG_LEVEL
 ## 11. 보안 체크리스트
 
 - 비밀번호는 Argon2id로 hash한다.
-- refresh token과 MCP token 원문을 DB에 저장하지 않는다.
+- refresh token과 OAuth authorization code 원문을 DB에 저장하지 않는다.
 - room의 `vaultId`를 token claim만 믿지 않고 DB owner와 대조한다.
 - 모든 Vault 경로는 정규화하고 `..`, 절대경로, NUL을 거부한다.
 - S3 object key는 사용자 입력 경로와 분리해 서버가 생성한다.

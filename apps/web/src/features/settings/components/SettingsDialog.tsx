@@ -1,4 +1,4 @@
-import { Database, LogOut, Plus, Trash2, UserRound, Users } from "lucide-react";
+import { Bot, Database, LogOut, Plus, Trash2, UserRound, Users } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   AlertDialog,
@@ -24,9 +24,10 @@ import type { Vault } from "@/features/vaults/types/vault";
 import { errorMessage } from "@/lib/error";
 import { cn } from "@/lib/utils";
 import { AccountSettings } from "./AccountSettings";
+import { McpSettings } from "./McpSettings";
 import { VaultMembers } from "@/features/vaults/components/VaultMembers";
 
-export type SettingsSection = "account" | "vaults" | "members";
+export type SettingsSection = "account" | "mcp" | "vaults" | "members";
 
 export function SettingsDialog({
   open,
@@ -51,6 +52,7 @@ export function SettingsDialog({
   const updateVault = useUpdateVault();
   const deleteVault = useDeleteVault();
   const [newName, setNewName] = useState("");
+  const accountSection = section === "account" || section === "mcp";
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -75,10 +77,23 @@ export function SettingsDialog({
         <div className="grid min-h-0 grid-cols-[180px_minmax(0,1fr)] sm:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col bg-muted/40 px-2 py-4">
             <div className="px-2 pb-3 text-sm font-semibold">Settings</div>
-            {section === "account" ? (
-              <SettingsButton active icon={<UserRound />} onClick={() => undefined}>
-                My account
-              </SettingsButton>
+            {accountSection ? (
+              <>
+                <SettingsButton
+                  active={section === "account"}
+                  icon={<UserRound />}
+                  onClick={() => onSectionChange("account")}
+                >
+                  My account
+                </SettingsButton>
+                <SettingsButton
+                  active={section === "mcp"}
+                  icon={<Bot />}
+                  onClick={() => onSectionChange("mcp")}
+                >
+                  MCP
+                </SettingsButton>
+              </>
             ) : (
               <>
                 <SettingsButton
@@ -97,7 +112,7 @@ export function SettingsDialog({
                 </SettingsButton>
               </>
             )}
-            {section === "account" && (
+            {accountSection && (
               <div className="mt-auto">
                 <Separator className="mb-2" />
                 <SettingsButton icon={<LogOut />} onClick={onLogout}>
@@ -110,6 +125,8 @@ export function SettingsDialog({
           <main className="min-h-0 overflow-y-auto px-6 py-8 sm:px-10">
             {section === "account" ? (
               <AccountSettings enabled={open} onLogout={onLogout} />
+            ) : section === "mcp" ? (
+              <McpSettings enabled={open} />
             ) : section === "vaults" ? (
               <section className="mx-auto max-w-xl">
                 <h2 className="text-xl font-semibold">Manage Vaults</h2>

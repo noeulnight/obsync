@@ -7,20 +7,74 @@ datasource db {
 }
 
 model User {
-  id                   String                @id @default(uuid()) @db.Uuid
-  email                String                @unique
-  displayName          String?               @map("display_name")
-  passwordHash         String?               @map("password_hash")
-  createdAt            DateTime              @default(now()) @map("created_at")
+  id                   String                  @id @default(uuid()) @db.Uuid
+  email                String                  @unique
+  displayName          String?                 @map("display_name")
+  passwordHash         String?                 @map("password_hash")
+  createdAt            DateTime                @default(now()) @map("created_at")
   deviceAuthorizations DeviceAuthorization[]
   sessions             Session[]
   vaults               Vault[]
   vaultMemberships     VaultMember[]
-  vaultInvitationsSent VaultInvitation[]     @relation("VaultInvitationInviter")
+  vaultInvitationsSent VaultInvitation[]       @relation("VaultInvitationInviter")
   fileVersions         VaultFileVersion[]
   authIdentities       AuthIdentity[]
+  mcpAuthorizations    McpOAuthAuthorization[]
+  mcpRefreshTokens     McpOAuthRefreshToken[]
 
   @@map("users")
+}
+
+model McpOAuthClient {
+  id             String                  @id
+  metadata       Json
+  createdAt      DateTime                @default(now()) @map("created_at")
+  authorizations McpOAuthAuthorization[]
+  refreshTokens  McpOAuthRefreshToken[]
+
+  @@map("mcp_oauth_clients")
+}
+
+model McpOAuthAuthorization {
+  id            String         @id @default(uuid()) @db.Uuid
+  clientId      String         @map("client_id")
+  userId        String?        @map("user_id") @db.Uuid
+  redirectUri   String         @map("redirect_uri")
+  codeChallenge String         @map("code_challenge")
+  codeHash      String?        @unique @map("code_hash")
+  state         String?
+  resource      String
+  scopes        String[]
+  expiresAt     DateTime       @map("expires_at")
+  approvedAt    DateTime?      @map("approved_at")
+  consumedAt    DateTime?      @map("consumed_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  client        McpOAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("mcp_oauth_authorizations")
+}
+
+model McpOAuthRefreshToken {
+  id        String         @id @default(uuid()) @db.Uuid
+  clientId  String         @map("client_id")
+  userId    String         @map("user_id") @db.Uuid
+  tokenHash String         @unique @map("token_hash")
+  resource  String
+  scopes    String[]
+  expiresAt DateTime       @map("expires_at")
+  revokedAt DateTime?      @map("revoked_at")
+  createdAt DateTime       @default(now()) @map("created_at")
+  client    McpOAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("mcp_oauth_refresh_tokens")
 }
 
 model AuthIdentity {

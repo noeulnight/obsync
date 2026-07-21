@@ -14,6 +14,7 @@ export type Environment = {
   OIDC_REDIRECT_URI?: string;
   OIDC_SCOPES: string;
   REGISTRATION_ENABLED: boolean;
+  MCP_PUBLIC_URL: string;
   S3_ENDPOINT?: string;
   S3_PUBLIC_ENDPOINT?: string;
   S3_REGION: string;
@@ -86,6 +87,9 @@ export const environmentValidationSchema = Joi.object<Environment>({
     .truthy('true')
     .falsy('false')
     .default(true),
+  MCP_PUBLIC_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('http://localhost:3000/mcp'),
   S3_ENDPOINT: Joi.when('NODE_ENV', {
     is: 'production',
     then: Joi.string()

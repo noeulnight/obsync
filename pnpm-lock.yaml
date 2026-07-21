@@ -45,6 +45,9 @@ catalogs:
     '@hocuspocus/server':
       specifier: ^4.4.0
       version: 4.4.0
+    '@modelcontextprotocol/sdk':
+      specifier: ^1.29.0
+      version: 1.29.0
     '@nestjs/config':
       specifier: ^4.0.4
       version: 4.0.4
@@ -197,6 +200,9 @@ importers:
       '@hocuspocus/server':
         specifier: 'catalog:'
         version: 4.4.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.29.0(supports-color@8.1.1)(zod@3.25.76)
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -251,6 +257,9 @@ importers:
       yjs:
         specifier: 'catalog:'
         version: 13.6.31
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.2.0

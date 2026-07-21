@@ -60,7 +60,7 @@
 ## MCP
 
 - Expose MCP from the same NestJS application using Streamable HTTP at `/mcp`.
-- Authenticate MCP with separately revocable hashed tokens.
+- Authenticate MCP with OAuth Authorization Code, PKCE, scoped audience-bound access tokens, and rotating refresh tokens.
 - Apply the same Vault ownership checks used by REST and WebSocket paths to every tool.
 - Markdown writes must update the corresponding Yjs document so connected Obsidian clients receive them.
 - Do not add MCP modules or tools before the MCP implementation phase is requested.
@@ -83,7 +83,7 @@
 - Keep unavoidable checks for external claims, WebSocket payloads, and storage responses narrow and local.
 - Do not use `any`; use `unknown` at trust boundaries and narrow it.
 - Use Nest exceptions for expected client errors and do not leak internal database, token, or storage errors.
-- Never log Authorization headers, cookies, passwords, access tokens, refresh tokens, MCP tokens, or signed URLs.
+- Never log Authorization headers, cookies, passwords, access tokens, refresh tokens, authorization codes, or signed URLs.
 
 ## Verification
 

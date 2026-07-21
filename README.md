@@ -15,6 +15,7 @@ Obsync keeps your notes, canvases, folders, and attachments aligned between Obsi
 - Create multiple Vaults and switch between them
 - Invite people as editors or viewers
 - Review and restore earlier file versions
+- Read, search, and update Vault notes from MCP clients
 
 ## Project layout
 
@@ -46,6 +47,9 @@ pnpm --filter web dev --host 0.0.0.0
 - API health: `http://localhost:3000/api/health`
 - Storage API: `http://localhost:9000`
 - Storage console: `http://localhost:9001`
+- MCP endpoint: `http://localhost:3000/mcp` in development, or `http://localhost:8080/mcp` with Compose
+
+Add the endpoint to an OAuth-capable MCP client. Obsync opens a browser approval screen and grants only the requested `vault:read` and `vault:write` scopes using Authorization Code with PKCE.
 
 See the [plugin guide](./apps/plugin/README.md) for the Obsidian build and installation steps. See [local backend development](./docs/backend-local-development.md) for environment configuration.
 

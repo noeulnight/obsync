@@ -9,6 +9,6 @@ import { InvitationsController } from './invitations.controller';
   imports: [AuthModule],
   controllers: [VaultsController, InvitationsController],
   providers: [VaultsService, VaultAccessService],
-  exports: [VaultAccessService],
+  exports: [VaultAccessService, VaultsService],
 })
 export class VaultsModule {}

@@ -21,6 +21,11 @@ export type AccountSession = {
   current: boolean;
 };
 
+export type McpConfig = {
+  url: string;
+  scopes: string[];
+};
+
 export type VaultRole = "EDITOR" | "VIEWER";
 
 export type VaultMember = {
@@ -209,8 +214,25 @@ export class ApiClient {
     return this.request<AccountSession[]>({ url: "/api/auth/sessions" });
   }
 
+  mcpConfig(): Promise<McpConfig> {
+    return this.request<McpConfig>({ url: "/api/auth/mcp/authorization/config" });
+  }
+
   async revokeSession(sessionId: string) {
     await this.request({ url: `/api/auth/sessions/${sessionId}`, method: "DELETE" });
+  }
+
+  mcpAuthorization(id: string) {
+    return this.publicRequest<{ clientName: string; scopes: string[] }>({
+      url: `/api/auth/mcp/authorization/${id}`,
+    });
+  }
+
+  mcpAuthorizationDecision(id: string, decision: "approve" | "deny") {
+    return this.request<{ redirectUrl: string }>({
+      url: `/api/auth/mcp/authorization/${id}/${decision}`,
+      method: "POST",
+    });
   }
 
   async deleteAccount(password: string) {

@@ -13,6 +13,32 @@ afterEach(() => {
 });
 
 describe("settings", () => {
+  it("shows the MCP server URL in account settings", async () => {
+    vi.spyOn(api, "mcpConfig").mockResolvedValue({
+      url: "https://sync.example.com/mcp",
+      scopes: ["vault:read", "vault:write"],
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <SettingsDialog
+          open
+          section="mcp"
+          vaults={[]}
+          selected=""
+          onOpenChange={() => undefined}
+          onSectionChange={() => undefined}
+          onSelect={() => undefined}
+          onLogout={() => undefined}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByDisplayValue("https://sync.example.com/mcp")).toBeTruthy();
+    expect(screen.getByText("How to connect")).toBeTruthy();
+  });
+
   it("renames and deletes a Vault", async () => {
     const vault = { id: "vault-1", name: "Personal", role: "OWNER" as const };
     const rename = vi.spyOn(api, "updateVault").mockResolvedValue({ ...vault, name: "Work" });

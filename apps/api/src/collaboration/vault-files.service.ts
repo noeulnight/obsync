@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type VaultFile, type VaultFileKind } from '@prisma/client';
 import * as Y from 'yjs';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
 import { vaultPath, vaultPathKey } from '../vaults/utils/vault-path';
@@ -66,6 +67,59 @@ export class VaultFilesService {
         path: result.path,
         excerpt: result.excerpt,
       }));
+  }
+
+  async readMarkdown(userId: string, vaultId: string, rawPath: string) {
+    await this.access.requireRead(userId, vaultId);
+    const path = vaultPath(rawPath);
+    const file = await this.prisma.vaultFile.findFirst({
+      where: {
+        vaultId,
+        activePathKey: vaultPathKey(path),
+        kind: 'MARKDOWN',
+        deletedAt: null,
+      },
+      select: { id: true, path: true },
+    });
+    if (!file) throw new NotFoundException('File not found');
+    return {
+      ...file,
+      content: await this.collaboration.readDocument(vaultId, file.id),
+    };
+  }
+
+  async writeMarkdown(
+    userId: string,
+    vaultId: string,
+    rawPath: string,
+    content: string,
+  ) {
+    await this.access.requireWrite(userId, vaultId);
+    const path = vaultPath(rawPath);
+    let file = await this.prisma.vaultFile.findFirst({
+      where: {
+        vaultId,
+        activePathKey: vaultPathKey(path),
+        deletedAt: null,
+      },
+      select: { id: true, path: true, kind: true },
+    });
+    if (file && file.kind !== 'MARKDOWN') {
+      throw new ConflictException('The path is not a Markdown document.');
+    }
+    if (!file) {
+      const fileId = randomUUID();
+      await this.apply(userId, vaultId, {
+        operationId: randomUUID(),
+        fileId,
+        type: FileOperationType.CREATE,
+        kind: FileKind.MARKDOWN,
+        path,
+      });
+      file = { id: fileId, path, kind: 'MARKDOWN' };
+    }
+    await this.collaboration.writeDocument(vaultId, file.id, content, userId);
+    return { id: file.id, path: file.path };
   }
 
   async backlinks(userId: string, vaultId: string, fileId: string) {

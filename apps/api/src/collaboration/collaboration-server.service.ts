@@ -171,13 +171,40 @@ export class CollaborationServerService
       const manifest = document.getMap<ManifestEntry>('files');
       for (const file of files) manifest.set(file.id, manifestEntry(file));
     });
-    await connection.disconnect({ unloadImmediately: false });
+    await connection.disconnect({ unloadImmediately: true });
   }
 
   async restoreDocument(
     vaultId: string,
     fileId: string,
     state: Uint8Array,
+    userId: string,
+  ) {
+    await this.writeDocument(vaultId, fileId, documentText(state), userId);
+  }
+
+  async readDocument(vaultId: string, fileId: string) {
+    const roomName = `vault:${vaultId}:doc:${fileId}`;
+    const connection = await this.hocuspocus.openDirectConnection(roomName, {
+      vaultId,
+      userId: 'server',
+      role: 'OWNER',
+    });
+    try {
+      let content = '';
+      await connection.transact((document) => {
+        content = document.getText('content').toJSON();
+      });
+      return content;
+    } finally {
+      await connection.disconnect({ unloadImmediately: true });
+    }
+  }
+
+  async writeDocument(
+    vaultId: string,
+    fileId: string,
+    content: string,
     userId: string,
   ) {
     const roomName = `vault:${vaultId}:doc:${fileId}`;
@@ -187,17 +214,19 @@ export class CollaborationServerService
       role: 'OWNER',
     });
     try {
-      const restored = new Y.Doc();
-      Y.applyUpdate(restored, state);
-      const content = restored.getText('content').toJSON();
       let currentState = Y.encodeStateAsUpdate(new Y.Doc());
+      let changed = false;
       await connection.transact((document) => {
         currentState = Y.encodeStateAsUpdate(document);
         const text = document.getText('content');
+        if (text.toJSON() === content) return;
+        changed = true;
         text.delete(0, text.length);
         text.insert(0, content);
       });
-      await this.createVersion(vaultId, fileId, currentState, userId, true);
+      if (changed) {
+        await this.createVersion(vaultId, fileId, currentState, userId, true);
+      }
     } finally {
       await connection.disconnect({ unloadImmediately: true });
     }

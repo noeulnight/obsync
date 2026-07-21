@@ -63,6 +63,7 @@ catalog:
   d3-force: ^3.0.0
   '@types/d3-force': ^3.0.10
   openid-client: ^6.8.4
+  '@modelcontextprotocol/sdk': ^1.29.0
 overrides:
   vite: "catalog:"
 peerDependencyRules:
