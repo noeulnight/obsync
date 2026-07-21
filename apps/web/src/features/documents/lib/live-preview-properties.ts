@@ -75,18 +75,18 @@ class PropertiesWidget extends WidgetType {
   toDOM(view: EditorView) {
     const panel = document.createElement("section");
     panel.className = "cm-live-properties";
-    panel.setAttribute("aria-label", "프로퍼티");
+    panel.setAttribute("aria-label", "Properties");
     const title = document.createElement("div");
     title.className = "cm-live-properties-title";
-    title.textContent = "프로퍼티";
+    title.textContent = "Properties";
     panel.append(title);
     const editable = view.state.facet(EditorView.editable);
     for (const row of this.properties.rows) {
       const wrapper = document.createElement("div");
       wrapper.className = "cm-live-property";
       wrapper.append(
-        this.input(view, row.key, "속성 이름", row.keyFrom, row.keyTo, editable),
-        this.input(view, row.value, "속성 값", row.valueFrom, row.valueTo, editable),
+        this.input(view, row.key, "Property name", row.keyFrom, row.keyTo, editable),
+        this.input(view, row.value, "Property value", row.valueFrom, row.valueTo, editable),
       );
       panel.append(wrapper);
     }
@@ -94,7 +94,7 @@ class PropertiesWidget extends WidgetType {
       const add = document.createElement("button");
       add.type = "button";
       add.className = "cm-live-property-add";
-      add.textContent = "+ 프로퍼티 추가";
+      add.textContent = "+ Add property";
       add.addEventListener("click", () => {
         view.dispatch({
           changes: { from: this.properties.insertAt, insert: "property: \n" },

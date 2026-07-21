@@ -16,7 +16,7 @@ export function DeviceApprovalPage() {
   if (!/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(userCode)) {
     return (
       <main className="grid min-h-svh place-items-center p-4 text-sm text-destructive">
-        유효한 기기 코드가 없습니다.
+        No valid device code was provided.
       </main>
     );
   }
@@ -25,42 +25,42 @@ export function DeviceApprovalPage() {
       <main className="grid min-h-svh place-items-center p-4">
         <Card className="w-full max-w-sm text-center">
           <CardHeader>
-            <CardTitle>승인 완료</CardTitle>
-            <CardDescription>이 창을 닫고 Obsidian으로 돌아가세요.</CardDescription>
+            <CardTitle>Device approved</CardTitle>
+            <CardDescription>Close this window and return to Obsidian.</CardDescription>
           </CardHeader>
         </Card>
       </main>
     );
   }
   if (session.isPending) {
-    return <main className="grid min-h-svh place-items-center">로그인 확인 중…</main>;
+    return <main className="grid min-h-svh place-items-center">Checking your session…</main>;
   }
   if (!session.data) {
     return (
       <CredentialsPage
-        title="기기 승인"
-        description={`Obsidian 기기 코드 ${userCode}`}
+        title="Approve device"
+        description={`Obsidian device code ${userCode}`}
         error={errorMessage(authenticate.error)}
         onSubmit={(credentials) => authenticate.mutateAsync(credentials)}
       />
     );
   }
   if (account.isPending) {
-    return <main className="grid min-h-svh place-items-center">계정 불러오는 중…</main>;
+    return <main className="grid min-h-svh place-items-center">Loading account…</main>;
   }
   return (
     <main className="grid min-h-svh place-items-center p-4">
       <Card className="w-full max-w-sm text-center">
         <CardHeader>
-          <CardTitle>기기 승인</CardTitle>
-          <CardDescription>Obsidian 기기 코드 {userCode}</CardDescription>
+          <CardTitle>Approve device</CardTitle>
+          <CardDescription>Obsidian device code {userCode}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
           <p className="text-sm text-muted-foreground">
-            {account.data?.displayName || account.data?.email} 계정으로 연결합니다.
+            Connect using {account.data?.displayName || account.data?.email}.
           </p>
           <Button disabled={approval.isPending} onClick={() => approval.mutate()}>
-            이 기기 승인
+            Approve this device
           </Button>
           {approval.error && (
             <p className="text-sm text-destructive">{errorMessage(approval.error)}</p>

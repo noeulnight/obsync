@@ -27,7 +27,7 @@ describe("file actions", () => {
     );
 
     fireEvent.contextMenu(screen.getByText("note"));
-    fireEvent.click(await screen.findByText("이름 변경"));
+    fireEvent.click(await screen.findByText("Rename"));
 
     await waitFor(() => expect(rename).toHaveBeenCalledWith(expect.objectContaining({ id: "1" })));
   });
@@ -42,8 +42,8 @@ describe("file actions", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("새 파일 이름"), { target: { value: "renamed" } });
-    fireEvent.click(screen.getByText("변경"));
+    fireEvent.change(screen.getByLabelText("New file name"), { target: { value: "renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
 
     expect(rename).toHaveBeenCalledWith("renamed");
   });

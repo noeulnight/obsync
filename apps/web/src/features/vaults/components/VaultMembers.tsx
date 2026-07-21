@@ -57,14 +57,14 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
 
   return (
     <section className="mx-auto max-w-xl">
-      <h2 className="text-xl font-semibold">멤버 및 초대</h2>
+      <h2 className="text-xl font-semibold">Members and invitations</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Vault별 편집 권한을 관리하고 받은 초대를 확인합니다.
+        Manage Vault access and review your invitations.
       </p>
 
       {pending.data?.length ? (
         <div className="mt-6 grid gap-2">
-          <h3 className="text-sm font-medium">받은 초대</h3>
+          <h3 className="text-sm font-medium">Invitations</h3>
           {pending.data.map((invitation) => (
             <div key={invitation.id} className="flex items-center gap-3 rounded-lg border p-3">
               <Mail className="size-4 text-muted-foreground" />
@@ -78,13 +78,13 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label={`${invitation.vault.name} 초대 거절`}
+                aria-label={`Decline invitation to ${invitation.vault.name}`}
                 onClick={() => answer.mutate({ id: invitation.id, accept: false })}
               >
                 <X />
               </Button>
               <Button size="sm" onClick={() => answer.mutate({ id: invitation.id, accept: true })}>
-                <Check /> 수락
+                <Check /> Accept
               </Button>
             </div>
           ))}
@@ -93,7 +93,7 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
       ) : null}
 
       {!vault ? (
-        <p className="mt-8 text-sm text-muted-foreground">관리할 Vault를 먼저 선택하세요.</p>
+        <p className="mt-8 text-sm text-muted-foreground">Select a Vault to manage.</p>
       ) : (
         <>
           <div className="mt-6 flex items-center justify-between">
@@ -104,14 +104,14 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
             <form className="mt-3 flex gap-2" onSubmit={(event) => void submit(event)}>
               <Input
                 type="email"
-                aria-label="초대 이메일"
+                aria-label="Invitation email"
                 placeholder="name@example.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
               <RoleSelect value={role} onChange={setRole} />
               <Button disabled={!email.trim() || invite.isPending}>
-                <UserPlus /> 초대
+                <UserPlus /> Invite
               </Button>
             </form>
           )}
@@ -137,7 +137,7 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      aria-label={`${member.email} 내보내기`}
+                      aria-label={`Remove ${member.email}`}
                       onClick={() => remove.mutate(member.id)}
                     >
                       <Trash2 />
@@ -152,7 +152,7 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
           {owner && invitations.data?.length ? (
             <>
               <Separator className="my-5" />
-              <h3 className="mb-2 text-sm font-medium">대기 중인 초대</h3>
+              <h3 className="mb-2 text-sm font-medium">Pending invitations</h3>
               <div className="grid gap-1">
                 {invitations.data.map((invitation) => (
                   <div key={invitation.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
@@ -162,7 +162,7 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      aria-label={`${invitation.email} 초대 취소`}
+                      aria-label={`Cancel invitation for ${invitation.email}`}
                       onClick={() => cancel.mutate(invitation.id)}
                     >
                       <X />
@@ -188,12 +188,12 @@ function RoleSelect({
 }) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as VaultRole)}>
-      <SelectTrigger className="w-24" aria-label="Vault 역할">
+      <SelectTrigger className="w-24" aria-label="Vault role">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="EDITOR">편집자</SelectItem>
-        <SelectItem value="VIEWER">뷰어</SelectItem>
+        <SelectItem value="EDITOR">Editor</SelectItem>
+        <SelectItem value="VIEWER">Viewer</SelectItem>
       </SelectContent>
     </Select>
   );
@@ -208,6 +208,6 @@ function RolePill({ role }: { role: "OWNER" | VaultRole }) {
 }
 
 function roleLabel(role: "OWNER" | VaultRole) {
-  if (role === "OWNER") return "소유자";
-  return role === "EDITOR" ? "편집자" : "뷰어";
+  if (role === "OWNER") return "Owner";
+  return role === "EDITOR" ? "Editor" : "Viewer";
 }

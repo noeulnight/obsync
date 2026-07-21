@@ -28,7 +28,7 @@ export type FileOperationResult = {
 
 export class ApiRequestError extends Error {
   constructor(readonly status: number) {
-    super(`서버 요청 실패 (${status})`);
+    super(`Server request failed (${status})`);
   }
 }
 
@@ -126,7 +126,7 @@ export class ApiClient {
     if (!this.accessToken || this.expiresSoon(this.accessToken)) {
       await this.refresh();
     }
-    if (!this.accessToken) throw new Error("로그인이 필요합니다.");
+    if (!this.accessToken) throw new Error("Sign in is required.");
     return this.accessToken;
   }
 
@@ -219,7 +219,7 @@ export class ApiClient {
   }
 
   private async refresh() {
-    if (!this.refreshToken) throw new Error("로그인이 필요합니다.");
+    if (!this.refreshToken) throw new Error("Sign in is required.");
     this.refreshing ??= (async () => {
       try {
         const tokens = this.tokens(

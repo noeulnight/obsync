@@ -51,7 +51,7 @@ export class RemoteVaultWriter {
             await this.sessions.canvas(this.ensureCanvas(path), "local").localChanged();
           }
           local = null;
-          this.setStatus("삭제 충돌 사본 보존됨");
+          this.setStatus("Deleted conflict copy preserved");
         }
         this.sessions.delete(entry);
         if (local || (await this.app.vault.adapter.stat(entry.path))) {
@@ -134,7 +134,7 @@ export class RemoteVaultWriter {
       this.app.vault.getAllLoadedFiles().map((file) => file.path),
     );
     await this.moveLocalConflict(path, next);
-    this.setStatus("경로 충돌 사본 보존됨");
+    this.setStatus("Path conflict copy preserved");
     this.recovered();
     return next;
   }

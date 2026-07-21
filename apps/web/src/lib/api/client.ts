@@ -291,7 +291,7 @@ export class ApiClient {
 
   async token() {
     if (!this.accessToken || expiresSoon(this.accessToken)) await this.refresh();
-    if (!this.accessToken) throw new Error("로그인이 필요합니다.");
+    if (!this.accessToken) throw new Error("Sign in is required.");
     return this.accessToken;
   }
 

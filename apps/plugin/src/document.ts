@@ -44,7 +44,7 @@ export class DocumentSync {
         this.providerSynced = true;
         void this.initialize();
       },
-      onAuthenticationFailed: () => setStatus("인증 실패"),
+      onAuthenticationFailed: () => setStatus("Authentication failed"),
     });
     this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {

@@ -28,10 +28,10 @@ export class InitialVaultSync {
     }
     if (initialMode === "local") this.removeRemoteOnlyEntries();
     else if (!(await remote.applyBatch(this.options.entries().map((entry) => ({ entry }))))) {
-      throw new Error("일부 파일을 다시 적용하는 중입니다.");
+      throw new Error("Some files are still being reapplied.");
     }
-    if (connection.readOnly) return "읽기 전용";
-    if (initialMode === "server") return "동기화됨";
+    if (connection.readOnly) return "Read only";
+    if (initialMode === "server") return "Synced";
 
     const loaded = app.vault.getAllLoadedFiles();
     for (const folder of loaded
@@ -44,7 +44,7 @@ export class InitialVaultSync {
     for (const file of app.vault.getFiles()) {
       if (!this.options.isApplying(file.path)) await this.options.syncFile(file, seedMode);
     }
-    return "동기화됨";
+    return "Synced";
   }
 
   private async clearContentCache() {

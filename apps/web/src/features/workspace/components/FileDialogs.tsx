@@ -48,20 +48,20 @@ export function CreateEntryDialog({
     close();
   }
 
-  const label = kind === "folder" ? "폴더" : kind === "canvas" ? "Canvas" : "문서";
+  const label = kind === "folder" ? "folder" : kind === "canvas" ? "Canvas" : "document";
   return (
     <Dialog open={Boolean(kind)} onOpenChange={(open) => !open && close()}>
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>새 {label}</DialogTitle>
-            <DialogDescription>폴더를 포함한 Vault 경로를 입력할 수 있습니다.</DialogDescription>
+            <DialogTitle>New {label}</DialogTitle>
+            <DialogDescription>You can enter a Vault path including folders.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
               autoFocus
-              aria-label={`새 ${label} 경로`}
-              placeholder={kind === "folder" ? "notes" : `notes/새 ${label}`}
+              aria-label={`New ${label} path`}
+              placeholder={kind === "folder" ? "notes" : `notes/New ${label}`}
               value={path}
               onChange={(event) => setPath(event.target.value)}
             />
@@ -70,10 +70,10 @@ export function CreateEntryDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                취소
+                Cancel
               </Button>
             </DialogClose>
-            <Button type="submit">생성</Button>
+            <Button type="submit">Create</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -111,15 +111,15 @@ export function RenameFileDialog({
       <DialogContent>
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>이름 변경</DialogTitle>
+            <DialogTitle>Rename</DialogTitle>
             <DialogDescription>
-              새 {entry?.kind === "folder" ? "폴더" : "파일"} 이름을 입력하세요.
+              Enter a new {entry?.kind === "folder" ? "folder" : "file"} name.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
               autoFocus
-              aria-label="새 파일 이름"
+              aria-label="New file name"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -128,10 +128,10 @@ export function RenameFileDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                취소
+                Cancel
               </Button>
             </DialogClose>
-            <Button type="submit">변경</Button>
+            <Button type="submit">Rename</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -154,17 +154,17 @@ export function DeleteFileDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {entry?.kind === "folder" ? "폴더" : "파일"}를 삭제할까요?
+            Delete this {entry?.kind === "folder" ? "folder" : "file"}?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            “{name}”{entry?.kind === "folder" ? "와 내부 항목이" : " 파일이"} 모든 기기에서
-            삭제됩니다.
+            “{name}”{entry?.kind === "folder" ? " and everything inside it" : ""} will be deleted
+            from every device.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>취소</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction variant="destructive" onClick={remove}>
-            삭제
+            Delete
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

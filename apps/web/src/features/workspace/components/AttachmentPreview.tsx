@@ -46,9 +46,7 @@ export function AttachmentPreview({
           onRename={onRename}
           onDelete={onDelete}
         />
-        <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
-          불러오는 중…
-        </div>
+        <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading…</div>
       </div>
     );
   }
@@ -67,7 +65,7 @@ export function AttachmentPreview({
         <div className="grid min-h-0 flex-1 place-items-center">
           <Button asChild>
             <a href={download.data} target="_blank" rel="noreferrer">
-              파일 열기
+              Open file
             </a>
           </Button>
         </div>

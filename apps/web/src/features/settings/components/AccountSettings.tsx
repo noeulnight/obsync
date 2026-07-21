@@ -67,7 +67,7 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
   }
 
   if (!account.data) {
-    return <p className="text-sm text-muted-foreground">계정 정보를 불러오는 중…</p>;
+    return <p className="text-sm text-muted-foreground">Loading account…</p>;
   }
 
   const error =
@@ -80,8 +80,8 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
 
   return (
     <section className="mx-auto max-w-xl">
-      <h2 className="text-xl font-semibold">내 계정</h2>
-      <p className="mt-1 text-sm text-muted-foreground">프로필과 보안 설정을 관리합니다.</p>
+      <h2 className="text-xl font-semibold">My account</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Manage your profile and security.</p>
 
       <div className="mt-6 flex items-center gap-4">
         <div className="grid size-12 shrink-0 place-items-center rounded-full bg-foreground text-lg font-semibold text-background">
@@ -97,39 +97,39 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
 
       <Separator className="my-6" />
       <SettingForm
-        title="표시 이름"
-        description="다른 기기의 실시간 커서에 표시할 이름입니다."
+        title="Display name"
+        description="Shown next to your live cursor on other devices."
         onSubmit={saveProfile}
       >
         <Input
-          aria-label="표시 이름"
+          aria-label="Display name"
           value={displayName}
           maxLength={100}
-          placeholder="표시 이름"
+          placeholder="Display name"
           onChange={(event) => setDisplayName(event.target.value)}
         />
         <Button variant="secondary" disabled={updateAccount.isPending}>
-          저장
+          Save
         </Button>
       </SettingForm>
 
       <Separator className="my-6" />
       <SettingForm
-        title="이메일"
-        description="이메일 변경에는 현재 비밀번호가 필요합니다."
+        title="Email"
+        description="Your current password is required to change your email."
         onSubmit={saveEmail}
       >
         <div className="grid flex-1 gap-2">
           <Input
             type="email"
-            aria-label="계정 이메일"
+            aria-label="Account email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
           <Input
             type="password"
-            aria-label="이메일 변경 현재 비밀번호"
-            placeholder="현재 비밀번호"
+            aria-label="Current password for email change"
+            placeholder="Current password"
             value={emailPassword}
             onChange={(event) => setEmailPassword(event.target.value)}
           />
@@ -140,28 +140,28 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
             updateAccount.isPending || email === account.data.email || emailPassword.length < 8
           }
         >
-          변경
+          Change
         </Button>
       </SettingForm>
 
       <Separator className="my-6" />
       <SettingForm
-        title="비밀번호"
-        description="변경하면 모든 기기에서 다시 로그인해야 합니다."
+        title="Password"
+        description="Changing it signs you out on every device."
         onSubmit={savePassword}
       >
         <div className="grid flex-1 gap-2">
           <Input
             type="password"
-            aria-label="현재 비밀번호"
-            placeholder="현재 비밀번호"
+            aria-label="Current password"
+            placeholder="Current password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
           />
           <Input
             type="password"
-            aria-label="새 비밀번호"
-            placeholder="새 비밀번호 (8자 이상)"
+            aria-label="New password"
+            placeholder="New password (8+ characters)"
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
           />
@@ -172,14 +172,14 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
             changePassword.isPending || currentPassword.length < 8 || newPassword.length < 8
           }
         >
-          변경
+          Change
         </Button>
       </SettingForm>
 
       <Separator className="my-6" />
       <div>
-        <h3 className="font-medium">로그인된 기기</h3>
-        <p className="mt-1 text-sm text-muted-foreground">활성 refresh session 목록입니다.</p>
+        <h3 className="font-medium">Signed-in devices</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Active refresh sessions.</p>
         <div className="mt-3 grid gap-1">
           {sessions.data?.map((session) => (
             <div
@@ -190,7 +190,7 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{sessionName(session.userAgent)}</div>
                 <div className="text-xs text-muted-foreground">
-                  {formatDate(session.createdAt)} · {session.current ? "현재 세션" : "활성"}
+                  {formatDate(session.createdAt)} · {session.current ? "Current session" : "Active"}
                 </div>
               </div>
               {!session.current && (
@@ -200,51 +200,51 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
                   disabled={revokeSession.isPending}
                   onClick={() => revokeSession.mutate(session.id)}
                 >
-                  로그아웃
+                  Sign out
                 </Button>
               )}
             </div>
           ))}
           {sessions.data?.length === 0 && (
-            <p className="py-3 text-sm text-muted-foreground">활성 session이 없습니다.</p>
+            <p className="py-3 text-sm text-muted-foreground">No active sessions.</p>
           )}
         </div>
       </div>
 
       <Separator className="my-6" />
       <div className="pb-4">
-        <h3 className="font-medium text-destructive">계정 삭제</h3>
+        <h3 className="font-medium text-destructive">Delete account</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          모든 Vault, 문서 기록과 첨부파일이 영구 삭제됩니다.
+          Permanently delete every Vault, document history, and attachment.
         </p>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button className="mt-3" variant="destructive">
-              <Trash2 /> 계정 삭제
+              <Trash2 /> Delete account
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>계정을 영구 삭제할까요?</AlertDialogTitle>
+              <AlertDialogTitle>Permanently delete your account?</AlertDialogTitle>
               <AlertDialogDescription>
-                이 작업은 되돌릴 수 없습니다. 계속하려면 현재 비밀번호를 입력하세요.
+                This cannot be undone. Enter your current password to continue.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <Input
               type="password"
-              aria-label="계정 삭제 비밀번호"
-              placeholder="현재 비밀번호"
+              aria-label="Password for account deletion"
+              placeholder="Current password"
               value={deletePassword}
               onChange={(event) => setDeletePassword(event.target.value)}
             />
             <AlertDialogFooter>
-              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 variant="destructive"
                 disabled={deletePassword.length < 8 || deleteAccount.isPending}
                 onClick={() => void removeAccount()}
               >
-                영구 삭제
+                Delete permanently
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -277,7 +277,7 @@ function SettingForm({
 }
 
 function sessionName(userAgent: string | null) {
-  if (!userAgent) return "알 수 없는 기기";
+  if (!userAgent) return "Unknown device";
   if (/obsidian/i.test(userAgent)) return "Obsidian";
   if (/chrome/i.test(userAgent)) return "Chrome";
   if (/safari/i.test(userAgent)) return "Safari";
@@ -286,5 +286,5 @@ function sessionName(userAgent: string | null) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
 }

@@ -119,10 +119,10 @@ class ImageWidget extends WidgetType {
     void this.resolveAsset(this.href)
       .then((url) => {
         if (url) image.src = url;
-        else wrapper.textContent = `이미지를 찾을 수 없습니다: ${this.href}`;
+        else wrapper.textContent = `Image not found: ${this.href}`;
       })
       .catch(() => {
-        wrapper.textContent = `이미지를 불러오지 못했습니다: ${this.href}`;
+        wrapper.textContent = `Failed to load image: ${this.href}`;
       });
     return wrapper;
   }

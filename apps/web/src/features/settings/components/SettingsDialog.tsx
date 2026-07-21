@@ -71,16 +71,16 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="h-[min(680px,calc(100svh-2rem))] gap-0 overflow-hidden p-0 sm:max-w-4xl">
-        <DialogTitle className="sr-only">설정</DialogTitle>
+        <DialogTitle className="sr-only">Settings</DialogTitle>
         <div className="grid min-h-0 grid-cols-[180px_minmax(0,1fr)] sm:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col bg-muted/40 px-2 py-4">
-            <div className="px-2 pb-3 text-sm font-semibold">설정</div>
+            <div className="px-2 pb-3 text-sm font-semibold">Settings</div>
             <SettingsButton
               active={section === "account"}
               icon={<UserRound />}
               onClick={() => onSectionChange("account")}
             >
-              내 계정
+              My account
             </SettingsButton>
             <SettingsButton
               active={section === "vaults"}
@@ -94,12 +94,12 @@ export function SettingsDialog({
               icon={<Users />}
               onClick={() => onSectionChange("members")}
             >
-              멤버
+              Members
             </SettingsButton>
             <div className="mt-auto">
               <Separator className="mb-2" />
               <SettingsButton icon={<LogOut />} onClick={onLogout}>
-                로그아웃
+                Sign out
               </SettingsButton>
             </div>
           </aside>
@@ -109,20 +109,20 @@ export function SettingsDialog({
               <AccountSettings enabled={open} onLogout={onLogout} />
             ) : section === "vaults" ? (
               <section className="mx-auto max-w-xl">
-                <h2 className="text-xl font-semibold">Vault 관리</h2>
+                <h2 className="text-xl font-semibold">Manage Vaults</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Vault를 만들고 이름을 바꾸거나 삭제할 수 있습니다.
+                  Create, rename, or delete your Vaults.
                 </p>
                 <form className="mt-6 flex gap-2" onSubmit={(event) => void create(event)}>
                   <Input
-                    aria-label="새 Vault 이름"
-                    placeholder="새 Vault 이름"
+                    aria-label="New Vault name"
+                    placeholder="New Vault name"
                     value={newName}
                     maxLength={100}
                     onChange={(event) => setNewName(event.target.value)}
                   />
                   <Button disabled={!newName.trim() || createVault.isPending}>
-                    <Plus /> 만들기
+                    <Plus /> Create
                   </Button>
                 </form>
                 <Separator className="my-6" />
@@ -139,9 +139,7 @@ export function SettingsDialog({
                     />
                   ))}
                   {vaults.length === 0 && (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      아직 Vault가 없습니다.
-                    </p>
+                    <p className="py-6 text-center text-sm text-muted-foreground">No Vaults yet.</p>
                   )}
                 </div>
               </section>
@@ -212,7 +210,7 @@ function VaultRow({
     <div className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-muted/60">
       <button
         type="button"
-        aria-label={`${vault.name} 열기`}
+        aria-label={`Open ${vault.name}`}
         className={cn(
           "size-2 shrink-0 rounded-full bg-muted-foreground/30",
           selected && "bg-emerald-500",
@@ -221,7 +219,7 @@ function VaultRow({
       />
       {vault.role === "OWNER" ? (
         <Input
-          aria-label={`${vault.name} 이름`}
+          aria-label={`${vault.name} name`}
           className="h-8 border-transparent bg-transparent shadow-none hover:border-input focus-visible:border-ring dark:bg-transparent"
           value={name}
           maxLength={100}
@@ -241,32 +239,32 @@ function VaultRow({
           disabled={pending}
           onClick={() => void onRename(name.trim())}
         >
-          저장
+          Save
         </Button>
       )}
       {!selected && (
         <Button size="sm" variant="ghost" onClick={onSelect}>
-          열기
+          Open
         </Button>
       )}
       {vault.role === "OWNER" && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button size="icon-sm" variant="ghost" aria-label={`${vault.name} 삭제`}>
+            <Button size="icon-sm" variant="ghost" aria-label={`Delete ${vault.name}`}>
               <Trash2 />
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>“{vault.name}” Vault를 삭제할까요?</AlertDialogTitle>
+              <AlertDialogTitle>Delete the “{vault.name}” Vault?</AlertDialogTitle>
               <AlertDialogDescription>
-                문서 기록과 첨부파일이 모두 삭제되며 되돌릴 수 없습니다.
+                All document history and attachments will be deleted. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction variant="destructive" onClick={() => void onDelete()}>
-                삭제
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

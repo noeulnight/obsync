@@ -55,7 +55,7 @@ export function Workspace({
   const [active, setActive] = useState(() =>
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
-  const [status, setStatus] = useState("연결 중");
+  const [status, setStatus] = useState("Connecting");
   const [online, setOnline] = useState(false);
   const [notice, setNotice] = useState("");
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
@@ -117,12 +117,12 @@ export function Workspace({
       : undefined;
 
   function rename(entry: FileEntry, name: string) {
-    if (!canWrite) return "오프라인에서는 편집할 수 없습니다.";
+    if (!canWrite) return "Editing is unavailable while offline.";
     const path =
       entry.kind === "markdown"
         ? renamedMarkdownPath(entry.path, name)
         : renamedFilePath(entry.path, name);
-    if (!path) return "파일 이름에 / 또는 \\ 문자를 사용할 수 없습니다.";
+    if (!path) return "File names cannot contain / or \\ characters.";
     try {
       sync?.rename(entry, path);
     } catch (reason) {
@@ -131,10 +131,10 @@ export function Workspace({
   }
 
   function create(path: string) {
-    if (!canWrite) return "오프라인에서는 편집할 수 없습니다.";
-    if (!sync || !createKind) return "동기화 연결을 기다려주세요.";
+    if (!canWrite) return "Editing is unavailable while offline.";
+    if (!sync || !createKind) return "Wait for synchronization to connect.";
     const requested = newEntryPath(createKind, path);
-    if (!requested) return "이름을 입력하세요.";
+    if (!requested) return "Enter a name.";
     try {
       const entry = sync.create(createKind, requested);
       if (entry.kind !== "folder") open(entry);
@@ -146,27 +146,27 @@ export function Workspace({
   async function upload(files: FileList | null) {
     if (!sync || !files?.length) return;
     if (!canWrite) {
-      setNotice("오프라인에서는 첨부파일을 업로드할 수 없습니다.");
+      setNotice("Attachments cannot be uploaded while offline.");
       return;
     }
     if (!sync.readyForNewEntries()) {
-      setNotice("최초 동기화가 끝난 뒤 다시 시도하세요.");
+      setNotice("Try again after the initial synchronization finishes.");
       return;
     }
-    setNotice("첨부파일 업로드 중…");
+    setNotice("Uploading attachments…");
     try {
       for (const file of files) {
         const path = validVaultPath(file.name);
-        if (!path) throw new Error(`올바르지 않은 파일 이름입니다: ${file.name}`);
+        if (!path) throw new Error(`Invalid file name: ${file.name}`);
         if (entries.some((entry) => entry.path.toLocaleLowerCase() === path.toLocaleLowerCase())) {
-          throw new Error(`같은 이름의 파일이 이미 있습니다: ${path}`);
+          throw new Error(`A file with this name already exists: ${path}`);
         }
         const uploaded = await uploadAttachment.mutateAsync({ file, path });
         open(sync.addAttachment(uploaded));
       }
       setNotice("");
     } catch (reason) {
-      setNotice(`첨부파일 업로드 실패: ${errorMessage(reason)}`);
+      setNotice(`Attachment upload failed: ${errorMessage(reason)}`);
     } finally {
       if (uploadInput.current) uploadInput.current.value = "";
     }
@@ -174,7 +174,7 @@ export function Workspace({
 
   function remove(entry: FileEntry) {
     if (!canWrite) {
-      setNotice("오프라인에서는 편집할 수 없습니다.");
+      setNotice("Editing is unavailable while offline.");
       return;
     }
     sync?.delete(entry);
@@ -193,7 +193,7 @@ export function Workspace({
       if (!activeEntry) return;
       const entry = resolveMarkdownLink(entries, activeEntry.path, href);
       if (!entry) {
-        setNotice(`문서를 찾을 수 없습니다: ${href}`);
+        setNotice(`Document not found: ${href}`);
         return;
       }
       setNotice("");
@@ -246,7 +246,7 @@ export function Workspace({
           : undefined;
       const entry = source ? resolveMarkdownLink(entries, source.path, href) : undefined;
       if (!entry) {
-        setNotice(`문서를 찾을 수 없습니다: ${href}`);
+        setNotice(`Document not found: ${href}`);
         return;
       }
       setNotice("");

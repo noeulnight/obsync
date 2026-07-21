@@ -24,7 +24,7 @@ export function FileHeader({
   const parts = [vaultName, ...path.split("/").slice(0, -1), name];
   return (
     <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3">
-      <nav className="min-w-0 justify-self-start" aria-label="문서 경로">
+      <nav className="min-w-0 justify-self-start" aria-label="Document path">
         <ol className="flex min-w-0 items-center gap-1 text-[13px] text-muted-foreground">
           {parts.map((part, index) => (
             <li key={`${index}-${part}`} className="flex min-w-0 items-center gap-1">
@@ -44,21 +44,21 @@ export function FileHeader({
         <div className="justify-self-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="파일 메뉴">
+              <Button variant="ghost" size="icon-sm" aria-label="File menu">
                 <Ellipsis />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => window.setTimeout(onRename)}>
                 <Pencil />
-                이름 변경
+                Rename
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                 onSelect={() => window.setTimeout(onDelete)}
               >
                 <Trash2 />
-                삭제
+                Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

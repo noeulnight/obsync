@@ -26,13 +26,13 @@ import type { CanvasNode, WebCanvas } from "../lib/sync";
 import { canvasColor } from "./CanvasNode";
 
 const nodeColors = [
-  { value: undefined, label: "기본" },
-  { value: "1", label: "빨강" },
-  { value: "2", label: "주황" },
-  { value: "3", label: "노랑" },
-  { value: "4", label: "초록" },
-  { value: "5", label: "청록" },
-  { value: "6", label: "보라" },
+  { value: undefined, label: "Default" },
+  { value: "1", label: "Red" },
+  { value: "2", label: "Orange" },
+  { value: "3", label: "Yellow" },
+  { value: "4", label: "Green" },
+  { value: "5", label: "Cyan" },
+  { value: "6", label: "Purple" },
 ];
 
 export function CanvasNodeToolbar({
@@ -61,14 +61,14 @@ export function CanvasNodeToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label="노드 삭제"
+        aria-label="Delete node"
         onClick={() => session.deleteNode(node.id)}
       >
         <Trash2 />
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" aria-label="노드 색상">
+          <Button variant="ghost" size="icon-sm" aria-label="Node color">
             <Palette />
           </Button>
         </DropdownMenuTrigger>
@@ -87,10 +87,10 @@ export function CanvasNodeToolbar({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button variant="ghost" size="icon-sm" aria-label="선택한 노드로 이동" onClick={onCenter}>
+      <Button variant="ghost" size="icon-sm" aria-label="Center selected node" onClick={onCenter}>
         <Focus />
       </Button>
-      <Button variant="ghost" size="icon-sm" aria-label="노드 편집" onClick={onEdit}>
+      <Button variant="ghost" size="icon-sm" aria-label="Edit node" onClick={onEdit}>
         <Pencil />
       </Button>
     </div>
@@ -100,12 +100,12 @@ export function CanvasNodeToolbar({
 export function CanvasAddToolbar({ session, files }: { session: WebCanvas; files: FileEntry[] }) {
   return (
     <div className="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 overflow-hidden rounded-md bg-popover p-1 shadow-md">
-      <Button variant="ghost" size="icon" aria-label="카드 추가" onClick={() => session.addText()}>
+      <Button variant="ghost" size="icon" aria-label="Add card" onClick={() => session.addText()}>
         <SquarePen />
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="문서 추가">
+          <Button variant="ghost" size="icon" aria-label="Add document">
             <FileText />
           </Button>
         </DropdownMenuTrigger>
@@ -122,7 +122,7 @@ export function CanvasAddToolbar({ session, files }: { session: WebCanvas; files
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="미디어 추가">
+          <Button variant="ghost" size="icon" aria-label="Add media">
             <Image />
           </Button>
         </DropdownMenuTrigger>
@@ -163,34 +163,34 @@ export function CanvasViewToolbar({
   return (
     <div className="absolute top-2 right-2 z-50 flex flex-col gap-2">
       <div className="flex flex-col overflow-hidden rounded-md border bg-background shadow-sm">
-        <ToolbarButton label="Canvas 설정" border onClick={onToggleGrid}>
+        <ToolbarButton label="Canvas settings" border onClick={onToggleGrid}>
           <Grid2X2 />
         </ToolbarButton>
-        <ToolbarButton label="확대" border onClick={onZoomIn}>
+        <ToolbarButton label="Zoom in" border onClick={onZoomIn}>
           <Plus />
         </ToolbarButton>
-        <ToolbarButton label="확대 초기화" border onClick={onResetZoom}>
+        <ToolbarButton label="Reset zoom" border onClick={onResetZoom}>
           <RotateCcw />
         </ToolbarButton>
-        <ToolbarButton label="화면에 맞춤" border onClick={onFit}>
+        <ToolbarButton label="Fit to screen" border onClick={onFit}>
           <Focus />
         </ToolbarButton>
-        <ToolbarButton label="축소" onClick={onZoomOut}>
+        <ToolbarButton label="Zoom out" onClick={onZoomOut}>
           <Minus />
         </ToolbarButton>
       </div>
       {!readOnly && (
         <div className="flex flex-col overflow-hidden rounded-md border bg-background shadow-sm">
-          <ToolbarButton label="실행 취소" border onClick={() => session.undo()}>
+          <ToolbarButton label="Undo" border onClick={() => session.undo()}>
             <Undo2 />
           </ToolbarButton>
-          <ToolbarButton label="다시 실행" onClick={() => session.redo()}>
+          <ToolbarButton label="Redo" onClick={() => session.redo()}>
             <Redo2 />
           </ToolbarButton>
         </div>
       )}
       <div className="overflow-hidden rounded-md border bg-background shadow-sm">
-        <ToolbarButton label="Canvas 도움말" onClick={onToggleHelp}>
+        <ToolbarButton label="Canvas help" onClick={onToggleHelp}>
           <CircleHelp />
         </ToolbarButton>
       </div>

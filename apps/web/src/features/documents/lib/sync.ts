@@ -106,13 +106,13 @@ export class WebVault {
           for (const [id, entry] of this.serverManifest) this.cachedManifest.set(id, entry);
         });
         this.notify();
-        setStatus("동기화됨");
+        setStatus("Synced");
         this.setOnline(true);
         this.outbox.setConnected(true);
       },
       onAuthenticationFailed: () => {
         this.setOnline(false);
-        setStatus("인증 실패");
+        setStatus("Authentication failed");
       },
     });
     this.provider.attach();
@@ -172,7 +172,7 @@ export class WebVault {
   create(kind: "markdown" | "folder" | "canvas", requestedPath: string) {
     this.requireManifest();
     const path = validVaultPath(requestedPath);
-    if (!path) throw new Error("올바른 Vault 경로를 입력하세요.");
+    if (!path) throw new Error("Enter a valid Vault path.");
     this.requireAvailablePath(path);
     const entry: FileEntry = {
       id: randomUuid(),
@@ -223,7 +223,7 @@ export class WebVault {
 
   rename(entry: FileEntry, path: string) {
     const nextPath = validVaultPath(path);
-    if (!nextPath) throw new Error("올바른 Vault 경로를 입력하세요.");
+    if (!nextPath) throw new Error("Enter a valid Vault path.");
     if (entry.path === nextPath) return;
     const changed =
       entry.kind === "folder"
@@ -236,7 +236,7 @@ export class WebVault {
         (item) => !ids.has(item.id) && paths.some((path) => samePath(item.path, path)),
       )
     ) {
-      throw new Error("같은 이름의 파일이 이미 있습니다.");
+      throw new Error("A file with this name already exists.");
     }
     this.enqueue({
       operationId: randomUuid(),
@@ -311,7 +311,7 @@ export class WebVault {
         next.applySnapshot(canvas.snapshot());
         canvas.destroy();
       }
-      this.setStatus("삭제 충돌 사본 보존됨");
+      this.setStatus("Deleted conflict copy preserved");
     } finally {
       this.preservingDeletes.delete(entry.id);
     }
@@ -328,19 +328,19 @@ export class WebVault {
 
   private requireAvailablePath(path: string) {
     if (this.entries().some((entry) => samePath(entry.path, path))) {
-      throw new Error("같은 이름의 파일이 이미 있습니다.");
+      throw new Error("A file with this name already exists.");
     }
   }
 
   private requireManifest() {
-    if (!this.manifestLoaded) throw new Error("로컬 Vault를 불러온 뒤 다시 시도하세요.");
+    if (!this.manifestLoaded) throw new Error("Try again after the local Vault loads.");
   }
 }
 
 function connectionStatus(status: string) {
-  if (status === "connected") return "동기화 중";
-  if (status === "disconnected") return "오프라인";
-  return "연결 중";
+  if (status === "connected") return "Synchronizing";
+  if (status === "disconnected") return "Offline";
+  return "Connecting";
 }
 
 function samePath(left: string, right: string) {

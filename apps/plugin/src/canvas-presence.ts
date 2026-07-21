@@ -157,7 +157,7 @@ function renderFocus(
   focus.style.transform = `translate(${node.x}px, ${node.y}px)`;
   focus.style.width = `${node.width}px`;
   focus.style.height = `${node.height}px`;
-  focus.ariaLabel = `${presence.name} 편집 중`;
+  focus.ariaLabel = `${presence.name} is editing`;
 }
 
 function hasBounds(node: CanvasItemController): node is CanvasItemController & {

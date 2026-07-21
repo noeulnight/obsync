@@ -310,7 +310,7 @@ export class VaultSync {
       onSynced: ({ state }) => {
         if (state) synced?.();
       },
-      onAuthenticationFailed: () => this.setStatus("인증 실패"),
+      onAuthenticationFailed: () => this.setStatus("Authentication failed"),
     });
     provider.attach();
     return provider;
@@ -391,13 +391,13 @@ export class VaultSync {
   }
 
   private report(error: unknown) {
-    this.setStatus("오류");
+    this.setStatus("Error");
     console.error("Obsync", error);
   }
 }
 
 function connectionStatus(status: string) {
-  if (status === "connected") return "동기화 중";
-  if (status === "disconnected") return "오프라인";
-  return "연결 중";
+  if (status === "connected") return "Synchronizing";
+  if (status === "disconnected") return "Offline";
+  return "Connecting";
 }

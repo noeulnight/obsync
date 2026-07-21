@@ -48,8 +48,8 @@ export function CredentialsPage({
             <Input
               type="email"
               autoComplete="email"
-              placeholder="이메일"
-              aria-label="이메일"
+              placeholder="Email"
+              aria-label="Email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -57,15 +57,15 @@ export function CredentialsPage({
             <Input
               type="password"
               autoComplete="current-password"
-              placeholder="비밀번호"
-              aria-label="비밀번호"
+              placeholder="Password"
+              aria-label="Password"
               minLength={8}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
             />
             <Button type="submit" disabled={submitting}>
-              로그인
+              Sign in
             </Button>
             <Button
               type="button"
@@ -73,7 +73,7 @@ export function CredentialsPage({
               disabled={submitting}
               onClick={() => void submit("register")}
             >
-              계정 만들기
+              Create account
             </Button>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </form>

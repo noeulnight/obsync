@@ -103,7 +103,7 @@ export function WorkspaceContent({
             onDelete={canWrite ? onDelete : undefined}
           />
         ) : (
-          <EmptyState>왼쪽에서 문서를 선택하세요.</EmptyState>
+          <EmptyState>Select a document from the sidebar.</EmptyState>
         )}
       </div>
     </SidebarInset>
@@ -117,5 +117,5 @@ function EmptyState({ children }: { children: string }) {
 }
 
 function EditorLoading() {
-  return <EmptyState>편집기 불러오는 중…</EmptyState>;
+  return <EmptyState>Loading editor…</EmptyState>;
 }

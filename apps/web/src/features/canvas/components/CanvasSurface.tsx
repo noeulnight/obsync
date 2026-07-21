@@ -431,7 +431,7 @@ export function CanvasSurface({
       />
       {showHelp && (
         <div className="absolute right-12 bottom-4 z-50 max-w-64 rounded-lg border bg-popover p-3 text-xs leading-5 text-popover-foreground shadow-md">
-          카드를 끌어 이동하고, 두 번 눌러 편집합니다. 빈 공간을 끌면 화면이 이동합니다.
+          Drag cards to move them and double-click to edit. Drag empty space to pan.
         </div>
       )}
     </div>

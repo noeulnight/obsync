@@ -44,9 +44,7 @@ describe("parseCanvas", () => {
   });
 
   it("rejects Canvas items without ids", () => {
-    expect(() => parseCanvas('{"nodes":[{"x":1}]}')).toThrow(
-      "Canvas 노드 형식이 올바르지 않습니다.",
-    );
+    expect(() => parseCanvas('{"nodes":[{"x":1}]}')).toThrow("Invalid Canvas node format.");
   });
 });
 

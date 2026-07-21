@@ -84,7 +84,7 @@ export function WorkspaceSidebar({
             <Select value={vault.id} onValueChange={onSelectVault}>
               <SelectTrigger
                 className="w-full border-0 bg-transparent px-2 font-medium shadow-none hover:bg-sidebar-accent focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent dark:hover:bg-sidebar-accent"
-                aria-label="Vault 선택"
+                aria-label="Select Vault"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -92,13 +92,13 @@ export function WorkspaceSidebar({
                 {vaults.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name}
-                    {item.role === "VIEWER" ? " (읽기 전용)" : ""}
+                    {item.role === "VIEWER" ? " (Read only)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <Button variant="ghost" size="icon" aria-label="새 Vault" onClick={onCreateVault}>
+          <Button variant="ghost" size="icon" aria-label="New Vault" onClick={onCreateVault}>
             <Plus />
           </Button>
         </div>
@@ -106,13 +106,13 @@ export function WorkspaceSidebar({
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="justify-between pr-1">
-            <span>파일</span>
+            <span>Files</span>
             {canWrite && (
               <span className="flex items-center gap-0.5">
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="새 문서"
+                  aria-label="New document"
                   onClick={() => onCreateEntry("markdown")}
                 >
                   <FilePlus2 />
@@ -120,7 +120,7 @@ export function WorkspaceSidebar({
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="새 폴더"
+                  aria-label="New folder"
                   onClick={() => onCreateEntry("folder")}
                 >
                   <FolderPlus />
@@ -128,7 +128,7 @@ export function WorkspaceSidebar({
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="새 Canvas"
+                  aria-label="New Canvas"
                   onClick={() => onCreateEntry("canvas")}
                 >
                   <LayoutDashboard />
@@ -136,7 +136,7 @@ export function WorkspaceSidebar({
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="첨부파일 업로드"
+                  aria-label="Upload attachments"
                   onClick={() => uploadInput.current?.click()}
                 >
                   <Upload />
@@ -165,17 +165,17 @@ export function WorkspaceSidebar({
       </SidebarContent>
       <SidebarFooter className="border-t">
         <div className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          <span className={status === "동기화됨" ? "text-emerald-500" : undefined}>
-            ● {vault.role === "VIEWER" ? "읽기 전용" : status}
+          <span className={status === "Synced" ? "text-emerald-500" : undefined}>
+            ● {vault.role === "VIEWER" ? "Read only" : status}
           </span>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton aria-label="계정 메뉴">
+                <SidebarMenuButton aria-label="Account menu">
                   <CircleUserRound />
-                  <span>계정</span>
+                  <span>Account</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -185,11 +185,11 @@ export function WorkspaceSidebar({
               >
                 <DropdownMenuItem onSelect={onSettings}>
                   <Settings2 />
-                  설정
+                  Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onLogout}>
                   <LogOut />
-                  로그아웃
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

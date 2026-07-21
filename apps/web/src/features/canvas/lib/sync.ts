@@ -133,7 +133,7 @@ export class WebCanvas {
       if (canvas?.path !== this.path) continue;
       values.push({
         clientId,
-        name: user.name ?? "사용자",
+        name: user.name ?? "User",
         color: user.color ?? "#30bced",
         x: canvas.x,
         y: canvas.y,
@@ -181,7 +181,7 @@ export class WebCanvas {
       }
       this.nodesMap.set(id, node);
       this.zOrder.set(id, this.zOrder.size);
-      this.document.getText(canvasNodeTextName(id)).insert(0, "새 노트");
+      this.document.getText(canvasNodeTextName(id)).insert(0, "New note");
     });
     return id;
   }

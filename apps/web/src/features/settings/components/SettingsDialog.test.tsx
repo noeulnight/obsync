@@ -41,12 +41,12 @@ describe("settings", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText("Personal 이름"), { target: { value: "Work" } });
-    fireEvent.click(screen.getByText("저장"));
+    fireEvent.change(screen.getByLabelText("Personal name"), { target: { value: "Work" } });
+    fireEvent.click(screen.getByText("Save"));
     await waitFor(() => expect(rename).toHaveBeenCalledWith(vault.id, "Work"));
 
-    fireEvent.click(screen.getByLabelText("Personal 삭제"));
-    fireEvent.click(await screen.findByText("삭제", { selector: "button" }));
+    fireEvent.click(screen.getByLabelText("Delete Personal"));
+    fireEvent.click(await screen.findByText("Delete", { selector: "button" }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith(vault.id));
     expect(select).toHaveBeenCalledWith("");
   });
@@ -87,10 +87,10 @@ describe("settings", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText("초대 이메일"), {
+    fireEvent.change(screen.getByLabelText("Invitation email"), {
       target: { value: "editor@example.com" },
     });
-    fireEvent.click(screen.getByText("초대", { selector: "button" }));
+    fireEvent.click(screen.getByText("Invite", { selector: "button" }));
     await waitFor(() =>
       expect(invite).toHaveBeenCalledWith(vault.id, "editor@example.com", "EDITOR"),
     );

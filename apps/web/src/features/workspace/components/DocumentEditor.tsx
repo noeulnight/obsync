@@ -36,7 +36,7 @@ export function DocumentEditor({
   function commit() {
     const path = renamedMarkdownPath(entry.path, title);
     if (!path) {
-      setError("제목에 / 또는 \\ 문자를 사용할 수 없습니다.");
+      setError("Titles cannot contain / or \\ characters.");
       setTitle(original);
       return;
     }
@@ -62,7 +62,7 @@ export function DocumentEditor({
         <div className="mx-auto w-[min(700px,calc(100%_-_64px))] pt-8">
           <Input
             className="mb-4 h-auto rounded-none border-0 bg-transparent px-0 py-0 !text-[2rem] !leading-[1.2] font-bold tracking-[-0.015em] shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
-            aria-label="문서 제목"
+            aria-label="Document title"
             value={title}
             readOnly={readOnly}
             onChange={(event) => setTitle(event.target.value)}

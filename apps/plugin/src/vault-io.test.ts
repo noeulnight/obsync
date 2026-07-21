@@ -52,7 +52,7 @@ describe("vault creation", () => {
   it("preserves real path conflicts", async () => {
     const target = app("file");
     await expect(createFolder(target.app, "conflict")).rejects.toThrow(
-      "폴더 경로가 파일과 충돌합니다: conflict",
+      "Folder path conflicts with a file: conflict",
     );
   });
 });

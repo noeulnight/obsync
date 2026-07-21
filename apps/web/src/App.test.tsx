@@ -13,7 +13,7 @@ describe("App routes", () => {
   it("renders the account login form", () => {
     const html = render("/");
 
-    expect(html).toContain("계정으로 로그인해 Vault를 편집하세요.");
+    expect(html).toContain("Sign in to edit your Vaults.");
     expect(html).toContain('type="email"');
     expect(html).toContain('type="password"');
   });
@@ -21,15 +21,15 @@ describe("App routes", () => {
   it("renders the device approval form for a valid code", () => {
     const html = render("/device?user_code=ABCD-EFGH");
 
-    expect(html).toContain("Obsidian 기기 코드 ABCD-EFGH");
-    expect(html).toContain("기기 승인");
+    expect(html).toContain("Obsidian device code ABCD-EFGH");
+    expect(html).toContain("Approve device");
   });
 
   it("uses the current web session to approve a device", () => {
     const html = render("/device?user_code=ABCD-EFGH", true);
 
-    expect(html).toContain("me@example.com 계정으로 연결합니다.");
-    expect(html).toContain("이 기기 승인");
+    expect(html).toContain("Connect using me@example.com.");
+    expect(html).toContain("Approve this device");
     expect(html).not.toContain('type="password"');
   });
 
@@ -57,7 +57,7 @@ describe("App routes", () => {
     );
 
     expect(tree).toContain('data-slot="context-menu-trigger"');
-    expect(header).toContain('aria-label="파일 메뉴"');
+    expect(header).toContain('aria-label="File menu"');
   });
 });
 

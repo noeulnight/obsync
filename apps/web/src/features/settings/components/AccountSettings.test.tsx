@@ -54,11 +54,11 @@ describe("account settings", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText("표시 이름"), { target: { value: "New name" } });
-    fireEvent.click(screen.getByText("저장"));
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "New name" } });
+    fireEvent.click(screen.getByText("Save"));
     await waitFor(() => expect(update).toHaveBeenCalledWith({ displayName: "New name" }));
 
-    fireEvent.click(screen.getByText("로그아웃", { selector: "button" }));
+    fireEvent.click(screen.getByText("Sign out", { selector: "button" }));
     await waitFor(() => expect(revoke).toHaveBeenCalledWith("session-2"));
   });
 });

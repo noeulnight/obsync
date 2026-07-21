@@ -118,22 +118,22 @@ export default class ObsyncPlugin extends Plugin {
 
     this.addCommand({
       id: "reconnect",
-      name: "동기화 다시 연결",
+      name: "Reconnect synchronization",
       callback: () => void this.connect(),
     });
     this.addCommand({
       id: "list-files",
-      name: "동기화된 파일 목록",
+      name: "List synchronized files",
       callback: () => {
         const files = this.sync?.listFiles() ?? [];
-        new Notice(files.length ? files.join("\n") : "동기화된 파일이 없습니다.");
+        new Notice(files.length ? files.join("\n") : "No synchronized files.");
       },
     });
 
     if (this.api.hasSession()) {
       void this.run(() => this.connect());
     } else {
-      this.setStatus("로그인 필요");
+      this.setStatus("Sign in required");
     }
   }
 
@@ -144,14 +144,14 @@ export default class ObsyncPlugin extends Plugin {
   async authenticateDevice() {
     this.api.setBaseUrl(this.settings.apiUrl);
     const authorization = await this.api.startDeviceAuthorization();
-    new Notice(`브라우저에서 기기 코드 ${authorization.userCode}를 승인하세요.`, 10_000);
+    new Notice(`Approve device code ${authorization.userCode} in your browser.`, 10_000);
     window.open(authorization.verificationUrl, "_blank");
     const deadline = Date.now() + authorization.expiresIn * 1000;
     while (Date.now() < deadline) {
       await delay(authorization.interval * 1000);
       if (await this.api.pollDeviceAuthorization(authorization.deviceCode)) break;
     }
-    if (!this.api.hasSession()) throw new Error("기기 인증 승인이 만료되었습니다.");
+    if (!this.api.hasSession()) throw new Error("Device authorization expired.");
     await this.loadAccount();
     if (!this.settings.vaultId && this.vaults[0]) {
       await this.selectVault(this.vaults[0].id);
@@ -174,7 +174,7 @@ export default class ObsyncPlugin extends Plugin {
       this.account = undefined;
       this.vaults = [];
       await this.saveData(this.settings);
-      this.setStatus("로그인 필요");
+      this.setStatus("Sign in required");
     }
   }
 
@@ -202,8 +202,8 @@ export default class ObsyncPlugin extends Plugin {
 
   async connect() {
     this.disconnect();
-    if (!this.api.hasSession()) return this.setStatus("로그인 필요");
-    if (!this.settings.vaultId) return this.setStatus("Vault 선택 필요");
+    if (!this.api.hasSession()) return this.setStatus("Sign in required");
+    if (!this.settings.vaultId) return this.setStatus("Select a Vault");
     const vaultId = this.settings.vaultId;
     try {
       await this.loadAccount();
@@ -216,7 +216,7 @@ export default class ObsyncPlugin extends Plugin {
     let initialMode: InitialSyncMode | undefined;
     if (!this.settings.initializedVaultIds.includes(vaultId)) {
       initialMode = await this.chooseInitialSync(readOnly);
-      if (!initialMode) return this.setStatus("초기 동기화 선택 필요");
+      if (!initialMode) return this.setStatus("Choose initial synchronization");
     }
     this.sync = new VaultSync(
       this.app,
@@ -238,7 +238,7 @@ export default class ObsyncPlugin extends Plugin {
         }
       },
     );
-    this.setStatus("연결 중");
+    this.setStatus("Connecting");
     this.refreshViews();
   }
 
@@ -369,7 +369,7 @@ export default class ObsyncPlugin extends Plugin {
       await work();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.setStatus("오류");
+      this.setStatus("Error");
       new Notice(`Obsync: ${message}`);
       console.error("Obsync", error);
     }

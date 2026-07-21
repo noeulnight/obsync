@@ -15,14 +15,14 @@ export function parseCanvas(text: string): CanvasData {
   const { nodes = [], edges = [], ...meta } = value;
   return {
     meta,
-    nodes: canvasItems(nodes, "노드"),
-    edges: canvasItems(edges, "연결선"),
+    nodes: canvasItems(nodes, "node"),
+    edges: canvasItems(edges, "edge"),
   };
 }
 
 function canvasItems(value: unknown, kind: string) {
   if (!Array.isArray(value) || value.some((item) => !(item as { id?: unknown })?.id)) {
-    throw new Error(`Canvas ${kind} 형식이 올바르지 않습니다.`);
+    throw new Error(`Invalid Canvas ${kind} format.`);
   }
   return value as CanvasItem[];
 }

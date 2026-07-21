@@ -30,7 +30,7 @@ export async function uploadAttachment(
       throw: false,
     });
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`첨부 업로드 실패 (${response.status})`);
+      throw new Error(`Attachment upload failed (${response.status})`);
     }
     await connection.api.completeUpload(connection.vaultId, approval.attachment.id);
   }
@@ -59,10 +59,10 @@ export async function downloadAttachment(
   const url = await connection.api.downloadUrl(connection.vaultId, entry.attachmentId);
   const response = await requestUrl({ url, throw: false });
   if (response.status < 200 || response.status >= 300) {
-    throw new Error(`첨부 다운로드 실패 (${response.status})`);
+    throw new Error(`Attachment download failed (${response.status})`);
   }
   if ((await sha256(response.arrayBuffer)) !== entry.sha256) {
-    throw new Error(`첨부 해시 불일치: ${entry.path}`);
+    throw new Error(`Attachment hash mismatch: ${entry.path}`);
   }
   await ensureParent();
   await write(async () => {

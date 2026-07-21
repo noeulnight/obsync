@@ -88,7 +88,7 @@ describe("offline manifest cache", () => {
 
     expect(create).toHaveBeenCalledOnce();
     expect(copy.getText("content").toJSON()).toBe("offline edit");
-    expect(setStatus).toHaveBeenCalledWith("삭제 충돌 사본 보존됨");
+    expect(setStatus).toHaveBeenCalledWith("Deleted conflict copy preserved");
     source.destroy();
     copy.destroy();
   });

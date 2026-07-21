@@ -3,7 +3,7 @@ import type { App } from "obsidian";
 export async function createFolder(app: App, path: string) {
   const existing = await app.vault.adapter.stat(path);
   if (existing?.type === "folder") return;
-  if (existing) throw new Error(`폴더 경로가 파일과 충돌합니다: ${path}`);
+  if (existing) throw new Error(`Folder path conflicts with a file: ${path}`);
   try {
     await app.vault.createFolder(path);
   } catch (error) {
@@ -14,7 +14,7 @@ export async function createFolder(app: App, path: string) {
 export async function createTextFile(app: App, path: string, content: string) {
   const existing = await app.vault.adapter.stat(path);
   if (existing?.type === "file") return;
-  if (existing) throw new Error(`파일 경로가 폴더와 충돌합니다: ${path}`);
+  if (existing) throw new Error(`File path conflicts with a folder: ${path}`);
   try {
     await app.vault.create(path, content);
   } catch (error) {
@@ -28,7 +28,7 @@ export async function createBinaryFile(app: App, path: string, content: ArrayBuf
     await app.vault.adapter.writeBinary(path, content);
     return;
   }
-  if (existing) throw new Error(`첨부파일 경로가 폴더와 충돌합니다: ${path}`);
+  if (existing) throw new Error(`Attachment path conflicts with a folder: ${path}`);
   try {
     await app.vault.createBinary(path, content);
   } catch (error) {

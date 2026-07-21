@@ -56,20 +56,20 @@ export function WorkspaceApp() {
   }
 
   if (session.isPending) {
-    return <main className="grid min-h-svh place-items-center">연결 확인 중…</main>;
+    return <main className="grid min-h-svh place-items-center">Checking connection…</main>;
   }
   if (!session.data) {
     return (
       <CredentialsPage
         title="Obsync"
-        description="계정으로 로그인해 Vault를 편집하세요."
+        description="Sign in to edit your Vaults."
         error={errorMessage(authenticate.error)}
         onSubmit={(credentials) => authenticate.mutateAsync(credentials)}
       />
     );
   }
   if (vaults.isPending || account.isPending) {
-    return <main className="grid min-h-svh place-items-center">Vault 불러오는 중…</main>;
+    return <main className="grid min-h-svh place-items-center">Loading Vaults…</main>;
   }
 
   const vault = vaults.data?.find((item) => item.id === selected);
@@ -79,15 +79,15 @@ export function WorkspaceApp() {
         <main className="grid min-h-svh place-items-center p-4">
           <Card className="w-full max-w-sm text-center">
             <CardHeader>
-              <CardTitle>Vault가 없습니다</CardTitle>
+              <CardTitle>No Vaults</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <Button onClick={() => setSettings("vaults")}>첫 Vault 만들기</Button>
+              <Button onClick={() => setSettings("vaults")}>Create your first Vault</Button>
               <Button variant="outline" onClick={() => setSettings("members")}>
-                받은 초대 확인
+                Review invitations
               </Button>
               <Button variant="ghost" onClick={() => void signOut()}>
-                로그아웃
+                Sign out
               </Button>
               {vaults.error && (
                 <p className="text-sm text-destructive">{errorMessage(vaults.error)}</p>
@@ -112,7 +112,7 @@ export function WorkspaceApp() {
   return (
     <>
       <Suspense
-        fallback={<main className="grid min-h-svh place-items-center">편집기 불러오는 중…</main>}
+        fallback={<main className="grid min-h-svh place-items-center">Loading editor…</main>}
       >
         <Workspace
           api={api}

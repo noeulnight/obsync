@@ -105,14 +105,14 @@ export function FileTree({
                 <ContextMenuContent>
                   <ContextMenuItem onSelect={() => window.setTimeout(() => rename(entry))}>
                     <Pencil />
-                    이름 변경
+                    Rename
                   </ContextMenuItem>
                   <ContextMenuItem
                     variant="destructive"
                     onSelect={() => window.setTimeout(() => remove(entry))}
                   >
                     <Trash2 />
-                    삭제
+                    Delete
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>

@@ -121,13 +121,13 @@ export class FileOperationOutbox {
     }
     if (result.type === "discard") {
       this.operations.delete(index, 1);
-      this.setStatus("서버 변경 적용됨");
+      this.setStatus("Server changes applied");
       return;
     }
     if (result.conflict) {
       await this.moveLocalConflict(result.conflict.from, result.conflict.to);
       this.rewritePendingPaths(result.conflict.from, result.conflict.to);
-      this.setStatus("충돌 사본 생성 중");
+      this.setStatus("Creating conflict copy");
     }
     this.replaceOperation(index, result.operation);
   }
@@ -151,7 +151,7 @@ export class FileOperationOutbox {
     if (this.retryTimer || this.destroyed || this.connection.readOnly) return;
     const delay = this.retryDelay;
     this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
-    this.setStatus("재연결 대기");
+    this.setStatus("Waiting to reconnect");
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
       void this.flush();

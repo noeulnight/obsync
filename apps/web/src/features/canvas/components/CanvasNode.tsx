@@ -13,22 +13,22 @@ import type { CanvasNode, CanvasSide, WebCanvas } from "../lib/sync";
 const sideHandles: { side: CanvasSide; label: string; className: string }[] = [
   {
     side: "top",
-    label: "위쪽 연결점",
+    label: "Top connection point",
     className: "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2",
   },
   {
     side: "right",
-    label: "오른쪽 연결점",
+    label: "Right connection point",
     className: "top-1/2 right-0 translate-x-1/2 -translate-y-1/2",
   },
   {
     side: "bottom",
-    label: "아래쪽 연결점",
+    label: "Bottom connection point",
     className: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2",
   },
   {
     side: "left",
-    label: "왼쪽 연결점",
+    label: "Left connection point",
     className: "top-1/2 left-0 -translate-x-1/2 -translate-y-1/2",
   },
 ];
@@ -126,7 +126,7 @@ export function CanvasNodeCard({
         {!editing && (
           <button
             type="button"
-            aria-label={`${node.type} Canvas 노드`}
+            aria-label={`${node.type} Canvas node`}
             className="absolute inset-0 cursor-grab active:cursor-grabbing"
             onPointerDown={(event) => onStartMove(event, node)}
             onPointerUp={(event) => onFinishConnection(event, node)}
@@ -151,7 +151,7 @@ export function CanvasNodeCard({
           {active && (
             <button
               type="button"
-              aria-label="Canvas 노드 크기 조절"
+              aria-label="Resize Canvas node"
               className="absolute -right-2 -bottom-2 size-5 cursor-nwse-resize"
               onPointerDown={(event) => onStartResize(event, node)}
             />
@@ -212,7 +212,7 @@ function CanvasNodeContent({
     }
     return (
       <div className="grid size-full place-items-center p-4 text-center text-sm text-muted-foreground">
-        {file ?? "파일을 찾을 수 없습니다."}
+        {file ?? "File not found."}
       </div>
     );
   }
@@ -224,7 +224,7 @@ function CanvasNodeContent({
         target="_blank"
         rel="noreferrer"
       >
-        {node.url ?? "링크"}
+        {node.url ?? "Link"}
       </a>
     );
   }

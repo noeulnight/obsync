@@ -70,7 +70,7 @@ export class VaultFilesService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         (error.code === 'P2002' || error.code === 'P2034')
       ) {
-        throw new ConflictException('같은 이름의 파일이 이미 있습니다.');
+        throw new ConflictException('A file with this name already exists.');
       }
       throw error;
     }
@@ -116,7 +116,7 @@ export class VaultFilesService {
       throw new BadRequestException('baseVersion is required');
     }
     if (file.version !== input.baseVersion) {
-      throw new ConflictException('다른 기기에서 파일이 변경되었습니다.');
+      throw new ConflictException('The file was changed on another device.');
     }
 
     if (input.type === FileOperationType.RENAME) {
@@ -180,7 +180,8 @@ export class VaultFilesService {
     input: FileOperationDto,
   ) {
     if (!input.path) throw new BadRequestException('path is required');
-    if (file.deletedAt) throw new ConflictException('삭제된 파일입니다.');
+    if (file.deletedAt)
+      throw new ConflictException('This file has been deleted.');
     const path = vaultPath(input.path);
     const affected =
       file.kind === 'FOLDER'
@@ -210,7 +211,7 @@ export class VaultFilesService {
       select: { id: true },
     });
     if (collision)
-      throw new ConflictException('같은 이름의 파일이 이미 있습니다.');
+      throw new ConflictException('A file with this name already exists.');
 
     const changed: VaultFile[] = [];
     for (const [index, entry] of affected.entries()) {
@@ -301,7 +302,7 @@ export class VaultFilesService {
     input: FileOperationDto,
   ) {
     if (file.kind !== 'ATTACHMENT' || file.deletedAt) {
-      throw new ConflictException('첨부파일이 아닙니다.');
+      throw new ConflictException('This file is not an attachment.');
     }
     const attachment = await this.attachment(
       transaction,

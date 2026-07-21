@@ -41,31 +41,31 @@ export class InitialSyncModal extends Modal {
   }
 
   onOpen() {
-    this.contentEl.createEl("h2", { text: "최초 Vault 동기화" });
+    this.contentEl.createEl("h2", { text: "Initial Vault synchronization" });
     this.contentEl.createEl("p", {
-      text: "이 Obsidian Vault와 서버 Vault의 기존 파일을 어떻게 처리할지 선택하세요.",
+      text: "Choose how to handle existing files in this Obsidian Vault and the server Vault.",
     });
 
     if (!this.readOnly) {
       new Setting(this.contentEl)
-        .setName("로컬을 서버에 업로드")
-        .setDesc("현재 로컬 Vault를 기준으로 서버 내용을 교체합니다.")
+        .setName("Upload local files")
+        .setDesc("Replace the server contents with this local Vault.")
         .addButton((button) =>
-          button.setButtonText("로컬 사용").onClick(() => this.finish("local")),
+          button.setButtonText("Use local").onClick(() => this.finish("local")),
         );
     }
 
     new Setting(this.contentEl)
-      .setName("양쪽 병합")
-      .setDesc("같은 문서의 변경 내용을 합치고, 서로 다른 파일은 모두 유지합니다.")
-      .addButton((button) => button.setButtonText("병합").onClick(() => this.finish("merge")));
+      .setName("Merge both")
+      .setDesc("Merge changes to matching documents and keep files from both Vaults.")
+      .addButton((button) => button.setButtonText("Merge").onClick(() => this.finish("merge")));
 
     new Setting(this.contentEl)
-      .setName("서버에서 다시 받기")
-      .setDesc("로컬 파일을 삭제하고 서버 Vault 내용으로 교체합니다.")
+      .setName("Download from server")
+      .setDesc("Delete local files and replace them with the server Vault.")
       .addButton((button) =>
         button
-          .setButtonText("서버 사용")
+          .setButtonText("Use server")
           .setWarning()
           .onClick(() => this.finish("server")),
       );
@@ -95,15 +95,15 @@ export class ServerReplaceConfirmModal extends Modal {
   }
 
   onOpen() {
-    this.contentEl.createEl("h2", { text: "로컬 Vault를 초기화할까요?" });
+    this.contentEl.createEl("h2", { text: "Reset the local Vault?" });
     this.contentEl.createEl("p", {
-      text: "`.obsidian` 설정을 제외한 로컬 파일과 폴더가 영구 삭제됩니다. 백업은 만들지 않습니다.",
+      text: "All local files and folders except `.obsidian` settings will be permanently deleted. No backup will be created.",
     });
     new Setting(this.contentEl)
-      .addButton((button) => button.setButtonText("취소").onClick(() => this.finish(false)))
+      .addButton((button) => button.setButtonText("Cancel").onClick(() => this.finish(false)))
       .addButton((button) =>
         button
-          .setButtonText("삭제 후 다운로드")
+          .setButtonText("Delete and download")
           .setWarning()
           .onClick(() => this.finish(true)),
       );
@@ -139,8 +139,8 @@ export class ObsyncSettingTab extends PluginSettingTab {
     containerEl.createEl("h2", { text: "Obsync" });
 
     new Setting(containerEl)
-      .setName("서버 주소")
-      .setDesc("동기화 서버 주소")
+      .setName("Server URL")
+      .setDesc("Synchronization server URL")
       .addText((text) =>
         text.setValue(this.plugin.settings.apiUrl).onChange((value) => {
           this.plugin.settings.apiUrl = value.trim();
@@ -149,11 +149,11 @@ export class ObsyncSettingTab extends PluginSettingTab {
 
     if (!this.plugin.api.hasSession()) {
       new Setting(containerEl)
-        .setName("계정 연결")
-        .setDesc("브라우저에서 로그인하거나 새 계정을 만든 뒤 이 기기를 승인합니다.")
+        .setName("Connect account")
+        .setDesc("Sign in or create an account in your browser, then approve this device.")
         .addButton((button) =>
           button
-            .setButtonText("브라우저에서 로그인")
+            .setButtonText("Sign in with browser")
             .setCta()
             .onClick(async () => {
               button.setDisabled(true);
@@ -179,15 +179,15 @@ export class ObsyncSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName(this.plugin.account?.displayName || "내 계정")
-      .setDesc(this.plugin.account?.email ?? "계정 정보를 불러오지 못했습니다.");
+      .setName(this.plugin.account?.displayName || "My account")
+      .setDesc(this.plugin.account?.email ?? "Could not load account information.");
 
     new Setting(containerEl).setName("Vault").addDropdown((dropdown) => {
-      dropdown.addOption("", "선택하세요");
+      dropdown.addOption("", "Select a Vault");
       for (const vault of this.plugin.vaults) {
         dropdown.addOption(
           vault.id,
-          `${vault.name}${vault.role === "VIEWER" ? " (읽기 전용)" : ""}`,
+          `${vault.name}${vault.role === "VIEWER" ? " (Read only)" : ""}`,
         );
       }
       dropdown.setValue(this.plugin.settings.vaultId).onChange(async (id) => {
@@ -199,15 +199,15 @@ export class ObsyncSettingTab extends PluginSettingTab {
       });
     });
     new Setting(containerEl)
-      .setName("새 Vault")
+      .setName("New Vault")
       .addText((text) =>
-        text.setPlaceholder("Vault 이름").onChange((value) => {
+        text.setPlaceholder("Vault name").onChange((value) => {
           this.newVaultName = value.trim();
         }),
       )
       .addButton((button) =>
-        button.setButtonText("생성").onClick(async () => {
-          if (!this.newVaultName) return new Notice("Vault 이름을 입력하세요.");
+        button.setButtonText("Create").onClick(async () => {
+          if (!this.newVaultName) return new Notice("Enter a Vault name.");
           try {
             await this.plugin.createVault(this.newVaultName);
             await this.render();
@@ -219,12 +219,12 @@ export class ObsyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .addButton((button) =>
         button
-          .setButtonText("저장 및 재연결")
+          .setButtonText("Save and reconnect")
           .setCta()
           .onClick(async () => {
             try {
               await this.plugin.saveSettings();
-              new Notice("Obsync 설정을 저장했습니다.");
+              new Notice("Obsync settings saved.");
             } catch (error) {
               this.notice(error);
             }
@@ -232,7 +232,7 @@ export class ObsyncSettingTab extends PluginSettingTab {
       )
       .addButton((button) =>
         button
-          .setButtonText("로그아웃")
+          .setButtonText("Sign out")
           .setWarning()
           .onClick(async () => {
             try {

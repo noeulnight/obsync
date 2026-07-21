@@ -143,10 +143,10 @@ describe("CanvasEditor", () => {
       />,
     );
 
-    const [source, target] = screen.getAllByRole("button", { name: "text Canvas 노드" });
+    const [source, target] = screen.getAllByRole("button", { name: "text Canvas node" });
     fireEvent.pointerDown(source, { pointerId: 1, clientX: 200, clientY: 200 });
     fireEvent.pointerUp(source, { pointerId: 1 });
-    const sourceHandle = screen.getByRole("button", { name: "오른쪽 연결점" });
+    const sourceHandle = screen.getByRole("button", { name: "Right connection point" });
     fireEvent.pointerDown(sourceHandle, {
       pointerId: 2,
       clientX: 380,
@@ -158,7 +158,7 @@ describe("CanvasEditor", () => {
     });
     fireEvent.pointerMove(sourceHandle, { pointerId: 2, clientX: 500, clientY: 180 });
     const targetHandle = screen
-      .getAllByRole("button", { name: "왼쪽 연결점" })
+      .getAllByRole("button", { name: "Left connection point" })
       .find((handle) => handle.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId === "two");
     expect(targetHandle?.className.includes("opacity-100")).toBe(true);
     fireEvent.pointerUp(sourceHandle, {
@@ -259,30 +259,32 @@ describe("CanvasEditor", () => {
       />,
     );
 
-    fireEvent.pointerDown(screen.getByRole("button", { name: "text Canvas 노드" }));
-    fireEvent.pointerDown(screen.getByRole("button", { name: "노드 색상" }), {
+    fireEvent.pointerDown(screen.getByRole("button", { name: "text Canvas node" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Node color" }), {
       button: 0,
       ctrlKey: false,
     });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "빨강" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Red" }));
     expect(setColor).toHaveBeenCalledWith("one", "1");
 
-    fireEvent.click(screen.getByRole("button", { name: "선택한 노드로 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "Center selected node" }));
     await waitFor(() =>
       expect(screen.getByTestId("canvas-viewport").style.transform).toContain(
         "translate(20px, 40px) scale(2)",
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "확대 초기화" }));
-    fireEvent.click(screen.getByRole("button", { name: "확대" }));
-    const toolbar = screen.getByRole("button", { name: "노드 삭제" }).parentElement;
+    fireEvent.click(screen.getByRole("button", { name: "Reset zoom" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    const toolbar = screen.getByRole("button", { name: "Delete node" }).parentElement;
     expect(Number(toolbar?.style.scale)).toBeCloseTo(1 / 1.1);
     expect(
-      screen.getByTestId("canvas-surface").contains(screen.getByRole("button", { name: "확대" })),
+      screen
+        .getByTestId("canvas-surface")
+        .contains(screen.getByRole("button", { name: "Zoom in" })),
     ).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: "노드 편집" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit node" }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox")));
     const editor = EditorView.findFromDOM(document.querySelector(".cm-editor") as HTMLElement);
     if (!editor) throw new Error("Canvas editor was not mounted");

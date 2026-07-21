@@ -57,13 +57,13 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
-    await waitFor(() => expect(screen.getByLabelText("프로퍼티")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Properties")).toBeTruthy());
     expect(rendered.container.querySelector(".cm-live-code-language")?.textContent).toBe("ts");
     expect(rendered.container.querySelector(".cm-live-code-line")?.textContent).toContain(
       "const value = 1",
     );
 
-    const value = screen.getAllByLabelText("속성 값")[0];
+    const value = screen.getAllByLabelText("Property value")[0];
     fireEvent.change(value, { target: { value: "published" } });
     fireEvent.blur(value);
     expect(connected.text.toJSON()).toContain("status: published");
