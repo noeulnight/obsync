@@ -1,0 +1,74 @@
+.obsync-status {
+  cursor: default;
+}
+
+.obsync-settings-actions {
+  display: flex;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-4);
+}
+
+.cm-ySelectionCaret {
+  border-right-width: 0;
+  border-left-width: 2px;
+}
+
+.cm-ySelectionCaretDot {
+  width: 6px;
+  height: 6px;
+  top: -3px;
+  left: -4px;
+}
+
+.cm-ySelectionInfo {
+  top: -20px;
+  left: -2px;
+  padding: 2px 5px;
+  color: white;
+  font-family: var(--font-interface);
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 4px;
+  opacity: 1;
+}
+
+.obsync-canvas-cursor,
+.obsync-canvas-focus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100000;
+  pointer-events: none;
+}
+
+.obsync-canvas-cursor::before {
+  display: block;
+  width: 0;
+  height: 0;
+  content: "";
+  border-top: 12px solid var(--obsync-user-color);
+  border-right: 8px solid transparent;
+}
+
+.obsync-canvas-cursor-label {
+  display: block;
+  width: max-content;
+  max-width: 160px;
+  padding: 2px 5px;
+  margin: -2px 0 0 7px;
+  overflow: hidden;
+  color: white;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--obsync-user-color);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.obsync-canvas-focus {
+  box-sizing: border-box;
+  border: 2px solid var(--obsync-user-color);
+  border-radius: var(--radius-m);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--obsync-user-color) 35%, transparent);
+}
