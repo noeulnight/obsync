@@ -42,5 +42,5 @@ jobs:
             apps/plugin/main.js \
             apps/plugin/manifest.json \
             apps/plugin/styles.css \
-            --title "Obsync $GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
             --generate-notes
