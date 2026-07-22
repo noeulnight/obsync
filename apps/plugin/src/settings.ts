@@ -182,22 +182,43 @@ export class ObsyncSettingTab extends PluginSettingTab {
       .setName(this.plugin.account?.displayName || "My account")
       .setDesc(this.plugin.account?.email ?? "Could not load account information.");
 
-    new Setting(containerEl).setName("Vault").addDropdown((dropdown) => {
-      dropdown.addOption("", "Select a Vault");
-      for (const vault of this.plugin.vaults) {
-        dropdown.addOption(
-          vault.id,
-          `${vault.name}${vault.role === "VIEWER" ? " (Read only)" : ""}`,
-        );
-      }
-      dropdown.setValue(this.plugin.settings.vaultId).onChange(async (id) => {
-        try {
-          await this.plugin.selectVault(id);
-        } catch (error) {
-          this.notice(error);
+    new Setting(containerEl).setName("Status").setDesc(this.plugin.currentStatus());
+
+    const selected = this.plugin.vaults.find((vault) => vault.id === this.plugin.settings.vaultId);
+    new Setting(containerEl)
+      .setName("Vault")
+      .setDesc(selected?.role === "VIEWER" ? "Read only" : selected ? "Can edit" : "Not selected")
+      .addDropdown((dropdown) => {
+        dropdown.addOption("", "Select a Vault");
+        for (const vault of this.plugin.vaults) {
+          dropdown.addOption(
+            vault.id,
+            `${vault.name}${vault.role === "VIEWER" ? " (Read only)" : ""}`,
+          );
         }
-      });
-    });
+        dropdown.setValue(this.plugin.settings.vaultId).onChange(async (id) => {
+          try {
+            await this.plugin.selectVault(id);
+            await this.render();
+          } catch (error) {
+            this.notice(error);
+          }
+        });
+      })
+      .addButton((button) =>
+        button.setButtonText("Refresh").onClick(async () => {
+          button.setDisabled(true);
+          try {
+            await this.plugin.refreshAccount();
+            new Notice("Vault list refreshed.");
+            await this.render();
+          } catch (error) {
+            this.notice(error);
+          } finally {
+            button.setDisabled(false);
+          }
+        }),
+      );
     new Setting(containerEl)
       .setName("New Vault")
       .addText((text) =>

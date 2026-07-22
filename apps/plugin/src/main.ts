@@ -35,6 +35,7 @@ export default class ObsyncPlugin extends Plugin {
   private boundEditors = new WeakMap<EditorView, string>();
   private readonly editorViews = new Set<EditorView>();
   private status?: HTMLElement;
+  private statusText = "Starting";
 
   async onload() {
     const saved = (await this.loadData()) as Partial<PluginSettings> | null;
@@ -120,6 +121,11 @@ export default class ObsyncPlugin extends Plugin {
       id: "reconnect",
       name: "Reconnect synchronization",
       callback: () => void this.connect(),
+    });
+    this.addCommand({
+      id: "refresh-account",
+      name: "Refresh account and Vaults",
+      callback: () => void this.run(() => this.refreshAccount()),
     });
     this.addCommand({
       id: "list-files",
@@ -261,6 +267,26 @@ export default class ObsyncPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  async refreshAccount() {
+    const previousRole = this.settings.vaultRole;
+    await this.loadAccount();
+    const selected = this.vaults.find((vault) => vault.id === this.settings.vaultId);
+    if (this.settings.vaultId && !selected) {
+      this.settings.vaultId = "";
+      this.settings.vaultName = "";
+      this.settings.vaultRole = "";
+      await this.saveData(this.settings);
+      this.disconnect();
+      this.setStatus("Select a Vault");
+    } else if (selected && selected.role !== previousRole) {
+      await this.connect();
+    }
+  }
+
+  currentStatus() {
+    return this.statusText;
+  }
+
   private disconnect() {
     this.sync?.destroy();
     this.sync = undefined;
@@ -361,6 +387,7 @@ export default class ObsyncPlugin extends Plugin {
   }
 
   private setStatus(status: string) {
+    this.statusText = status;
     this.status?.setText(`Obsync: ${status}`);
   }
 
