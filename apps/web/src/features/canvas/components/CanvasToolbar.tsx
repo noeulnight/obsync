@@ -1,4 +1,5 @@
 import {
+  Check,
   CircleHelp,
   FileText,
   Focus,
@@ -14,13 +15,8 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { CanvasNode, CanvasSession } from "../lib/sync";
 import { canvasColor } from "./CanvasNode";
 
@@ -47,9 +43,11 @@ export function CanvasNodeToolbar({
   onCenter: () => void;
   onEdit: () => void;
 }) {
+  const [colorsOpen, setColorsOpen] = useState(false);
   return (
     <div
-      className="absolute z-50 flex -translate-x-1/2 -translate-y-full overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+      className="absolute z-50 flex -translate-x-1/2 -translate-y-full rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+      onPointerDown={(event) => event.stopPropagation()}
       style={{
         left: node.x + node.width / 2,
         top: node.y - 10,
@@ -65,27 +63,54 @@ export function CanvasNodeToolbar({
       >
         <Trash2 />
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" aria-label="Node color">
-            <Palette />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="center" className="min-w-28">
-          {nodeColors.map((option) => (
-            <DropdownMenuItem
-              key={option.label}
-              onSelect={() => session.setColor(node.id, option.value)}
-            >
-              <span
-                className="size-3 rounded-full border border-foreground/20"
-                style={{ backgroundColor: canvasColor(option.value) ?? "var(--card)" }}
+      <div className="relative">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Node color"
+          aria-expanded={colorsOpen}
+          onClick={() => setColorsOpen((open) => !open)}
+        >
+          <Palette />
+        </Button>
+        {colorsOpen && (
+          <div
+            role="menu"
+            aria-label="Node color"
+            className="absolute bottom-full left-1/2 mb-2 min-w-32 -translate-x-1/2 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+          >
+            {nodeColors.map((option) => (
+              <button
+                type="button"
+                role="menuitem"
+                key={option.label}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                onClick={() => {
+                  session.setColor(node.id, option.value);
+                  setColorsOpen(false);
+                }}
+              >
+                <span
+                  className="size-3 rounded-full border border-foreground/20"
+                  style={{ backgroundColor: canvasColor(option.value) ?? "var(--card)" }}
+                />
+                <span className="flex-1">{option.label}</span>
+                {(node.color ?? undefined) === option.value && <Check aria-hidden="true" />}
+              </button>
+            ))}
+            <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground">
+              <input
+                type="color"
+                aria-label="Custom node color"
+                className="size-4 cursor-pointer border-0 bg-transparent p-0"
+                value={node.color?.startsWith("#") ? node.color : "#7c3aed"}
+                onChange={(event) => session.setColor(node.id, event.currentTarget.value)}
               />
-              {option.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              Custom
+            </label>
+          </div>
+        )}
+      </div>
       <Button variant="ghost" size="icon-sm" aria-label="Center selected node" onClick={onCenter}>
         <Focus />
       </Button>

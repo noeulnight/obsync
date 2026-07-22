@@ -7,10 +7,17 @@ import * as Y from "yjs";
 import type { WebDocument } from "@/features/documents/lib/sync";
 import type { WebCanvas } from "../lib/sync";
 import { CanvasEditor } from "./CanvasEditor";
+import { canvasColor } from "./CanvasNode";
 
 afterEach(cleanup);
 
 describe("CanvasEditor", () => {
+  it("uses Obsidian's dark Canvas palette", () => {
+    expect(canvasColor("1")).toBe("rgb(251 70 76)");
+    expect(canvasColor("6")).toBe("rgb(168 130 255)");
+    expect(canvasColor("#123456")).toBe("#123456");
+  });
+
   it("pans beyond the old Canvas boundaries", () => {
     HTMLElement.prototype.setPointerCapture = vi.fn();
     const onAddFile = vi.fn();
@@ -51,6 +58,42 @@ describe("CanvasEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add document" }));
     fireEvent.click(screen.getByRole("button", { name: "Add media" }));
     expect(onAddFile).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates a card by double-clicking empty space", () => {
+    const addText = vi.fn(() => "new-card");
+    const session = {
+      nodes: () => [],
+      edges: () => [],
+      presence: () => [],
+      subscribe: () => () => undefined,
+      subscribePresence: () => () => undefined,
+      destroy: () => undefined,
+      setPresence: () => undefined,
+      addText,
+    } as unknown as WebCanvas;
+
+    render(
+      <CanvasEditor
+        session={session}
+        vaultName="Vault"
+        path="Test.canvas"
+        onRename={() => undefined}
+        onDelete={() => undefined}
+        openDocument={() => undefined}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        resolveFileAsset={() => Promise.resolve(undefined)}
+        files={[]}
+        onAddFile={() => undefined}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByTestId("canvas-surface"), {
+      clientX: 400,
+      clientY: 300,
+    });
+    expect(addText).toHaveBeenCalledWith(260, 220);
   });
 
   it("keeps embedded documents connected while their nodes are not being edited", async () => {
@@ -274,21 +317,32 @@ describe("CanvasEditor", () => {
       clientHeight: { configurable: true, get: () => 800 },
     });
     const setColor = vi.fn();
+    const deleteNode = vi.fn();
     const ydoc = new Y.Doc();
     const text = ydoc.getText("canvas-node:one:text");
     text.insert(0, "One");
     const session = {
       nodes: () => [
-        { id: "one", type: "text", x: 100, y: 100, width: 280, height: 160, text: "One" },
+        {
+          id: "one",
+          type: "text",
+          x: 100,
+          y: 100,
+          width: 280,
+          height: 160,
+          color: "3",
+          text: "One",
+        },
       ],
       edges: () => [],
-      presence: () => [],
+      presence: () => [{ clientId: 2, name: "Remote", color: "#30bced", focusId: "one" }],
       subscribe: () => () => undefined,
       subscribePresence: () => () => undefined,
       destroy: () => undefined,
       setPresence: () => undefined,
       bringToFront: () => undefined,
       setColor,
+      deleteNode,
       text: () => text,
       provider: { awareness: undefined },
     } as unknown as WebCanvas;
@@ -309,13 +363,23 @@ describe("CanvasEditor", () => {
       />,
     );
 
-    fireEvent.pointerDown(screen.getByRole("button", { name: "text Canvas node" }));
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Node color" }), {
-      button: 0,
-      ctrlKey: false,
-    });
+    const nodeButton = screen.getByRole("button", { name: "text Canvas node" });
+    fireEvent.pointerDown(nodeButton);
+    expect(nodeButton.parentElement?.style.borderColor).toBe("rgb(224 222 113)");
+    expect(nodeButton.parentElement?.className).toContain("[&_.cm-editor]:!bg-transparent");
+    fireEvent.click(screen.getByRole("button", { name: "Node color" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Red" }));
     expect(setColor).toHaveBeenCalledWith("one", "1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Node color" }));
+    const customColor = await screen.findByLabelText("Custom node color");
+    fireEvent.click(customColor);
+    expect(screen.getByRole("menu", { name: "Node color" })).toBeTruthy();
+    fireEvent.change(customColor, {
+      target: { value: "#123456" },
+    });
+    expect(setColor).toHaveBeenCalledWith("one", "#123456");
+    fireEvent.keyDown(customColor, { key: "Escape" });
 
     fireEvent.click(screen.getByRole("button", { name: "Center selected node" }));
     await waitFor(() =>
@@ -340,5 +404,45 @@ describe("CanvasEditor", () => {
     if (!editor) throw new Error("Canvas editor was not mounted");
     editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: "한글 입력" } });
     expect(text.toJSON()).toBe("한글 입력");
+  });
+
+  it("deletes the selected node with Backspace", () => {
+    HTMLElement.prototype.setPointerCapture = vi.fn();
+    const deleteNode = vi.fn();
+    const session = {
+      nodes: () => [
+        { id: "one", type: "text", x: 100, y: 100, width: 280, height: 160, text: "One" },
+      ],
+      edges: () => [],
+      presence: () => [],
+      subscribe: () => () => undefined,
+      subscribePresence: () => () => undefined,
+      destroy: () => undefined,
+      setPresence: () => undefined,
+      bringToFront: () => undefined,
+      deleteNode,
+      text: () => new Y.Doc().getText("text"),
+      provider: { awareness: undefined },
+    } as unknown as WebCanvas;
+
+    render(
+      <CanvasEditor
+        session={session}
+        vaultName="Vault"
+        path="Test.canvas"
+        onRename={() => undefined}
+        onDelete={() => undefined}
+        openDocument={() => undefined}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        resolveFileAsset={() => Promise.resolve(undefined)}
+        files={[]}
+        onAddFile={() => undefined}
+      />,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "text Canvas node" }));
+    fireEvent.keyDown(screen.getByTestId("canvas-surface"), { key: "Backspace" });
+    expect(deleteNode).toHaveBeenCalledWith("one");
   });
 });

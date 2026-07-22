@@ -224,7 +224,10 @@ export class ApiClient {
   }
 
   cachedVaults() {
-    return cached<Vault[]>(vaultsCacheKey);
+    const vaults = cached<Vault[]>(vaultsCacheKey);
+    if (Array.isArray(vaults)) return vaults;
+    localStorage.removeItem(vaultsCacheKey);
+    return undefined;
   }
 
   updateAccount(input: {

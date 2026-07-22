@@ -3,6 +3,8 @@ import {
   useEffect,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -126,6 +128,7 @@ export function CanvasSurface({
     };
     setSelectedId(node.id);
     setEditingId(undefined);
+    surface.current?.focus({ preventScroll: true });
     session.bringToFront(node.id);
     session.setPresence(point.x, point.y, node.id);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -172,6 +175,31 @@ export function CanvasSurface({
     setSelectedId(undefined);
     setEditingId(undefined);
     event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function addTextAt(event: ReactMouseEvent) {
+    if (
+      readOnly ||
+      (event.target as HTMLElement).closest("[data-canvas-node],button,a,textarea,.cm-editor")
+    ) {
+      return;
+    }
+    const point = position(event.clientX, event.clientY);
+    const id = session.addText(point.x - 140, point.y - 80);
+    editNode(id);
+  }
+
+  function deleteSelected(event: ReactKeyboardEvent) {
+    if (readOnly || !selectedId || editingId) return;
+    if (event.key !== "Backspace" && event.key !== "Delete") return;
+    if (
+      (event.target as HTMLElement).closest("input,textarea,.cm-editor,[contenteditable='true']")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    session.deleteNode(selectedId);
+    setSelectedId(undefined);
   }
 
   function finishConnection(event: ReactPointerEvent, node: CanvasNode) {
@@ -269,6 +297,8 @@ export function CanvasSurface({
       <div
         ref={surface}
         data-testid="canvas-surface"
+        tabIndex={0}
+        aria-label="Canvas"
         className="absolute inset-0 touch-none overflow-hidden border bg-background cursor-grab active:cursor-grabbing"
         style={
           showGrid
@@ -280,6 +310,8 @@ export function CanvasSurface({
             : undefined
         }
         onPointerDown={startPan}
+        onDoubleClick={addTextAt}
+        onKeyDown={deleteSelected}
         onPointerMove={pointerMove}
         onPointerUp={finishConnectionAt}
         onPointerCancel={cancelConnection}

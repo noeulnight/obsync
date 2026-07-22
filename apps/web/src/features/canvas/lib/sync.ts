@@ -199,7 +199,6 @@ export class WebCanvas {
       }
       this.nodesMap.set(id, node);
       this.zOrder.set(id, this.zOrder.size);
-      this.document.getText(canvasNodeTextName(id)).insert(0, "New note");
     });
     return id;
   }

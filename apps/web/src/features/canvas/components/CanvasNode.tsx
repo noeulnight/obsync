@@ -76,6 +76,7 @@ export function CanvasNodeCard({
   onEdit: (id: string) => void;
 }) {
   const color = canvasColor(node.color);
+  const themedBorder = color ? `color-mix(in srgb, ${color} 70%, transparent)` : undefined;
   const targeted = connectionTarget?.nodeId === node.id;
   return (
     <section
@@ -96,17 +97,29 @@ export function CanvasNodeCard({
         </div>
       )}
       <div
-        className="relative size-full overflow-hidden rounded-lg border bg-card shadow-[0_0.5px_1px_0.5px_rgba(0,0,0,0.1)]"
+        className="relative size-full overflow-hidden rounded-lg border bg-card shadow-[0_0.5px_1px_0.5px_rgba(0,0,0,0.1)] [&_.cm-editor]:!bg-transparent"
         style={{
-          borderColor: active || targeted ? "rgb(124 58 237)" : (remoteFocus?.color ?? color),
-          backgroundColor: color ? `color-mix(in srgb, ${color} 12%, var(--card))` : undefined,
+          borderColor: targeted
+            ? "rgb(124 58 237)"
+            : color
+              ? active
+                ? color
+                : themedBorder
+              : active
+                ? "rgb(124 58 237)"
+                : remoteFocus?.color,
+          backgroundColor: color ? `color-mix(in srgb, ${color} 7%, var(--card))` : undefined,
           boxShadow: targeted
             ? "0 0 0 3px rgb(124 58 237 / 35%)"
-            : active
-              ? "0 0.5px 1px 0.5px rgba(0,0,0,.1), 0 0 0 2px rgb(124 58 237)"
-              : remoteFocus
-                ? `0 0 0 2px ${remoteFocus.color}`
-                : undefined,
+            : color
+              ? active
+                ? `inset 0 0 0 1px ${color}, 0 0 0 2px ${color}`
+                : `inset 0 0 0 1px ${themedBorder}${remoteFocus ? `, 0 0 0 2px ${remoteFocus.color}` : ""}`
+              : active
+                ? "0 0.5px 1px 0.5px rgba(0,0,0,.1), 0 0 0 2px rgb(124 58 237)"
+                : remoteFocus
+                  ? `0 0 0 2px ${remoteFocus.color}`
+                  : undefined,
         }}
       >
         <CanvasNodeContent
@@ -288,14 +301,15 @@ function CanvasAttachment({
 }
 
 export function canvasColor(color?: string) {
-  return {
-    "1": "rgb(224 108 117)",
-    "2": "rgb(209 154 102)",
-    "3": "rgb(229 192 123)",
-    "4": "rgb(152 195 121)",
-    "5": "rgb(86 182 194)",
-    "6": "rgb(198 120 221)",
+  const preset = {
+    "1": "rgb(251 70 76)",
+    "2": "rgb(233 151 63)",
+    "3": "rgb(224 222 113)",
+    "4": "rgb(68 207 110)",
+    "5": "rgb(83 223 221)",
+    "6": "rgb(168 130 255)",
   }[color ?? ""];
+  return preset ?? color;
 }
 
 function canvasFileName(path: string) {

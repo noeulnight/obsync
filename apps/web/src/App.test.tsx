@@ -7,6 +7,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { App } from "./App";
 import { FileTree } from "./features/documents/components/FileTree";
 import { FileHeader } from "./features/workspace/components/FileHeader";
+import { api } from "./lib/api/client";
 import { queryKeys } from "./lib/query/keys";
 
 describe("App routes", () => {
@@ -62,6 +63,15 @@ describe("App routes", () => {
 
   it("renders the anonymous public share route", () => {
     expect(render("/s/public-slug")).toContain("Loading shared page…");
+  });
+
+  it("discards an incompatible Vault cache", () => {
+    const cache = storage();
+    cache.setItem("obsync.vaults", JSON.stringify({ vaults: [] }));
+    Object.defineProperty(globalThis, "localStorage", { value: cache, configurable: true });
+
+    expect(api.cachedVaults()).toBeUndefined();
+    expect(cache.getItem("obsync.vaults")).toBeNull();
   });
 });
 
