@@ -19,6 +19,15 @@ import { CollaborationServerService } from './collaboration-server.service';
 import { nextFileRevision } from './vault-file-version';
 import { VaultLinksService } from './vault-links.service';
 import type { CanvasData } from './types/canvas-data.type';
+import {
+  appendMarkdown,
+  markdownDocumentMap,
+  markdownFrontmatter,
+  markdownTags,
+  patchMarkdown,
+  type MarkdownPatchOperation,
+  type MarkdownPatchTarget,
+} from './utils/markdown-document';
 
 @Injectable()
 export class VaultFilesService {
@@ -121,6 +130,107 @@ export class VaultFilesService {
     }
     await this.collaboration.writeDocument(vaultId, file.id, content, userId);
     return { id: file.id, path: file.path };
+  }
+
+  async appendMarkdown(
+    userId: string,
+    vaultId: string,
+    rawPath: string,
+    content: string,
+  ) {
+    await this.access.requireWrite(userId, vaultId);
+    const file = await this.liveFile(vaultId, rawPath, 'MARKDOWN');
+    await this.collaboration.updateDocument(
+      vaultId,
+      file.id,
+      userId,
+      (current) => appendMarkdown(current, content),
+    );
+    return file;
+  }
+
+  async patchMarkdown(
+    userId: string,
+    vaultId: string,
+    rawPath: string,
+    targetType: MarkdownPatchTarget,
+    target: string,
+    operation: MarkdownPatchOperation,
+    content: string,
+  ) {
+    await this.access.requireWrite(userId, vaultId);
+    const file = await this.liveFile(vaultId, rawPath, 'MARKDOWN');
+    await this.collaboration.updateDocument(
+      vaultId,
+      file.id,
+      userId,
+      (current) =>
+        patchMarkdown(current, targetType, target, operation, content),
+    );
+    return file;
+  }
+
+  async documentMap(userId: string, vaultId: string, rawPath: string) {
+    const document = await this.readMarkdown(userId, vaultId, rawPath);
+    return {
+      id: document.id,
+      path: document.path,
+      ...markdownDocumentMap(document.content),
+    };
+  }
+
+  async tags(userId: string, vaultId: string) {
+    await this.access.requireRead(userId, vaultId);
+    const counts = new Map<string, number>();
+    for (const document of await this.markdownDocuments(vaultId)) {
+      for (const tag of new Set(markdownTags(document.content)))
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((left, right) => left.tag.localeCompare(right.tag));
+  }
+
+  async structuredSearch(
+    userId: string,
+    vaultId: string,
+    query: {
+      path?: string;
+      content?: string;
+      tag?: string;
+      frontmatterKey?: string;
+      frontmatterValue?: string;
+    },
+  ) {
+    await this.access.requireRead(userId, vaultId);
+    if (!Object.values(query).some(Boolean)) {
+      throw new BadRequestException('At least one search filter is required');
+    }
+    if (query.frontmatterValue && !query.frontmatterKey) {
+      throw new BadRequestException(
+        'frontmatterKey is required with frontmatterValue',
+      );
+    }
+    const matches = (value: string, term: string) =>
+      value.toLowerCase().includes(term.toLowerCase());
+    return (await this.markdownDocuments(vaultId))
+      .filter((document) => {
+        const properties = markdownFrontmatter(document.content);
+        return (
+          (!query.path || matches(document.path, query.path)) &&
+          (!query.content || matches(document.content, query.content)) &&
+          (!query.tag || markdownTags(document.content).includes(query.tag)) &&
+          (!query.frontmatterKey || query.frontmatterKey in properties) &&
+          (!query.frontmatterValue ||
+            (query.frontmatterKey !== undefined &&
+              matches(
+                properties[query.frontmatterKey] ?? '',
+                query.frontmatterValue,
+              )))
+        );
+      })
+      .slice(0, 100)
+      .map(({ id, path }) => ({ id, path }));
   }
 
   async readCanvas(userId: string, vaultId: string, rawPath: string) {

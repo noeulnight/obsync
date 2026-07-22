@@ -186,6 +186,11 @@ describe('MCP OAuth (e2e)', () => {
       'vault_list',
       'vault_read',
       'vault_write',
+      'vault_append',
+      'vault_patch',
+      'vault_get_document_map',
+      'tag_list',
+      'search_query',
       'search_simple',
     ]);
 
@@ -196,6 +201,46 @@ describe('MCP OAuth (e2e)', () => {
     });
     const read = await callTool('vault_read', { vaultId, path: 'MCP Test.md' });
     expect(read.text).toContain('# Written through OAuth MCP');
+
+    await callTool('vault_write', {
+      vaultId,
+      path: 'MCP Test.md',
+      content: '---\nstatus: draft\ntags: [mcp]\n---\n# Work\nOriginal ^task\n',
+    });
+    await callTool('vault_patch', {
+      vaultId,
+      path: 'MCP Test.md',
+      targetType: 'frontmatter',
+      target: 'status',
+      operation: 'replace',
+      content: 'done',
+    });
+    await callTool('vault_append', {
+      vaultId,
+      path: 'MCP Test.md',
+      content: '# Later\nAdded',
+    });
+    expect(
+      toolValue<{ frontmatter: Array<{ key: string; value: string }> }>(
+        await callTool('vault_get_document_map', {
+          vaultId,
+          path: 'MCP Test.md',
+        }),
+      ).frontmatter,
+    ).toContainEqual({ key: 'status', value: 'done' });
+    expect(toolValue(await callTool('tag_list', { vaultId }))).toEqual(
+      expect.arrayContaining([expect.objectContaining({ tag: 'mcp' })]),
+    );
+    const structured = toolValue<Array<{ id: string; path: string }>>(
+      await callTool('search_query', {
+        vaultId,
+        frontmatterKey: 'status',
+        frontmatterValue: 'done',
+      }),
+    );
+    expect(
+      typeof structured.find(({ path }) => path === 'MCP Test.md')?.id,
+    ).toBe('string');
 
     const files = toolValue<Array<{ id: string; path: string }>>(
       await callTool('vault_list', { vaultId }),

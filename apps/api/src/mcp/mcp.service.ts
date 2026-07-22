@@ -322,6 +322,99 @@ export class McpService {
           ),
       );
 
+    if (scopes.includes('vault:write')) {
+      server.registerTool(
+        'vault_append',
+        {
+          description:
+            'Append content to a Markdown document without replacing concurrent edits.',
+          inputSchema: {
+            vaultId: z.string().uuid(),
+            path: z.string().min(1),
+            content: z.string(),
+          },
+        },
+        ({ vaultId, path, content }) =>
+          this.result(() =>
+            this.files.appendMarkdown(userId, vaultId, path, content),
+          ),
+      );
+
+      server.registerTool(
+        'vault_patch',
+        {
+          description:
+            'Append, prepend, or replace one Markdown heading, block, or frontmatter property.',
+          inputSchema: {
+            vaultId: z.string().uuid(),
+            path: z.string().min(1),
+            targetType: z.enum(['heading', 'block', 'frontmatter']),
+            target: z.string().min(1),
+            operation: z.enum(['append', 'prepend', 'replace']),
+            content: z.string(),
+          },
+        },
+        ({ vaultId, path, targetType, target, operation, content }) =>
+          this.result(() =>
+            this.files.patchMarkdown(
+              userId,
+              vaultId,
+              path,
+              targetType,
+              target,
+              operation,
+              content,
+            ),
+          ),
+      );
+    }
+
+    if (scopes.includes('vault:read')) {
+      server.registerTool(
+        'vault_get_document_map',
+        {
+          description:
+            'List headings, block references, and frontmatter properties in a Markdown document.',
+          inputSchema: {
+            vaultId: z.string().uuid(),
+            path: z.string().min(1),
+          },
+        },
+        ({ vaultId, path }) =>
+          this.result(() => this.files.documentMap(userId, vaultId, path)),
+      );
+
+      server.registerTool(
+        'tag_list',
+        {
+          description:
+            'List Markdown tags and their document counts in a Vault.',
+          inputSchema: { vaultId: z.string().uuid() },
+        },
+        ({ vaultId }) => this.result(() => this.files.tags(userId, vaultId)),
+      );
+
+      server.registerTool(
+        'search_query',
+        {
+          description:
+            'Search Markdown documents by path, content, tag, or frontmatter property.',
+          inputSchema: {
+            vaultId: z.string().uuid(),
+            path: z.string().min(1).optional(),
+            content: z.string().min(1).optional(),
+            tag: z.string().min(1).optional(),
+            frontmatterKey: z.string().min(1).optional(),
+            frontmatterValue: z.string().min(1).optional(),
+          },
+        },
+        ({ vaultId, ...query }) =>
+          this.result(() =>
+            this.files.structuredSearch(userId, vaultId, query),
+          ),
+      );
+    }
+
     if (scopes.includes('vault:read'))
       server.registerTool(
         'search_simple',

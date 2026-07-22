@@ -246,6 +246,15 @@ export class CollaborationServerService
     content: string,
     userId: string,
   ) {
+    await this.updateDocument(vaultId, fileId, userId, () => content);
+  }
+
+  async updateDocument(
+    vaultId: string,
+    fileId: string,
+    userId: string,
+    update: (content: string) => string,
+  ) {
     const roomName = `doc:${fileId}`;
     const connection = await this.collaboration(vaultId).openDirectConnection(
       roomName,
@@ -261,6 +270,7 @@ export class CollaborationServerService
       await connection.transact((document) => {
         currentState = Y.encodeStateAsUpdate(document);
         const text = document.getText('content');
+        const content = update(text.toJSON());
         if (text.toJSON() === content) return;
         changed = true;
         replaceSharedText(text, content);
@@ -268,6 +278,11 @@ export class CollaborationServerService
       if (changed) {
         await this.createVersion(vaultId, fileId, currentState, userId, true);
       }
+      let content = '';
+      await connection.transact((document) => {
+        content = document.getText('content').toJSON();
+      });
+      return content;
     } finally {
       await connection.disconnect({ unloadImmediately: true });
     }
