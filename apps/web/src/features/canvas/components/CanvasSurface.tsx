@@ -361,8 +361,9 @@ export function CanvasSurface({
                 d={previewEdgePath(connecting, connectingFrom?.side ?? "right", connectionPoint)}
                 fill="none"
                 stroke="rgb(124 58 237)"
-                strokeWidth="2"
+                strokeWidth="3"
                 pointerEvents="none"
+                markerEnd="url(#canvas-arrow)"
               />
             )}
           </svg>

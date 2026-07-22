@@ -44,6 +44,12 @@ describe("VersionHistorySheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Version history" }));
     expect(await screen.findByText("Earlier content")).toBeTruthy();
+    const drawer = document.querySelector<HTMLElement>('[data-slot="sheet-content"]');
+    const initialWidth = Number.parseInt(drawer?.style.width ?? "0", 10);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Resize version history" }), {
+      key: "ArrowRight",
+    });
+    expect(Number.parseInt(drawer?.style.width ?? "0", 10)).toBe(initialWidth - 32);
     fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     fireEvent.click(await screen.findByRole("button", { name: "Restore version" }));
 

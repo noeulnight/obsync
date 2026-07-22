@@ -11,10 +11,10 @@ import {
 import { ApiClient, type AccountSummary, type VaultSummary } from "./api";
 import {
   DEFAULT_SETTINGS,
+  ConfirmationModal,
   InitialSyncModal,
   ObsyncSettingTab,
   type PluginSettings,
-  ServerReplaceConfirmModal,
 } from "./settings";
 import { VaultSync } from "./sync";
 import type { InitialSyncMode } from "./sync-types";
@@ -152,7 +152,7 @@ export default class ObsyncPlugin extends Plugin {
     this.sync?.destroy();
   }
 
-  async authenticateDevice() {
+  async authenticateDevice(autoSelectVault = true) {
     this.api.setBaseUrl(this.settings.apiUrl);
     const authorization = await this.api.startDeviceAuthorization();
     new Notice(`Approve device code ${authorization.userCode} in your browser.`, 10_000);
@@ -164,9 +164,9 @@ export default class ObsyncPlugin extends Plugin {
     }
     if (!this.api.hasSession()) throw new Error("Device authorization expired.");
     await this.loadAccount();
-    if (!this.settings.vaultId && this.vaults[0]) {
+    if (autoSelectVault && !this.settings.vaultId && this.vaults[0]) {
       await this.selectVault(this.vaults[0].id);
-    } else {
+    } else if (this.settings.vaultId) {
       await this.connect();
     }
   }
@@ -193,6 +193,7 @@ export default class ObsyncPlugin extends Plugin {
     const vault = await this.api.createVault(name);
     this.vaults = await this.api.listVaults();
     await this.selectVault(vault.id);
+    return vault;
   }
 
   async selectVault(id: string) {
@@ -222,6 +223,17 @@ export default class ObsyncPlugin extends Plugin {
   async saveSettings(apiUrl: string) {
     const nextApiUrl = apiUrl.replace(/\/+$/, "");
     if (nextApiUrl !== this.settings.apiUrl) {
+      if (
+        this.api.hasSession() &&
+        !(await new ConfirmationModal(
+          this.app,
+          "Change synchronization server?",
+          `Changing from ${this.settings.apiUrl} to ${nextApiUrl} will sign out this device and disconnect the current Vault.`,
+          "Change server",
+        ).confirm())
+      ) {
+        return false;
+      }
       this.disconnect();
       try {
         await this.api.logout();
@@ -239,11 +251,12 @@ export default class ObsyncPlugin extends Plugin {
       this.api.setBaseUrl(nextApiUrl);
       await this.saveData(this.settings);
       this.setStatus("Sign in required");
-      return;
+      return true;
     }
     this.api.setBaseUrl(nextApiUrl);
     await this.saveData(this.settings);
     await this.connect();
+    return true;
   }
 
   async connect() {
@@ -267,7 +280,14 @@ export default class ObsyncPlugin extends Plugin {
     const readOnly = role === "VIEWER";
     let initialMode: InitialSyncMode | undefined;
     if (this.settings.initializedVaultId !== vaultId) {
-      initialMode = await this.chooseInitialSync(readOnly);
+      const source = this.vaults.find(
+        (vault) => vault.id === this.settings.initializedVaultId,
+      )?.name;
+      initialMode = await this.chooseInitialSync(
+        readOnly,
+        source ?? (this.settings.initializedVaultId ? "Current local Vault" : undefined),
+        selected?.name || this.settings.vaultName,
+      );
       if (!initialMode) {
         this.setStatus("Vault switch cancelled");
         return false;
@@ -298,10 +318,29 @@ export default class ObsyncPlugin extends Plugin {
     return true;
   }
 
-  private async chooseInitialSync(readOnly: boolean) {
-    const mode = await new InitialSyncModal(this.app, readOnly).choose();
-    if (mode !== "server") return mode;
-    return (await new ServerReplaceConfirmModal(this.app).confirm()) ? mode : undefined;
+  private async chooseInitialSync(readOnly: boolean, source?: string, target?: string) {
+    const mode = await new InitialSyncModal(this.app, readOnly, source, target).choose();
+    if (mode === "local") {
+      return (await new ConfirmationModal(
+        this.app,
+        "Replace the server Vault?",
+        `All files currently stored in ${target ?? "the server Vault"} will be replaced with this local Obsidian Vault.`,
+        "Replace server Vault",
+      ).confirm())
+        ? mode
+        : undefined;
+    }
+    if (mode === "server") {
+      return (await new ConfirmationModal(
+        this.app,
+        "Reset the local Vault?",
+        "All local files and folders except `.obsidian` settings will be permanently deleted. No backup will be created.",
+        "Delete and download",
+      ).confirm())
+        ? mode
+        : undefined;
+    }
+    return mode;
   }
 
   async loadAccount() {

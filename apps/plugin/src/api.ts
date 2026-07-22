@@ -67,6 +67,20 @@ export class ApiClient {
     return this.refreshToken.length > 0;
   }
 
+  async testConnection(baseUrl: string) {
+    const response = await requestUrl({
+      url: `${baseUrl.replace(/\/+$/, "")}/api/health`,
+      method: "GET",
+      throw: false,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new ApiRequestError(response.status);
+    }
+    if (this.body<{ status?: string }>(response.text).status !== "ok") {
+      throw new Error("The server health check did not return OK.");
+    }
+  }
+
   async register(email: string, password: string) {
     await this.raw("/api/auth/register", {
       method: "POST",

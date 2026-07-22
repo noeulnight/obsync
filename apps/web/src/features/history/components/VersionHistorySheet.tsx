@@ -42,6 +42,7 @@ export function VersionHistorySheet({
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [restoreError, setRestoreError] = useState("");
+  const [width, setWidth] = useState(() => Math.min(672, window.innerWidth - 24));
   const versions = useFileVersions(api, vaultId, fileId, open);
   const items = versions.data ?? [];
   const selected = useFileVersion(api, vaultId, fileId, selectedId);
@@ -61,12 +62,40 @@ export function VersionHistorySheet({
           <History />
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full gap-0 sm:max-w-2xl">
-        <SheetHeader>
+      <SheetContent
+        className="w-full max-w-[calc(100vw-24px)] gap-0 overflow-hidden sm:max-w-none"
+        style={{ width }}
+      >
+        <button
+          type="button"
+          aria-label="Resize version history"
+          className="group absolute inset-y-0 left-0 z-20 w-3 -translate-x-1/2 cursor-ew-resize touch-none"
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            event.preventDefault();
+          }}
+          onPointerMove={(event) => {
+            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            setWidth(
+              Math.min(window.innerWidth - 24, Math.max(360, window.innerWidth - event.clientX)),
+            );
+          }}
+          onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              setWidth((current) => Math.min(window.innerWidth - 24, current + 32));
+            } else if (event.key === "ArrowRight") {
+              setWidth((current) => Math.max(360, current - 32));
+            }
+          }}
+        >
+          <span className="absolute inset-y-0 left-1/2 w-px bg-border transition-colors group-hover:bg-primary group-focus-visible:bg-primary" />
+        </button>
+        <SheetHeader className="shrink-0">
           <SheetTitle>Version history</SheetTitle>
           <SheetDescription>Review and restore earlier versions of this document.</SheetDescription>
         </SheetHeader>
-        <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr] border-t">
+        <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr] overflow-hidden border-t">
           <div className="overflow-y-auto border-r p-2">
             {versions.isPending ? (
               <Message>Loading history…</Message>
@@ -83,7 +112,7 @@ export function VersionHistorySheet({
               ))
             )}
           </div>
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
             <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
               <span className="truncate text-sm text-muted-foreground">
                 {selectedItem ? authorName(selectedItem) : "Select a version"}

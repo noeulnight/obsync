@@ -1,6 +1,7 @@
 import { type App, Modal, Notice, PluginSettingTab, Setting } from "obsidian";
 import type { VaultSummary } from "./api";
 import type ObsyncPlugin from "./main";
+import { SetupWizardModal } from "./setup-wizard";
 import type { InitialSyncMode } from "./sync-types";
 
 export type PluginSettings = {
@@ -29,6 +30,8 @@ export class InitialSyncModal extends Modal {
   constructor(
     app: App,
     private readonly readOnly: boolean,
+    private readonly sourceVault?: string,
+    private readonly targetVault?: string,
   ) {
     super(app);
   }
@@ -41,9 +44,13 @@ export class InitialSyncModal extends Modal {
   }
 
   onOpen() {
-    this.contentEl.createEl("h2", { text: "Initial Vault synchronization" });
+    this.contentEl.createEl("h2", {
+      text: this.sourceVault ? "Switch Vault" : "Set up Vault synchronization",
+    });
     this.contentEl.createEl("p", {
-      text: "Choose how to handle existing files in this Obsidian Vault and the server Vault.",
+      text: this.sourceVault
+        ? `${this.sourceVault} → ${this.targetVault ?? "selected Vault"}. Choose how to handle the files currently stored in this local Obsidian Vault.`
+        : `Choose how to handle existing local files and ${this.targetVault ?? "the server Vault"}.`,
     });
 
     if (!this.readOnly) {
@@ -65,7 +72,7 @@ export class InitialSyncModal extends Modal {
       .setDesc("Delete local files and replace them with the server Vault.")
       .addButton((button) =>
         button
-          .setButtonText("Use server")
+          .setButtonText("Use server (recommended)")
           .setWarning()
           .onClick(() => this.finish("server")),
       );
@@ -84,8 +91,17 @@ export class InitialSyncModal extends Modal {
   }
 }
 
-export class ServerReplaceConfirmModal extends Modal {
+export class ConfirmationModal extends Modal {
   private resolve?: (confirmed: boolean) => void;
+
+  constructor(
+    app: App,
+    private readonly title: string,
+    private readonly message: string,
+    private readonly confirmText: string,
+  ) {
+    super(app);
+  }
 
   confirm() {
     return new Promise<boolean>((resolve) => {
@@ -95,15 +111,13 @@ export class ServerReplaceConfirmModal extends Modal {
   }
 
   onOpen() {
-    this.contentEl.createEl("h2", { text: "Reset the local Vault?" });
-    this.contentEl.createEl("p", {
-      text: "All local files and folders except `.obsidian` settings will be permanently deleted. No backup will be created.",
-    });
+    this.contentEl.createEl("h2", { text: this.title });
+    this.contentEl.createEl("p", { text: this.message });
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText("Cancel").onClick(() => this.finish(false)))
       .addButton((button) =>
         button
-          .setButtonText("Delete and download")
+          .setButtonText(this.confirmText)
           .setWarning()
           .onClick(() => this.finish(true)),
       );
@@ -125,6 +139,7 @@ export class ServerReplaceConfirmModal extends Modal {
 export class ObsyncSettingTab extends PluginSettingTab {
   private newVaultName = "";
   private apiUrl = "";
+  private connectionResult = "";
 
   constructor(private readonly plugin: ObsyncPlugin) {
     super(plugin.app, plugin);
@@ -142,33 +157,37 @@ export class ObsyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Server URL")
-      .setDesc("Synchronization server URL")
+      .setDesc(this.connectionResult || "Synchronization server URL")
       .addText((text) =>
-        text.setValue(this.plugin.settings.apiUrl).onChange((value) => {
+        text.setValue(this.apiUrl).onChange((value) => {
           this.apiUrl = value.trim();
+          this.connectionResult = "";
+        }),
+      )
+      .addButton((button) =>
+        button.setButtonText("Test connection").onClick(async () => {
+          button.setDisabled(true).setButtonText("Testing…");
+          try {
+            await this.plugin.api.testConnection(this.apiUrl);
+            this.connectionResult = "Connected successfully.";
+          } catch (error) {
+            this.connectionResult = `Connection failed: ${this.message(error)}`;
+          }
+          await this.render();
         }),
       );
 
     if (!this.plugin.api.hasSession()) {
       new Setting(containerEl)
-        .setName("Connect account")
-        .setDesc("Sign in or create an account in your browser, then approve this device.")
+        .setName("Set up Obsync")
+        .setDesc("Connect a server, approve this device, and choose a Vault.")
         .addButton((button) =>
           button
-            .setButtonText("Sign in with browser")
+            .setButtonText("Open setup wizard")
             .setCta()
-            .onClick(async () => {
-              button.setDisabled(true);
-              try {
-                await this.plugin.saveSettings(this.apiUrl);
-                await this.plugin.authenticateDevice();
-                await this.render();
-              } catch (error) {
-                this.notice(error);
-              } finally {
-                button.setDisabled(false);
-              }
-            }),
+            .onClick(() =>
+              new SetupWizardModal(this.app, this.plugin, () => void this.render()).open(),
+            ),
         );
       return;
     }
@@ -200,17 +219,20 @@ export class ObsyncSettingTab extends PluginSettingTab {
           );
         }
         dropdown.setValue(this.plugin.settings.vaultId).onChange(async (id) => {
+          dropdown.setDisabled(true);
           try {
             await this.plugin.selectVault(id);
             await this.render();
           } catch (error) {
             this.notice(error);
+          } finally {
+            dropdown.setDisabled(false);
           }
         });
       })
       .addButton((button) =>
         button.setButtonText("Refresh").onClick(async () => {
-          button.setDisabled(true);
+          button.setDisabled(true).setButtonText("Refreshing…");
           try {
             await this.plugin.refreshAccount();
             new Notice("Vault list refreshed.");
@@ -218,7 +240,7 @@ export class ObsyncSettingTab extends PluginSettingTab {
           } catch (error) {
             this.notice(error);
           } finally {
-            button.setDisabled(false);
+            button.setDisabled(false).setButtonText("Refresh");
           }
         }),
       );
@@ -232,13 +254,26 @@ export class ObsyncSettingTab extends PluginSettingTab {
       .addButton((button) =>
         button.setButtonText("Create").onClick(async () => {
           if (!this.newVaultName) return new Notice("Enter a Vault name.");
+          button.setDisabled(true).setButtonText("Creating…");
           try {
             await this.plugin.createVault(this.newVaultName);
             await this.render();
           } catch (error) {
             this.notice(error);
+          } finally {
+            button.setDisabled(false).setButtonText("Create");
           }
         }),
+      );
+    new Setting(containerEl)
+      .setName("Setup wizard")
+      .setDesc("Change the server, account, or connected Vault step by step.")
+      .addButton((button) =>
+        button
+          .setButtonText("Run wizard")
+          .onClick(() =>
+            new SetupWizardModal(this.app, this.plugin, () => void this.render()).open(),
+          ),
       );
     new Setting(containerEl)
       .addButton((button) =>
@@ -246,12 +281,15 @@ export class ObsyncSettingTab extends PluginSettingTab {
           .setButtonText("Save and reconnect")
           .setCta()
           .onClick(async () => {
+            button.setDisabled(true).setButtonText("Saving…");
             try {
-              await this.plugin.saveSettings(this.apiUrl);
+              if (!(await this.plugin.saveSettings(this.apiUrl))) return;
               new Notice("Obsync settings saved.");
               await this.render();
             } catch (error) {
               this.notice(error);
+            } finally {
+              button.setDisabled(false).setButtonText("Save and reconnect");
             }
           }),
       )
@@ -271,6 +309,10 @@ export class ObsyncSettingTab extends PluginSettingTab {
   }
 
   private notice(error: unknown) {
-    new Notice(error instanceof Error ? error.message : String(error));
+    new Notice(this.message(error));
+  }
+
+  private message(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
   }
 }

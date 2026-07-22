@@ -82,6 +82,7 @@ export function CanvasNodeCard({
   onEdit: (id: string) => void;
 }) {
   const color = canvasColor(node.color);
+  const targeted = connectionTarget?.nodeId === node.id;
   return (
     <section
       data-canvas-node
@@ -103,13 +104,15 @@ export function CanvasNodeCard({
       <div
         className="relative size-full overflow-hidden rounded-lg border bg-card shadow-[0_0.5px_1px_0.5px_rgba(0,0,0,0.1)]"
         style={{
-          borderColor: active ? "rgb(124 58 237)" : (remoteFocus?.color ?? color),
+          borderColor: active || targeted ? "rgb(124 58 237)" : (remoteFocus?.color ?? color),
           backgroundColor: color ? `color-mix(in srgb, ${color} 12%, var(--card))` : undefined,
-          boxShadow: active
-            ? "0 0.5px 1px 0.5px rgba(0,0,0,.1), 0 0 0 2px rgb(124 58 237)"
-            : remoteFocus
-              ? `0 0 0 2px ${remoteFocus.color}`
-              : undefined,
+          boxShadow: targeted
+            ? "0 0 0 3px rgb(124 58 237 / 35%)"
+            : active
+              ? "0 0.5px 1px 0.5px rgba(0,0,0,.1), 0 0 0 2px rgb(124 58 237)"
+              : remoteFocus
+                ? `0 0 0 2px ${remoteFocus.color}`
+                : undefined,
         }}
       >
         <CanvasNodeContent
@@ -141,7 +144,7 @@ export function CanvasNodeCard({
               key={handle.side}
               type="button"
               aria-label={handle.label}
-              className={`absolute size-3 cursor-crosshair rounded-full border-2 border-background bg-violet-600 opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100 ${handle.className} ${connectingFrom?.nodeId === node.id && connectingFrom.side === handle.side ? "opacity-100 ring-4 ring-violet-500/30" : ""} ${connectionTarget?.nodeId === node.id && connectionTarget.side === handle.side ? "opacity-100 ring-4 ring-violet-500/30" : ""}`}
+              className={`absolute z-10 size-4 cursor-crosshair rounded-full border-2 border-background bg-violet-600 opacity-70 shadow-sm transition-[opacity,transform,box-shadow] hover:scale-125 hover:opacity-100 focus-visible:scale-125 focus-visible:opacity-100 ${handle.className} ${connectingFrom?.nodeId === node.id && connectingFrom.side === handle.side ? "scale-125 opacity-100 ring-4 ring-violet-500/30" : ""} ${connectionTarget?.nodeId === node.id && connectionTarget.side === handle.side ? "scale-150 opacity-100 ring-4 ring-violet-500/40" : ""}`}
               onPointerDown={(event) =>
                 onStartConnection(event, { nodeId: node.id, side: handle.side })
               }
