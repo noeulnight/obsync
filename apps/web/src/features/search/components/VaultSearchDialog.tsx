@@ -45,7 +45,7 @@ export function VaultSearchDialog({
           (entry) =>
             !entry.deleted &&
             entry.kind !== "folder" &&
-            (mode !== "canvas" || entry.kind === "markdown" || entry.kind === "attachment") &&
+            (mode !== "canvas" || entry.kind === "markdown" || entry.kind === "canvas") &&
             entry.path.toLowerCase().includes(query.trim().toLowerCase()),
         )
         .sort((left, right) => left.path.localeCompare(right.path))
@@ -74,7 +74,7 @@ export function VaultSearchDialog({
           {mode === "search"
             ? "Search document titles and contents."
             : mode === "canvas"
-              ? "Add a document or attachment to the Canvas."
+              ? "Add a document or Canvas to the Canvas."
               : "Open a Vault file."}
         </DialogDescription>
         <Input
@@ -87,7 +87,7 @@ export function VaultSearchDialog({
             mode === "search"
               ? "Search titles and contents…"
               : mode === "canvas"
-                ? "Add a document or attachment…"
+                ? "Add a document or Canvas…"
                 : "Open a file…"
           }
           value={query}

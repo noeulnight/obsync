@@ -6,6 +6,7 @@ import {
   type MarkdownFileInfo,
   Notice,
   Plugin,
+  setIcon,
   TFile,
 } from "obsidian";
 import { ApiClient, type AccountSummary, type VaultSummary } from "./api";
@@ -62,6 +63,8 @@ export default class ObsyncPlugin extends Plugin {
       },
     );
     this.status = this.addStatusBarItem();
+    this.status.classList.add("obsync-status");
+    this.setStatus(this.statusText);
     this.registerEditorExtension([
       ViewPlugin.define((view) => {
         const compartment = new Compartment();
@@ -477,7 +480,23 @@ export default class ObsyncPlugin extends Plugin {
 
   private setStatus(status: string) {
     this.statusText = status;
-    this.status?.setText(`Obsync: ${status}`);
+    if (!this.status) return;
+    const state = statusState(status);
+    this.status.dataset.state = state;
+    this.status.setAttribute("aria-label", `Obsync: ${status}`);
+    this.status.setAttribute("title", `Obsync: ${status}`);
+    setIcon(
+      this.status,
+      state === "synced"
+        ? "check-circle"
+        : state === "offline"
+          ? "cloud-off"
+          : state === "error"
+            ? "alert-triangle"
+            : state === "idle"
+              ? "circle-dashed"
+              : "refresh-cw",
+    );
   }
 
   private async run(work: () => unknown) {
@@ -490,6 +509,15 @@ export default class ObsyncPlugin extends Plugin {
       console.error("Obsync", error);
     }
   }
+}
+
+function statusState(status: string) {
+  if (["Synced", "Read only", "Server changes applied"].includes(status)) return "synced";
+  if (["Offline", "Waiting to reconnect"].includes(status)) return "offline";
+  if (["Error", "Authentication failed"].includes(status)) return "error";
+  if (["Sign in required", "Select a Vault", "Vault switch cancelled"].includes(status))
+    return "idle";
+  return "syncing";
 }
 
 function delay(milliseconds: number) {

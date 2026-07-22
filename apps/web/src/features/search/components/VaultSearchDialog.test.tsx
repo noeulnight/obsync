@@ -26,7 +26,7 @@ describe("VaultSearchDialog", () => {
     expect(open).toHaveBeenCalledWith(entries[1]);
   });
 
-  it("offers only documents and attachments when adding to a Canvas", () => {
+  it("offers only documents and Canvases when adding to a Canvas", () => {
     const open = vi.fn<(entry: FileEntry) => void>();
     renderDialog(open, "canvas", [
       ...entries,
@@ -35,8 +35,8 @@ describe("VaultSearchDialog", () => {
     ]);
 
     expect(screen.getByRole("button", { name: "Alpha Alpha.md" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "photo photo.png" })).toBeTruthy();
-    expect(screen.queryByText("Board")).toBeNull();
+    expect(screen.getByRole("button", { name: "Board Board.canvas" })).toBeTruthy();
+    expect(screen.queryByText("photo")).toBeNull();
   });
 
   it("re-filters an open picker when its mode changes", () => {
@@ -50,7 +50,7 @@ describe("VaultSearchDialog", () => {
 
     view.rerender(dialog(open, "canvas", files));
 
-    expect(screen.queryByText("Board")).toBeNull();
+    expect(screen.getByText("Board")).toBeTruthy();
   });
 });
 

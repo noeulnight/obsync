@@ -309,7 +309,9 @@ function createSimulation(data: VaultGraph) {
   const simulation = forceSimulation(nodes)
     .force(
       "link",
-      forceLink<ForceNode, ForceLink>(links).id((node) => node.id),
+      forceLink<ForceNode, ForceLink>(links)
+        .id((node) => node.id)
+        .distance(100),
     )
     .force("charge", forceManyBody().strength(-60).distanceMax(300))
     .force("center", forceCenter(width / 2, height / 2))

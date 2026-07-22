@@ -1,5 +1,30 @@
 .obsync-status {
-  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.obsync-status[data-state="synced"] {
+  color: var(--text-success);
+}
+
+.obsync-status[data-state="offline"],
+.obsync-status[data-state="idle"] {
+  color: var(--text-faint);
+}
+
+.obsync-status[data-state="error"] {
+  color: var(--text-error);
+}
+
+.obsync-status[data-state="syncing"] svg {
+  animation: obsync-spin 1.2s linear infinite;
+}
+
+@keyframes obsync-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 
 .obsync-settings-actions {
