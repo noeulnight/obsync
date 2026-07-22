@@ -250,7 +250,13 @@ export class McpOAuthService implements OAuthServerProvider {
         expiresAt: { gt: new Date() },
       },
     });
-    if (!stored || stored.resource !== this.validResource(resource)) {
+    if (!stored) {
+      throw new InvalidGrantError('Invalid refresh token');
+    }
+    const expectedResource = resource
+      ? this.validResource(resource)
+      : this.resourceUrl().toString();
+    if (stored.resource !== expectedResource) {
       throw new InvalidGrantError('Invalid refresh token');
     }
     const scopes = requestedScopes?.length

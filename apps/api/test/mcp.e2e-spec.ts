@@ -281,7 +281,18 @@ describe('MCP OAuth (e2e)', () => {
     });
   });
 
-  it('rotates refresh tokens', async () => {
+  it('rotates refresh tokens when clients omit the resource', async () => {
+    await request(app.getHttpServer())
+      .post('/token')
+      .type('form')
+      .send({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        refresh_token: refreshToken,
+        resource: 'https://example.com/mcp',
+      })
+      .expect(400);
+
     const refreshed = await request(app.getHttpServer())
       .post('/token')
       .type('form')
@@ -289,7 +300,6 @@ describe('MCP OAuth (e2e)', () => {
         grant_type: 'refresh_token',
         client_id: clientId,
         refresh_token: refreshToken,
-        resource,
       })
       .expect(200);
     const next = json<{ access_token: string; refresh_token: string }>(
