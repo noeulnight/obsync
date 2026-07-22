@@ -1,6 +1,7 @@
 import {
   markdownLinkTargets,
   resolveMarkdownTarget,
+  unresolvedMarkdownPath,
 } from '../utils/markdown-links';
 
 describe('Markdown links', () => {
@@ -15,5 +16,17 @@ describe('Markdown links', () => {
         { id: 'today', path: 'Daily/Today.md' },
       ]),
     ).toEqual({ id: 'today', path: 'Daily/Today.md' });
+  });
+
+  it('places unresolved links beside their source document', () => {
+    expect(unresolvedMarkdownPath('Projects/Source.md', 'Roadmap')).toBe(
+      'Projects/Roadmap.md',
+    );
+    expect(unresolvedMarkdownPath('Projects/Source.md', '../Daily/Today')).toBe(
+      'Daily/Today.md',
+    );
+    expect(unresolvedMarkdownPath('Projects/Source.md', 'Shared/Plan.md')).toBe(
+      'Shared/Plan.md',
+    );
   });
 });

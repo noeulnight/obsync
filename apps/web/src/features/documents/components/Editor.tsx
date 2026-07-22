@@ -14,6 +14,7 @@ export function Editor({
   session,
   onNavigate,
   resolveAsset,
+  onPasteImages,
   files = [],
   compact = false,
   readOnly = false,
@@ -21,6 +22,7 @@ export function Editor({
   session: WebDocument;
   onNavigate: (href: string) => void;
   resolveAsset: (href: string) => Promise<string | undefined>;
+  onPasteImages?: (files: File[]) => Promise<string[]>;
   files?: FileEntry[];
   compact?: boolean;
   readOnly?: boolean;
@@ -29,9 +31,11 @@ export function Editor({
   const editor = useRef<EditorView | null>(null);
   const navigate = useRef(onNavigate);
   const asset = useRef(resolveAsset);
+  const pasteImages = useRef(onPasteImages);
   const vaultFiles = useRef(files);
   navigate.current = onNavigate;
   asset.current = resolveAsset;
+  pasteImages.current = onPasteImages;
   vaultFiles.current = files;
 
   useEffect(() => {
@@ -51,6 +55,22 @@ export function Editor({
           EditorView.lineWrapping,
           EditorView.editable.of(!readOnly),
           compact ? compactEditorTheme : editorTheme,
+          EditorView.domEventHandlers({
+            paste(event, view) {
+              const images = [...(event.clipboardData?.files ?? [])].filter((file) =>
+                file.type.startsWith("image/"),
+              );
+              if (!images.length || !pasteImages.current) return false;
+              event.preventDefault();
+              void pasteImages.current(images).then((paths) => {
+                if (!paths.length || editor.current !== view) return;
+                view.dispatch(
+                  view.state.replaceSelection(paths.map((path) => `![[${path}]]`).join("\n")),
+                );
+              });
+              return true;
+            },
+          }),
           livePreview(
             (href) => navigate.current(href),
             (href) => asset.current(href),

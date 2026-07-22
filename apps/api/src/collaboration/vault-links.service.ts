@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import {
   markdownLinkTargets,
   resolveMarkdownTarget,
+  unresolvedMarkdownPath,
   type MarkdownFile,
 } from './utils/markdown-links';
 
@@ -73,27 +74,60 @@ export class VaultLinksService {
 
   async graph(vaultId: string) {
     await this.ensureIndexed(vaultId);
-    const [nodes, links] = await Promise.all([
+    const [files, links] = await Promise.all([
       this.files(vaultId),
       this.prisma.vaultFileLink.findMany({
         where: {
           vaultId,
-          targetFileId: { not: null },
           source: { deletedAt: null, kind: 'MARKDOWN' },
-          target: { deletedAt: null, kind: 'MARKDOWN' },
         },
-        select: { sourceFileId: true, targetFileId: true },
+        select: {
+          sourceFileId: true,
+          targetFileId: true,
+          rawTarget: true,
+          source: { select: { path: true } },
+          target: { select: { deletedAt: true, kind: true } },
+        },
       }),
     ]);
+    const nodes = files.map((file) => ({ ...file, exists: true }));
+    const missing = new Map<
+      string,
+      { id: string; path: string; exists: false }
+    >();
     const edges = [
       ...new Map(
-        links.map((link) => [
-          `${link.sourceFileId}:${link.targetFileId}`,
-          { source: link.sourceFileId, target: link.targetFileId! },
-        ]),
+        links.flatMap((link) => {
+          const resolved =
+            link.target?.kind === 'MARKDOWN' && !link.target.deletedAt;
+          let target = link.targetFileId!;
+          if (!resolved) {
+            const fallback = resolveMarkdownTarget(
+              link.source.path,
+              link.rawTarget,
+              files,
+            );
+            if (fallback) target = fallback.id;
+            else {
+              const path = unresolvedMarkdownPath(
+                link.source.path,
+                link.rawTarget,
+              );
+              target = `missing:${path.normalize('NFC').toLowerCase()}`;
+              if (!missing.has(target))
+                missing.set(target, { id: target, path, exists: false });
+            }
+          }
+          return [
+            [
+              `${link.sourceFileId}:${target}`,
+              { source: link.sourceFileId, target },
+            ],
+          ];
+        }),
       ).values(),
     ];
-    return { nodes, edges };
+    return { nodes: [...nodes, ...missing.values()], edges };
   }
 
   private async ensureIndexed(vaultId: string) {

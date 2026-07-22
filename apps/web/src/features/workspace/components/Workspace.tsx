@@ -165,6 +165,18 @@ export function Workspace({
     }
   }
 
+  function createGraphDocument(path: string) {
+    if (!sync || !canWrite) {
+      setNotice("Editing is unavailable while offline.");
+      return;
+    }
+    try {
+      open(sync.create("markdown", path));
+    } catch (reason) {
+      setNotice(`Document creation failed: ${errorMessage(reason)}`);
+    }
+  }
+
   async function upload(files: FileList | null) {
     if (!sync || !files?.length) return;
     if (!canWrite) {
@@ -178,13 +190,7 @@ export function Workspace({
     setNotice("Uploading attachments…");
     try {
       for (const file of files) {
-        const path = validVaultPath(file.name);
-        if (!path) throw new Error(`Invalid file name: ${file.name}`);
-        if (entries.some((entry) => entry.path.toLocaleLowerCase() === path.toLocaleLowerCase())) {
-          throw new Error(`A file with this name already exists: ${path}`);
-        }
-        const uploaded = await uploadAttachment.mutateAsync({ file, path });
-        open(sync.addAttachment(uploaded));
+        open(await addAttachment(file, validVaultPath(file.name)));
       }
       setNotice("");
     } catch (reason) {
@@ -192,6 +198,36 @@ export function Workspace({
     } finally {
       if (uploadInput.current) uploadInput.current.value = "";
     }
+  }
+
+  async function pasteImages(files: File[]) {
+    if (!sync || !canWrite || !sync.readyForNewEntries()) return [];
+    const folder = activeEntry?.path.split("/").slice(0, -1).join("/");
+    const occupied = new Set(sync.entries().map((entry) => entry.path.toLocaleLowerCase()));
+    try {
+      const paths: string[] = [];
+      for (const file of files) {
+        const path = availableAttachmentPath(file, folder, occupied);
+        await addAttachment(file, path);
+        paths.push(path);
+      }
+      return paths;
+    } catch (reason) {
+      setNotice(`Image paste failed: ${errorMessage(reason)}`);
+      return [];
+    }
+  }
+
+  async function addAttachment(file: File, path: string | undefined) {
+    if (!sync) throw new Error("Wait for synchronization to connect.");
+    if (!path) throw new Error(`Invalid file name: ${file.name}`);
+    if (
+      sync.entries().some((entry) => entry.path.toLocaleLowerCase() === path.toLocaleLowerCase())
+    ) {
+      throw new Error(`A file with this name already exists: ${path}`);
+    }
+    const uploaded = await uploadAttachment.mutateAsync({ file, path });
+    return sync.addAttachment(uploaded);
   }
 
   function remove(entry: FileEntry) {
@@ -334,12 +370,14 @@ export function Workspace({
           onDelete={() => activeEntry && setDeleteTarget(activeEntry)}
           onNavigate={navigate}
           resolveAsset={resolveAsset}
+          onPasteImages={pasteImages}
           openCanvasDocument={openCanvasDocument}
           navigateFromCanvas={navigateFromCanvas}
           resolveCanvasAsset={resolveCanvasAsset}
           resolveCanvasFileAsset={resolveCanvasFileAsset}
           onAddCanvasFile={() => setSearchMode("canvas")}
           onOpenEntry={open}
+          onCreateGraphDocument={createGraphDocument}
         />
       </SidebarProvider>
       <VaultSearchDialog
@@ -366,4 +404,22 @@ export function Workspace({
       />
     </>
   );
+}
+
+function availableAttachmentPath(file: File, folder: string | undefined, occupied: Set<string>) {
+  const name = file.name.trim() || `Pasted image.${imageExtension(file.type)}`;
+  const requested = validVaultPath(folder ? `${folder}/${name}` : name);
+  if (!requested) throw new Error(`Invalid file name: ${name}`);
+  const dot = requested.lastIndexOf(".");
+  const stem = dot > requested.lastIndexOf("/") ? requested.slice(0, dot) : requested;
+  const extension = dot > requested.lastIndexOf("/") ? requested.slice(dot) : "";
+  let path = requested;
+  let suffix = 1;
+  while (occupied.has(path.toLocaleLowerCase())) path = `${stem} ${suffix++}${extension}`;
+  occupied.add(path.toLocaleLowerCase());
+  return path;
+}
+
+function imageExtension(type: string) {
+  return type.split("/")[1]?.replace("jpeg", "jpg") || "png";
 }

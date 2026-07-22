@@ -66,8 +66,8 @@ describe("resolveMarkdownLink", () => {
 
   it("builds wiki-link completions from active Markdown files", () => {
     expect(markdownLinkOptions(entries)).toEqual([
-      { label: "a", detail: "notes", target: "notes/a" },
-      { label: "b", detail: "shared", target: "shared/b" },
+      { label: "a", detail: "notes/a.md", target: "notes/a" },
+      { label: "b", detail: "shared/b.md", target: "shared/b" },
     ]);
   });
 

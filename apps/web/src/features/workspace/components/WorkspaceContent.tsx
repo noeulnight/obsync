@@ -33,12 +33,14 @@ export function WorkspaceContent({
   onDelete,
   onNavigate,
   resolveAsset,
+  onPasteImages,
   openCanvasDocument,
   navigateFromCanvas,
   resolveCanvasAsset,
   resolveCanvasFileAsset,
   onAddCanvasFile,
   onOpenEntry,
+  onCreateGraphDocument,
 }: {
   api: ApiClient;
   vaultId: string;
@@ -56,12 +58,14 @@ export function WorkspaceContent({
   onDelete: () => void;
   onNavigate: (href: string) => void;
   resolveAsset: (href: string) => Promise<string | undefined>;
+  onPasteImages: (files: File[]) => Promise<string[]>;
   openCanvasDocument: (file: string) => WebDocument | undefined;
   navigateFromCanvas: (file: string, href: string) => void;
   resolveCanvasAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveCanvasFileAsset: (file: string) => Promise<string | undefined>;
   onAddCanvasFile: () => void;
   onOpenEntry: (entry: FileEntry) => void;
+  onCreateGraphDocument: (path: string) => void;
 }) {
   return (
     <SidebarInset className="h-svh min-w-0 overflow-hidden">
@@ -73,6 +77,7 @@ export function WorkspaceContent({
             vaultName={vaultName}
             entries={entries}
             open={onOpenEntry}
+            create={onCreateGraphDocument}
           />
         ) : notice ? (
           <EmptyState>{notice}</EmptyState>
@@ -91,6 +96,7 @@ export function WorkspaceContent({
               onDelete={onDelete}
               onNavigate={onNavigate}
               resolveAsset={resolveAsset}
+              onPasteImages={onPasteImages}
               onOpenDocument={(fileId) => {
                 const entry = entries.find((item) => item.id === fileId);
                 if (entry) onOpenEntry(entry);

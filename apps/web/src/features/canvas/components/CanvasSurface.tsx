@@ -150,6 +150,8 @@ export function CanvasSurface({
     connectingFromRef.current = connection;
     setConnectingFrom(connection);
     setConnectionPoint(position(event.clientX, event.clientY));
+    surface.current?.setPointerCapture(event.pointerId);
+    event.preventDefault();
     event.stopPropagation();
   }
 

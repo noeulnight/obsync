@@ -93,7 +93,7 @@ export type FileVersionDetail = Omit<FileVersion, "attachmentId" | "hasContent">
 };
 
 export type VaultGraph = {
-  nodes: Array<{ id: string; path: string }>;
+  nodes: Array<{ id: string; path: string; exists: boolean }>;
   edges: Array<{ source: string; target: string }>;
 };
 

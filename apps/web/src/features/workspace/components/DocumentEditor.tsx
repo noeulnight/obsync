@@ -21,6 +21,7 @@ export function DocumentEditor({
   onDelete,
   onNavigate,
   resolveAsset,
+  onPasteImages,
   onOpenDocument,
   readOnly = false,
 }: {
@@ -35,6 +36,7 @@ export function DocumentEditor({
   onDelete: () => void;
   onNavigate: (href: string) => void;
   resolveAsset: (href: string) => Promise<string | undefined>;
+  onPasteImages: (files: File[]) => Promise<string[]>;
   onOpenDocument: (fileId: string) => void;
   readOnly?: boolean;
 }) {
@@ -109,6 +111,7 @@ export function DocumentEditor({
           files={files}
           onNavigate={onNavigate}
           resolveAsset={resolveAsset}
+          onPasteImages={onPasteImages}
           readOnly={readOnly}
         />
       </div>

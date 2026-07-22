@@ -135,6 +135,34 @@ describe("Editor", () => {
     );
   });
 
+  it("uploads pasted images and inserts Vault embeds", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "Before ");
+    const onPasteImages = vi.fn().mockResolvedValue(["Notes/photo.png"]);
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        onPasteImages={onPasteImages}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    fireEvent.paste(view.container.querySelector(".cm-content") as HTMLElement, {
+      clipboardData: {
+        files: [new File(["image"], "photo.png", { type: "image/png" })],
+      },
+    });
+
+    await waitFor(() => expect(connected.text.toJSON()).toBe("Before ![[Notes/photo.png]]"));
+    expect(onPasteImages).toHaveBeenCalledOnce();
+  });
+
   it("releases the session without destroying it during an editor remount", () => {
     const { connected, acquire, release, destroy } = session();
     const first = render(

@@ -27,12 +27,14 @@ export function VaultGraphView({
   vaultName,
   entries,
   open,
+  create,
 }: {
   api: ApiClient;
   vaultId: string;
   vaultName: string;
   entries: FileEntry[];
   open: (entry: FileEntry) => void;
+  create: (path: string) => void;
 }) {
   const graph = useVaultGraph(api, vaultId);
 
@@ -52,9 +54,10 @@ export function VaultGraphView({
           <ForceGraph
             data={graph.data}
             vaultId={vaultId}
-            open={(fileId) => {
-              const entry = entries.find((item) => item.id === fileId);
+            open={(node) => {
+              const entry = entries.find((item) => item.id === node.id);
               if (entry) open(entry);
+              else if (!node.exists) create(node.path);
             }}
           />
         ) : (
@@ -72,13 +75,14 @@ function ForceGraph({
 }: {
   data: VaultGraph;
   vaultId: string;
-  open: (fileId: string) => void;
+  open: (node: VaultGraph["nodes"][number]) => void;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const simulation = useRef<Simulation<ForceNode, ForceLink> | undefined>(undefined);
   const nodes = useRef(new Map<string, SVGGElement>());
   const links = useRef<Array<SVGLineElement | null>>([]);
   const dragging = useRef<ForceNode | undefined>(undefined);
+  const dragStart = useRef<{ id: string; x: number; y: number } | undefined>(undefined);
   const panning = useRef<Point | undefined>(undefined);
   const [viewport, setViewport] = useState(defaultViewport);
   const [hovered, setHovered] = useState<string>();
@@ -131,7 +135,7 @@ function ForceGraph({
     setViewport((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
   }
 
-  function release() {
+  function release(event?: PointerEvent<SVGSVGElement>) {
     panning.current = undefined;
     const node = dragging.current;
     if (!node) return;
@@ -139,6 +143,12 @@ function ForceGraph({
     node.fx = null;
     node.fy = null;
     dragging.current = undefined;
+    const start = dragStart.current;
+    dragStart.current = undefined;
+    if (event && start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 5) {
+      const selected = data.nodes.find((item) => item.id === start.id);
+      if (selected) open(selected);
+    }
   }
 
   function zoom(event: WheelEvent<SVGSVGElement>) {
@@ -189,7 +199,7 @@ function ForceGraph({
         }}
         onPointerMove={move}
         onPointerUp={release}
-        onPointerCancel={release}
+        onPointerCancel={() => release()}
       >
         <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.k})`}>
           <g fill="none" strokeWidth={1 / viewport.k}>
@@ -216,11 +226,13 @@ function ForceGraph({
               return (
                 <a
                   key={node.id}
-                  href={`/vaults/${vaultId}/files/${node.id}`}
+                  href={
+                    node.exists ? `/vaults/${vaultId}/files/${node.id}` : `/vaults/${vaultId}/graph`
+                  }
                   aria-label={`Open ${name(node.path)}`}
                   onClick={(event) => {
                     event.preventDefault();
-                    open(node.id);
+                    if (event.detail === 0) open(node);
                   }}
                 >
                   <g
@@ -240,6 +252,7 @@ function ForceGraph({
                         ?.nodes()
                         .find((item) => item.id === node.id);
                       if (!forceNode) return;
+                      dragStart.current = { id: node.id, x: event.clientX, y: event.clientY };
                       dragging.current = forceNode;
                       forceNode.fx = forceNode.x;
                       forceNode.fy = forceNode.y;
@@ -253,14 +266,20 @@ function ForceGraph({
                           ? "fill-violet-500 stroke-violet-300"
                           : connected
                             ? "fill-foreground stroke-background"
-                            : "fill-muted-foreground/70 stroke-background"
+                            : node.exists
+                              ? "fill-muted-foreground/70 stroke-background"
+                              : "fill-muted-foreground/25 stroke-muted-foreground/50"
                       }
                     />
                     <text
                       y={20 / viewport.k}
                       textAnchor="middle"
                       className={
-                        selected ? "fill-foreground font-semibold" : "fill-muted-foreground"
+                        selected
+                          ? "fill-foreground font-semibold"
+                          : node.exists
+                            ? "fill-muted-foreground"
+                            : "fill-muted-foreground/60"
                       }
                       fontSize={11 / viewport.k}
                       stroke="none"

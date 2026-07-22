@@ -40,6 +40,22 @@ export function resolveMarkdownTarget(
   });
 }
 
+export function unresolvedMarkdownPath(sourcePath: string, rawTarget: string) {
+  const folder = sourcePath.split('/').slice(0, -1);
+  const link = rawTarget.replace(/^\/+/, '');
+  const parts =
+    link.startsWith('.') || !link.includes('/')
+      ? [...folder, ...link.split('/')]
+      : link.split('/');
+  const path: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') path.pop();
+    else path.push(part);
+  }
+  return `${path.join('/').replace(/\.md$/i, '')}.md`;
+}
+
 function linkTarget(value: string) {
   const decoded = decodeLink(value).split('|')[0].split('#')[0].trim();
   if (!decoded || /^[a-z][a-z\d+.-]*:/i.test(decoded)) return undefined;

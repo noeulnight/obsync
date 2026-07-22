@@ -81,7 +81,7 @@ export function markdownLinkOptions(entries: FileEntry[]) {
       const parts = entry.path.replace(/\.md$/i, "").split("/");
       return {
         label: parts.at(-1) ?? entry.path,
-        detail: parts.slice(0, -1).join("/"),
+        detail: entry.path,
         target: parts.join("/"),
       };
     })
