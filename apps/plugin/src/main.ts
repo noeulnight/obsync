@@ -22,6 +22,7 @@ import type { InitialSyncMode } from "./sync-types";
 
 type CodeMirrorEditor = { cm?: EditorView };
 type EditorBinding = { key?: string; extension: Extension; text: string; ready: boolean };
+type EditorBindingToken = { key?: string };
 type CanvasTextInfo = {
   node?: { id?: string; canvas?: { view?: { file?: TFile | null } } };
 };
@@ -33,7 +34,7 @@ export default class ObsyncPlugin extends Plugin {
   vaults: VaultSummary[] = [];
   private sync?: VaultSync;
   private readonly bindings = new WeakMap<EditorView, Compartment>();
-  private boundEditors = new WeakMap<EditorView, string>();
+  private boundEditors = new WeakMap<EditorView, EditorBindingToken>();
   private readonly editorViews = new Set<EditorView>();
   private status?: HTMLElement;
   private statusText = "Starting";
@@ -406,53 +407,66 @@ export default class ObsyncPlugin extends Plugin {
     }
   }
 
-  private bindEditorView(view: EditorView, changed = false) {
+  private bindEditorView(view: EditorView) {
     const info = view.state.field(editorInfoField as never, false) as MarkdownFileInfo | undefined;
     if (!info) return;
-    if (info.file) this.bindEditor(info.file, { cm: view }, changed);
-    else this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view }, changed);
+    if (info.file) this.bindEditor(info.file, { cm: view });
+    else this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view });
   }
 
-  private bindEditor(file: TFile | null, editor: CodeMirrorEditor, changed = false) {
+  private bindEditor(file: TFile | null, editor: CodeMirrorEditor) {
     const view = editor.cm;
     if (!this.sync || !file || !view) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.extension(file, current, changed, (key) =>
-      this.editorDetached(view, key),
+    const token: EditorBindingToken = {};
+    const binding: EditorBinding = this.sync.extension(file, current, false, () =>
+      this.editorDetached(view, token),
     );
-    this.applyEditorBinding(view, current, binding);
+    token.key = binding.key;
+    this.applyEditorBinding(view, current, binding, token);
   }
 
-  private bindCanvasTextEditor(info: CanvasTextInfo, editor: CodeMirrorEditor, changed = false) {
+  private bindCanvasTextEditor(info: CanvasTextInfo, editor: CodeMirrorEditor) {
     const view = editor.cm;
     const nodeId = info.node?.id;
     const canvasFile = info.node?.canvas?.view?.file;
     if (!this.sync || !view || !nodeId || !canvasFile) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.canvasTextExtension(canvasFile, nodeId, current, changed, (key) =>
-      this.editorDetached(view, key),
+    const token: EditorBindingToken = {};
+    const binding: EditorBinding = this.sync.canvasTextExtension(
+      canvasFile,
+      nodeId,
+      current,
+      false,
+      () => this.editorDetached(view, token),
     );
-    this.applyEditorBinding(view, current, binding);
+    token.key = binding.key;
+    this.applyEditorBinding(view, current, binding, token);
   }
 
-  private editorDetached(view: EditorView, key: string) {
-    if (this.boundEditors.get(view) !== key) return;
+  private editorDetached(view: EditorView, token: EditorBindingToken) {
+    if (this.boundEditors.get(view) !== token) return;
     this.boundEditors.delete(view);
     window.setTimeout(() => {
-      if (this.editorViews.has(view)) this.bindEditorView(view, true);
+      if (this.editorViews.has(view)) this.bindEditorView(view);
     }, 300);
   }
 
-  private applyEditorBinding(view: EditorView, current: string, binding: EditorBinding) {
+  private applyEditorBinding(
+    view: EditorView,
+    current: string,
+    binding: EditorBinding,
+    token: EditorBindingToken,
+  ) {
     const compartment = this.bindings.get(view);
     if (
       !compartment ||
       !binding.key ||
-      this.boundEditors.get(view) === binding.key ||
+      this.boundEditors.get(view)?.key === binding.key ||
       !binding.ready
     )
       return;
-    this.boundEditors.set(view, binding.key);
+    this.boundEditors.set(view, token);
     try {
       view.dispatch({
         effects: compartment.reconfigure([

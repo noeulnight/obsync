@@ -60,6 +60,10 @@
   font-size: 11px;
   line-height: 16px;
   border-radius: 4px;
+  opacity: 0;
+}
+
+.cm-ySelectionCaret:hover > .cm-ySelectionInfo {
   opacity: 1;
 }
 

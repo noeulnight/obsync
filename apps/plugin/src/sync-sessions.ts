@@ -28,12 +28,7 @@ export class VaultSessions {
     this.canvases.clear();
   }
 
-  extension(
-    entry: MarkdownEntry,
-    editorText: string,
-    changed = false,
-    onDetached?: (key: string) => void,
-  ) {
+  extension(entry: MarkdownEntry, editorText: string, changed = false, onDetached?: () => void) {
     const document = this.document(entry);
     if (changed) document.editorChanged(editorText);
     const key = editorBindingKey(entry.id);
@@ -52,7 +47,7 @@ export class VaultSessions {
 
             destroy() {
               document.closeEditor();
-              onDetached?.(key);
+              onDetached?.();
             }
           },
         ),
@@ -65,7 +60,7 @@ export class VaultSessions {
     nodeId: string,
     editorText: string,
     changed = false,
-    onDetached?: (key: string) => void,
+    onDetached?: () => void,
   ) {
     const key = editorBindingKey(entry.id, nodeId);
     const binding = this.canvas(entry).textExtension(nodeId, editorText, changed);
@@ -78,7 +73,7 @@ export class VaultSessions {
             ViewPlugin.fromClass(
               class {
                 destroy() {
-                  onDetached?.(key);
+                  onDetached?.();
                 }
               },
             ),

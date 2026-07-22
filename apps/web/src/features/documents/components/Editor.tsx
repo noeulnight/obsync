@@ -166,8 +166,9 @@ const baseEditorTheme = EditorView.theme({
     borderRadius: "var(--radius-sm)",
     padding: "2px 5px",
     font: "11px system-ui",
-    opacity: "1",
+    opacity: "0",
   },
+  ".cm-ySelectionCaret:hover > .cm-ySelectionInfo": { opacity: "1" },
 });
 
 const livePreviewTheme = EditorView.theme({

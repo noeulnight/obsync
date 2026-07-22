@@ -70,7 +70,7 @@ overrides:
   fast-uri: "^3.1.4"
   vite: "catalog:"
 patchedDependencies:
-  y-codemirror.next@0.3.5: patches/y-codemirror.next@0.3.5.patch
+  y-codemirror.next: patches/y-codemirror.next.patch
 peerDependencyRules:
   allowAny:
     - vite

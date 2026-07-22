@@ -8,7 +8,7 @@ import { canvasNodeTextName, presenceColor, replaceText } from "@obsync/sync-cor
 import { type CanvasController, observeCanvas, renderCanvas } from "./canvas-controller";
 import { parseCanvas, type CanvasData, type CanvasItem } from "./canvas-data";
 import { bindCanvasPresence } from "./canvas-presence";
-import { syncMap, syncNodes } from "./canvas-yjs";
+import { changesCanvasStructure, syncMap, syncNodes } from "./canvas-yjs";
 
 type SeedMode = "local" | "server" | "merge";
 
@@ -76,7 +76,12 @@ export class CanvasSync {
     this.document.on("update", (_update, origin, _document, transaction) => {
       if (origin !== localOrigin) {
         this.scheduleWrite();
-        if (!transaction.local) this.scheduleRender();
+        if (
+          !transaction.local &&
+          changesCanvasStructure(transaction, [this.nodes, this.zOrder, this.edges, this.meta])
+        ) {
+          this.scheduleRender();
+        }
       }
     });
   }
@@ -107,6 +112,10 @@ export class CanvasSync {
       syncItems(this.edges, data.edges);
       this.applyPendingText();
     }, localOrigin);
+  }
+
+  async fileChanged() {
+    await this.localChanged(undefined, this.bindings.size === 0 && !this.isOpen());
   }
 
   textExtension(
@@ -186,7 +195,7 @@ export class CanvasSync {
     this.writeTimer = window.setTimeout(() => {
       this.writeTimer = undefined;
       void this.writeFile();
-    }, 300);
+    }, 1_000);
   }
 
   private scheduleRender() {
@@ -235,6 +244,13 @@ export class CanvasSync {
   private nodeText(nodeId: string) {
     if (this.nodes.get(nodeId)?.get("type") !== "text") return;
     return this.document.getText(canvasNodeTextName(nodeId));
+  }
+
+  private isOpen() {
+    return this.app.workspace.getLeavesOfType("canvas").some((leaf) => {
+      const view = leaf.view as unknown as { file?: TFile };
+      return view.file?.path === this.path;
+    });
   }
 
   private applyPendingText() {

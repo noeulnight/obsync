@@ -35,6 +35,7 @@ export class CollaborationServerService
   private readonly hocuspocus: Hocuspocus<CollaborationContext>;
   private readonly websocketServer = new WebSocketServer({ noServer: true });
   private readonly pendingStores = new Set<Promise<void>>();
+  private readonly storeChains = new Map<string, Promise<void>>();
   private server?: Server;
 
   constructor(
@@ -151,16 +152,11 @@ export class CollaborationServerService
 
   private async persist(
     roomName: string,
-    document: Y.Doc,
+    state: Uint8Array,
     userId: string,
     clientsCount: number,
   ): Promise<void> {
-    await this.store(
-      roomName,
-      Y.encodeStateAsUpdate(document),
-      userId,
-      clientsCount,
-    );
+    await this.store(roomName, state, userId, clientsCount);
   }
 
   async publishFiles(vaultId: string, files: VaultFile[]): Promise<void> {
@@ -222,8 +218,7 @@ export class CollaborationServerService
         const text = document.getText('content');
         if (text.toJSON() === content) return;
         changed = true;
-        text.delete(0, text.length);
-        text.insert(0, content);
+        replaceSharedText(text, content);
       });
       if (changed) {
         await this.createVersion(vaultId, fileId, currentState, userId, true);
@@ -287,12 +282,19 @@ export class CollaborationServerService
     userId: string,
     clientsCount: number,
   ): Promise<void> {
-    const pending = this.persist(roomName, document, userId, clientsCount);
+    const state = Y.encodeStateAsUpdate(document);
+    const previous = this.storeChains.get(roomName) ?? Promise.resolve();
+    const pending = previous
+      .catch(() => undefined)
+      .then(() => this.persist(roomName, state, userId, clientsCount));
+    this.storeChains.set(roomName, pending);
     this.pendingStores.add(pending);
-    void pending.then(
-      () => this.pendingStores.delete(pending),
-      () => this.pendingStores.delete(pending),
-    );
+    const cleanup = () => {
+      this.pendingStores.delete(pending);
+      if (this.storeChains.get(roomName) === pending)
+        this.storeChains.delete(roomName);
+    };
+    void pending.then(cleanup, cleanup);
     return pending;
   }
 
@@ -452,8 +454,7 @@ function syncCanvas(document: Y.Doc, data: CanvasData) {
   syncItems(nodes, data.nodes, (item) => {
     const { text = '', ...value } = item;
     const sharedText = document.getText(`canvas-node:${item.id}:text`);
-    sharedText.delete(0, sharedText.length);
-    if (text) sharedText.insert(0, text);
+    replaceSharedText(sharedText, text);
     return value;
   });
   syncItems(edges, data.edges, (item) => item);
@@ -483,4 +484,31 @@ function syncItems(
 function syncMap(target: Y.Map<unknown>, value: Record<string, unknown>) {
   for (const key of target.keys()) if (!(key in value)) target.delete(key);
   for (const [key, next] of Object.entries(value)) target.set(key, next);
+}
+
+export function replaceSharedText(text: Y.Text, next: string) {
+  const previous = text.toJSON();
+  if (previous === next) return;
+  let prefix = 0;
+  while (
+    prefix < previous.length &&
+    prefix < next.length &&
+    previous[prefix] === next[prefix]
+  ) {
+    prefix += 1;
+  }
+  let suffix = 0;
+  while (
+    suffix < previous.length - prefix &&
+    suffix < next.length - prefix &&
+    previous[previous.length - 1 - suffix] === next[next.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  text.doc?.transact(() => {
+    const removed = previous.length - prefix - suffix;
+    if (removed > 0) text.delete(prefix, removed);
+    const inserted = next.slice(prefix, next.length - suffix);
+    if (inserted) text.insert(prefix, inserted);
+  });
 }

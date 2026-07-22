@@ -80,9 +80,10 @@ export class DocumentSync {
     this.path = path;
   }
 
-  async localChanged() {
+  async localChanged(allowOpenEditor = true) {
     if (this.readOnly) return;
     if (this.destroyed || !this.persistenceSynced || this.applying.has(this.path)) return;
+    if (!allowOpenEditor && (this.openEditors > 0 || this.isOpen())) return;
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     replaceText(this.text, await this.app.vault.read(file));

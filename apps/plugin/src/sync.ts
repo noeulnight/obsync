@@ -139,7 +139,7 @@ export class VaultSync {
     file: TFile,
     editorText: string,
     changed = false,
-    onDetached?: (key: string) => void,
+    onDetached?: () => void,
   ): { key?: string; extension: Extension; text: string; ready: boolean } {
     const existing = this.files.findPath(file.path);
     if (!existing && !this.manifestLoaded) {
@@ -172,7 +172,7 @@ export class VaultSync {
     nodeId: string,
     editorText: string,
     changed = false,
-    onDetached?: (key: string) => void,
+    onDetached?: () => void,
   ) {
     const entry = this.files.findPath(canvasFile.path);
     if (entry?.kind !== "canvas" || entry.deleted) {
@@ -208,11 +208,11 @@ export class VaultSync {
     if (!this.manifestLoaded && !this.files.findPath(file.path)) return;
     if (file.extension === "md") {
       const entry = this.files.ensureMarkdown(file.path);
-      await this.sessions.document(entry).localChanged();
+      await this.sessions.document(entry).localChanged(false);
       return;
     }
     if (file.extension === "canvas") {
-      await this.sessions.canvas(this.files.ensureCanvas(file.path)).localChanged();
+      await this.sessions.canvas(this.files.ensureCanvas(file.path)).fileChanged();
       return;
     }
     await this.remote.queue(file.path, () => this.upload(file));

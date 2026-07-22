@@ -8,8 +8,7 @@ import * as Y from "yjs";
 import type { WebDocument } from "../lib/sync";
 import { Editor } from "./Editor";
 
-function session() {
-  const document = new Y.Doc();
+function session(document = new Y.Doc()) {
   const listeners = new Set<() => void>();
   const local: Record<string, unknown> = { user: { name: "Web", color: "#7c6cff" } };
   const awareness = {
@@ -117,6 +116,161 @@ describe("Editor", () => {
     editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
     await waitFor(() => expect(editor.state.doc.toString()).toBe("local remote"));
     expect(editor.state.selection.main.anchor).toBe(2);
+  });
+
+  it("publishes a completed IME composition as one Yjs change", async () => {
+    const { connected } = session();
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    editor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    editor.dispatch({ changes: { from: 0, insert: "ㅎ" } });
+    editor.dispatch({ changes: { from: 0, to: 1, insert: "한" } });
+    expect(connected.text.toJSON()).toBe("");
+
+    Object.defineProperty(editor, "composing", { configurable: true, value: false });
+    editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    await waitFor(() => expect(connected.text.toJSON()).toBe("한"));
+  });
+
+  it("keeps simultaneous IME compositions intact", async () => {
+    const firstDocument = new Y.Doc();
+    const secondDocument = new Y.Doc();
+    firstDocument.on("update", (update, origin) => {
+      if (origin !== "peer") Y.applyUpdate(secondDocument, update, "peer");
+    });
+    secondDocument.on("update", (update, origin) => {
+      if (origin !== "peer") Y.applyUpdate(firstDocument, update, "peer");
+    });
+    const first = session(firstDocument).connected;
+    const second = session(secondDocument).connected;
+    const firstView = render(
+      <Editor
+        session={first}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const secondView = render(
+      <Editor
+        session={second}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const firstEditor = EditorView.findFromDOM(
+      firstView.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    const secondEditor = EditorView.findFromDOM(
+      secondView.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!firstEditor || !secondEditor) throw new Error("Editors were not mounted");
+
+    for (const editor of [firstEditor, secondEditor]) {
+      editor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+      Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    }
+    firstEditor.dispatch({ changes: { from: 0, insert: "한" } });
+    secondEditor.dispatch({ changes: { from: 0, insert: "글" } });
+
+    Object.defineProperty(firstEditor, "composing", { configurable: true, value: false });
+    firstEditor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    await waitFor(() => expect(first.text.toJSON()).toBe("한"));
+    Object.defineProperty(secondEditor, "composing", { configurable: true, value: false });
+    secondEditor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+
+    await waitFor(() => expect(first.text.toJSON()).toBe(second.text.toJSON()));
+    expect(["한글", "글한"]).toContain(first.text.toJSON());
+  });
+
+  it("commits IME text before queued remote enters", async () => {
+    const { connected } = session();
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    editor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    editor.dispatch({ changes: { from: 0, insert: "한" } });
+    connected.document.transact(() => connected.text.insert(0, "\n"), "remote");
+
+    Object.defineProperty(editor, "composing", { configurable: true, value: false });
+    editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    connected.document.transact(() => connected.text.insert(1, "\n"), "remote");
+
+    await waitFor(() => expect(editor.state.doc.toString()).toBe(connected.text.toJSON()));
+    expect(connected.text.toJSON().replaceAll("\n", "")).toBe("한");
+    expect(connected.text.toJSON().match(/\n/g)).toHaveLength(2);
+  });
+
+  it("recomposes an existing Korean syllable without duplicating it", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "가");
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    editor.dispatch({ selection: { anchor: 1 } });
+    editor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    editor.dispatch({ changes: { from: 0, to: 1, insert: "각" } });
+    connected.document.transact(() => connected.text.insert(1, "\n"), "remote");
+
+    Object.defineProperty(editor, "composing", { configurable: true, value: false });
+    editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+
+    await waitFor(() => expect(editor.state.doc.toString()).toBe(connected.text.toJSON()));
+    expect(connected.text.toJSON().replaceAll("\n", "")).toBe("각");
+  });
+
+  it("does not duplicate English while remote enters are arriving", async () => {
+    const { connected } = session();
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    for (const character of "synchronized") {
+      const at = editor.state.selection.main.head;
+      editor.dispatch({ changes: { from: at, insert: character }, selection: { anchor: at + 1 } });
+      connected.document.transact(() => connected.text.insert(0, "\n"), "remote");
+    }
+
+    await waitFor(() => expect(editor.state.doc.toString()).toBe(connected.text.toJSON()));
+    expect(connected.text.toJSON().replaceAll("\n", "")).toBe("synchronized");
   });
 
   it("renders remote changes while read only and unfocused", async () => {

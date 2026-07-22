@@ -4,7 +4,7 @@ import { replaceText } from "@obsync/sync-core";
 import { type CanvasItemController, observeCanvas, renderCanvas } from "./canvas-controller";
 import { parseCanvas } from "./canvas-data";
 import { readCanvasPresence } from "./canvas-presence";
-import { syncNodes } from "./canvas-yjs";
+import { changesCanvasStructure, syncNodes } from "./canvas-yjs";
 import { mimeType } from "./mime";
 import { fileId, isWithin, moveWithin, parentPath, pathKey } from "./path";
 import { editorBindingKey } from "./sync-types";
@@ -49,6 +49,35 @@ describe("parseCanvas", () => {
 });
 
 describe("canvas text synchronization", () => {
+  it("does not rerender the canvas for direct node text updates", () => {
+    const document = new Y.Doc();
+    const nodes = document.getMap<Y.Map<unknown>>("nodes");
+    const text = document.getText("canvas-node:node:text");
+    let structural = true;
+    document.on("afterTransaction", (transaction) => {
+      structural = changesCanvasStructure(transaction, [nodes]);
+    });
+
+    text.insert(0, "remote text");
+
+    expect(structural).toBe(false);
+  });
+
+  it("rerenders the canvas for nested node metadata updates", () => {
+    const document = new Y.Doc();
+    const nodes = document.getMap<Y.Map<unknown>>("nodes");
+    const node = new Y.Map<unknown>();
+    nodes.set("node", node);
+    let structural = false;
+    document.on("afterTransaction", (transaction) => {
+      structural = changesCanvasStructure(transaction, [nodes]);
+    });
+
+    node.set("x", 100);
+
+    expect(structural).toBe(true);
+  });
+
   it("seeds new notes but leaves existing text to the CodeMirror binding", () => {
     const document = new Y.Doc();
     const nodes = document.getMap<Y.Map<unknown>>("nodes");
