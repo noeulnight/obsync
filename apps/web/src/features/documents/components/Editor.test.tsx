@@ -119,6 +119,29 @@ describe("Editor", () => {
     expect(editor.state.selection.main.anchor).toBe(2);
   });
 
+  it("renders remote changes while read only and unfocused", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "before");
+    const view = render(
+      <Editor
+        session={connected}
+        readOnly
+        compact
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    connected.document.transact(() => connected.text.insert(6, " remote"), "remote");
+
+    await waitFor(() => expect(editor.state.doc.toString()).toBe("before remote"));
+    expect(editor.state.facet(EditorView.editable)).toBe(false);
+  });
+
   it("refreshes an image when its Vault entry arrives", async () => {
     const { connected } = session();
     connected.text.insert(0, "![[photo.png]]\nEnd");

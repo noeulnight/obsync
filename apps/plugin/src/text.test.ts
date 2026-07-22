@@ -135,7 +135,7 @@ describe("canvas controller", () => {
   it("leaves a focused text node to its CodeMirror binding", () => {
     const activeElement = {};
     const nodeEl = {
-      ownerDocument: { activeElement },
+      ownerDocument: { activeElement, hasFocus: () => true },
       contains: (element: unknown) => element === activeElement,
     } as unknown as HTMLElement;
     const setData = vi.fn();
@@ -150,6 +150,26 @@ describe("canvas controller", () => {
     renderCanvas(controller, { nodes: [{ id: "node", text: "remote" }], edges: [] });
 
     expect(setData).not.toHaveBeenCalled();
+  });
+
+  it("updates a text node when the Obsidian window is not focused", () => {
+    const activeElement = {};
+    const nodeEl = {
+      ownerDocument: { activeElement, hasFocus: () => false },
+      contains: (element: unknown) => element === activeElement,
+    } as unknown as HTMLElement;
+    const setData = vi.fn();
+    const controller = {
+      nodes: new Map([["node", { nodeEl, setData }]]),
+      edges: new Map(),
+      getData: () => ({ nodes: [], edges: [] }),
+      importData: () => undefined,
+      requestSave: () => undefined,
+    };
+
+    renderCanvas(controller, { nodes: [{ id: "node", text: "remote" }], edges: [] });
+
+    expect(setData).toHaveBeenCalledOnce();
   });
 });
 

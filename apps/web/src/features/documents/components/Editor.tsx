@@ -81,9 +81,7 @@ export function Editor({
             (href) => navigate.current(href),
             (href) => asset.current(href),
           ),
-          ...(!readOnly && session.provider
-            ? [yCollab(session.text, session.provider.awareness)]
-            : []),
+          ...(session.provider ? [yCollab(session.text, session.provider.awareness)] : []),
         ],
       }),
     });

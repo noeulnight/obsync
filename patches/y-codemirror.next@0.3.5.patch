@@ -1,19 +1,23 @@
 diff --git a/src/y-sync.js b/src/y-sync.js
-index 0e510a9..f6a0e26 100644
+index d633174..74e12b5 100644
 --- a/src/y-sync.js
 +++ b/src/y-sync.js
-@@ -106,6 +106,10 @@ class YSyncPluginValue {
-     this.view = view
+@@ -106,6 +106,14 @@ class YSyncPluginValue {
      this.conf = view.state.facet(ySyncFacet)
      this._observer = (event, tr) => {
        if (tr.origin !== this.conf) {
-+        if (view.composing || this._pendingRemote) {
++        if (view.composing) {
 +          this._pendingRemote = true
++          return
++        }
++        if (this._pendingRemote) {
++          this._flushRemote()
 +          return
 +        }
          const delta = event.delta
          const changes = []
-@@ -123,6 +127,29 @@ class YSyncPluginValue {
+         let pos = 0
+@@ -123,6 +131,31 @@ class YSyncPluginValue {
          view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] })
        }
      }
@@ -39,13 +43,16 @@ index 0e510a9..f6a0e26 100644
 +      }
 +    }
 +    this._compositionEnd = () => queueMicrotask(this._flushRemote)
++    this._blur = () => queueMicrotask(this._flushRemote)
      this._ytext = this.conf.ytext
      this._ytext.observe(this._observer)
 +    view.contentDOM.addEventListener('compositionend', this._compositionEnd)
++    view.contentDOM.addEventListener('blur', this._blur)
    }
-@@ -156,4 +175,5 @@ class YSyncPluginValue {
+@@ -156,4 +189,6 @@ class YSyncPluginValue {
    destroy () {
      this._ytext.unobserve(this._observer)
 +    this.view.contentDOM.removeEventListener('compositionend', this._compositionEnd)
++    this.view.contentDOM.removeEventListener('blur', this._blur)
    }
  }
