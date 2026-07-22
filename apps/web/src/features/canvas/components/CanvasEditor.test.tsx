@@ -369,6 +369,7 @@ describe("CanvasEditor", () => {
 
     const nodeButton = screen.getByRole("button", { name: "text Canvas node" });
     fireEvent.pointerDown(nodeButton);
+    expect(screen.getByTestId("canvas-surface").className).toContain("outline-none");
     expect(nodeButton.parentElement?.style.borderColor).toBe("rgb(224 222 113)");
     expect(nodeButton.parentElement?.className).toContain("[&_.cm-editor]:!bg-transparent");
     fireEvent.click(screen.getByRole("button", { name: "Node color" }));
