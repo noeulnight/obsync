@@ -158,7 +158,7 @@ function PublicCanvas({
     [canvas.edges, canvas.nodes],
   );
   return (
-    <div className="min-h-0 flex-1 border-t">
+    <div className="flex min-h-0 flex-1 border-t">
       <CanvasSurface
         session={session}
         files={files}

@@ -412,7 +412,7 @@ export function CanvasSurface({
               >
                 <span className="block size-2 rotate-45 bg-current" />
                 <span
-                  className="rounded px-1.5 py-0.5 text-[11px] text-white"
+                  className="max-w-40 shrink-0 truncate whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] text-white"
                   style={{ backgroundColor: user.color }}
                 >
                   {user.name}

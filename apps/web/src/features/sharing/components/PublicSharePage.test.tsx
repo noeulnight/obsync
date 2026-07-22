@@ -58,6 +58,7 @@ describe("PublicSharePage", () => {
     );
 
     expect(view.getByText("Board")).not.toBeNull();
+    expect(view.getByTestId("canvas-surface").parentElement?.className).toContain("flex");
     await waitFor(() => expect(view.container.textContent).toContain("Embedded note"));
   });
 

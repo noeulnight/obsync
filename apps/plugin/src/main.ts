@@ -423,8 +423,11 @@ export default class ObsyncPlugin extends Plugin {
     const view = editor.cm;
     if (!this.sync || !file || !view) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.extension(file, current, changed, (key) =>
-      this.editorDetached(view, key),
+    const binding = this.sync.extension(
+      file,
+      current,
+      changed && !this.boundEditors.has(view),
+      (key) => this.editorDetached(view, key),
     );
     this.applyEditorBinding(view, current, binding);
   }
@@ -435,8 +438,12 @@ export default class ObsyncPlugin extends Plugin {
     const canvasFile = info.node?.canvas?.view?.file;
     if (!this.sync || !view || !nodeId || !canvasFile) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.canvasTextExtension(canvasFile, nodeId, current, changed, (key) =>
-      this.editorDetached(view, key),
+    const binding = this.sync.canvasTextExtension(
+      canvasFile,
+      nodeId,
+      current,
+      changed && !this.boundEditors.has(view),
+      (key) => this.editorDetached(view, key),
     );
     this.applyEditorBinding(view, current, binding);
   }

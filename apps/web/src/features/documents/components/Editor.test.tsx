@@ -93,6 +93,29 @@ describe("Editor", () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
+  it("defers remote changes until IME composition ends", async () => {
+    const { connected } = session();
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    connected.document.transact(() => connected.text.insert(0, "remote"), "remote");
+    expect(editor.state.doc.toString()).toBe("");
+
+    Object.defineProperty(editor, "composing", { configurable: true, value: false });
+    editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    await waitFor(() => expect(editor.state.doc.toString()).toBe("remote"));
+  });
+
   it("refreshes an image when its Vault entry arrives", async () => {
     const { connected } = session();
     connected.text.insert(0, "![[photo.png]]\nEnd");
