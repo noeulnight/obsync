@@ -37,10 +37,12 @@ vi.mock("y-indexeddb", () => ({
 vi.mock("obsidian", () => ({
   MarkdownView: class {},
   TFile: class {},
+  TFolder: class {},
 }));
 
 import { CanvasSync } from "./canvas";
 import { DocumentSync } from "./document";
+import { VaultSync } from "./sync";
 import type { SyncConnection } from "./sync-types";
 
 const app = {
@@ -122,5 +124,23 @@ describe("startup synchronization", () => {
 
     await vi.waitFor(() => expect(vault.modify).toHaveBeenCalledWith(file, "after from web"));
     expect(sync.text.toJSON()).toBe("after from web");
+  });
+
+  it("does not reapply the local file after opening its merge session", async () => {
+    const localChanged = vi.fn();
+    const sync = Object.assign(Object.create(VaultSync.prototype), {
+      files: {
+        findPath: () => ({ id: "id", kind: "markdown", path: "Note.md" }),
+        ensureMarkdown: vi.fn(),
+      },
+      sessions: { document: vi.fn(() => ({ localChanged })) },
+    }) as {
+      syncInitialFile(file: TFile, seedMode: "merge"): Promise<void>;
+    };
+    const file = Object.assign(new TFile(), { path: "Note.md", extension: "md" });
+
+    await sync.syncInitialFile(file, "merge");
+
+    expect(localChanged).not.toHaveBeenCalled();
   });
 });

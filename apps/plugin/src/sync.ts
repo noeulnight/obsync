@@ -323,11 +323,11 @@ export class VaultSync {
     const entry = this.files.findPath(file.path);
     if (file.extension === "md") {
       const markdown = entry?.kind === "markdown" ? entry : this.files.ensureMarkdown(file.path);
-      await this.sessions.document(markdown, seedMode).localChanged();
+      this.sessions.document(markdown, seedMode);
       return;
     }
     if (file.extension === "canvas") {
-      await this.sessions.canvas(this.files.ensureCanvas(file.path), seedMode).localChanged();
+      this.sessions.canvas(this.files.ensureCanvas(file.path), seedMode);
       return;
     }
     await this.remote.queue(file.path, async () => {
