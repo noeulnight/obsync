@@ -14,11 +14,12 @@ const documentId = '68bf1227-8707-4a13-921f-bf7258084893';
 const userId = '3ccfd17d-414b-47fb-afbc-5f7fe2458139';
 const otherUserId = '622841b6-2cd5-462f-8c5c-1065f00ca4d6';
 const viewerUserId = '88fdb2ee-1228-4720-b38c-bba19d19a7db';
-const manifestRoom = `vault:${vaultId}:manifest`;
-const documentRoom = `vault:${vaultId}:doc:${documentId}`;
-const liveDocumentRoom = `vault:${vaultId}:doc:78bf1227-8707-4a13-921f-bf7258084893`;
-const presenceDocumentRoom = `vault:${vaultId}:doc:88bf1227-8707-4a13-921f-bf7258084893`;
-const canvasRoom = `vault:${vaultId}:canvas:${documentId}`;
+const otherVaultId = '9f0d6f4e-6c5b-4af7-90c2-61a7aa3bb122';
+const manifestRoom = 'manifest';
+const documentRoom = `doc:${documentId}`;
+const liveDocumentRoom = 'doc:78bf1227-8707-4a13-921f-bf7258084893';
+const presenceDocumentRoom = 'doc:88bf1227-8707-4a13-921f-bf7258084893';
+const canvasRoom = `canvas:${documentId}`;
 
 describe('Collaboration WebSocket (e2e)', () => {
   let app: INestApplication<App>;
@@ -102,14 +103,48 @@ describe('Collaboration WebSocket (e2e)', () => {
     websocketUrl = (await app.getUrl()).replace('http://', 'ws://');
   }
 
-  function provider(name: string, document = new Y.Doc(), token = accessToken) {
+  function provider(
+    name: string,
+    document = new Y.Doc(),
+    token = accessToken,
+    providerVaultId = vaultId,
+  ) {
     return new HocuspocusProvider({
-      url: `${websocketUrl}/collaboration`,
+      url: `${websocketUrl}/collaboration?vaultId=${providerVaultId}`,
       name,
       document,
       token,
     });
   }
+
+  it('isolates identical room names by the Vault query', async () => {
+    await prisma.vault.upsert({
+      where: { id: otherVaultId },
+      create: { id: otherVaultId, ownerId: otherUserId, name: 'Other Vault' },
+      update: {},
+    });
+    const firstDocument = new Y.Doc();
+    const secondDocument = new Y.Doc();
+    const first = provider(documentRoom, firstDocument);
+    const second = provider(
+      documentRoom,
+      secondDocument,
+      otherAccessToken,
+      otherVaultId,
+    );
+    await Promise.all([first, second].map(waitForSync));
+
+    firstDocument.getText('isolation').insert(0, 'first');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(secondDocument.getText('isolation').toJSON()).toBe('');
+
+    first.destroy();
+    second.destroy();
+    firstDocument.destroy();
+    secondDocument.destroy();
+    await prisma.yDocument.deleteMany({ where: { vaultId: otherVaultId } });
+    await prisma.vault.delete({ where: { id: otherVaultId } });
+  });
 
   function waitForSync(client: HocuspocusProvider) {
     return new Promise<void>((resolve, reject) => {
@@ -182,7 +217,7 @@ describe('Collaboration WebSocket (e2e)', () => {
 
   it('saves and restores document history through the live collaboration room', async () => {
     const fileId = '98bf1227-8707-4a13-921f-bf7258084893';
-    const room = `vault:${vaultId}:doc:${fileId}`;
+    const room = `doc:${fileId}`;
     const headers = { Authorization: `Bearer ${accessToken}` };
     await request(app.getHttpServer())
       .post(`/api/vaults/${vaultId}/files/operations`)
@@ -555,10 +590,7 @@ describe('Collaboration WebSocket (e2e)', () => {
     );
 
     const liveSource = new Y.Doc();
-    const liveSourceClient = provider(
-      `vault:${vaultId}:doc:${sourceId}`,
-      liveSource,
-    );
+    const liveSourceClient = provider(`doc:${sourceId}`, liveSource);
     await waitForSync(liveSourceClient);
     const liveText = liveSource.getText('content');
     liveText.delete(0, liveText.length);
@@ -598,7 +630,7 @@ describe('Collaboration WebSocket (e2e)', () => {
   ])('rejects %s', async (_label, name, token) => {
     const document = new Y.Doc();
     const client = new HocuspocusProvider({
-      url: `${websocketUrl}/collaboration`,
+      url: `${websocketUrl}/collaboration?vaultId=${vaultId}`,
       name,
       document,
       token: typeof token === 'function' ? token() : token,

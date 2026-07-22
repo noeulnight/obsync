@@ -53,7 +53,7 @@ export class CanvasSync {
       this.document,
     );
     this.provider = new HocuspocusProvider({
-      name: `vault:${connection.vaultId}:canvas:${id}`,
+      name: `canvas:${id}`,
       document: this.document,
       websocketProvider: socket,
       token: connection.token,

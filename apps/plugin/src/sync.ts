@@ -43,7 +43,7 @@ export class VaultSync {
   ) {
     this.initialMode = connection.initialMode;
     this.socket = new HocuspocusProviderWebsocket({
-      url: connection.serverUrl,
+      url: withVaultId(connection.serverUrl, connection.vaultId),
       delay: 1_000,
       maxDelay: 5_000,
       maxAttempts: 0,
@@ -112,16 +112,12 @@ export class VaultSync {
       }
       void this.remote.applyBatch(changes).catch((error) => this.report(error));
     });
-    this.manifestProvider = this.provider(
-      `vault:${connection.vaultId}:manifest`,
-      this.manifestDocument,
-      () => {
-        this.manifestLoaded = true;
-        this.manifestSynced = true;
-        this.outbox.setSynced(true);
-        this.startReconcile();
-      },
-    );
+    this.manifestProvider = this.provider("manifest", this.manifestDocument, () => {
+      this.manifestLoaded = true;
+      this.manifestSynced = true;
+      this.outbox.setSynced(true);
+      this.startReconcile();
+    });
   }
 
   destroy() {
@@ -394,6 +390,12 @@ export class VaultSync {
     this.setStatus("Error");
     console.error("Obsync", error);
   }
+}
+
+function withVaultId(serverUrl: string, vaultId: string) {
+  const url = new URL(serverUrl);
+  url.searchParams.set("vaultId", vaultId);
+  return url.toString();
 }
 
 function connectionStatus(status: string) {

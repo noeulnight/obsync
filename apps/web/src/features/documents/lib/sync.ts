@@ -56,7 +56,7 @@ export class WebVault {
       () => this.notify(),
     );
     this.socket = new HocuspocusProviderWebsocket({
-      url: api.websocketUrl(),
+      url: api.websocketUrl(vaultId),
       delay: 1_000,
       maxDelay: 5_000,
       maxAttempts: 0,
@@ -93,7 +93,7 @@ export class WebVault {
       this.notify();
     });
     this.provider = new HocuspocusProvider({
-      name: `vault:${vaultId}:manifest`,
+      name: "manifest",
       document: this.serverManifestDocument,
       websocketProvider: this.socket,
       token: () => api.token(),

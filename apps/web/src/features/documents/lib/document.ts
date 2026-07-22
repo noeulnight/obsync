@@ -27,7 +27,7 @@ export class WebDocument {
       this.document,
     );
     this.provider = new HocuspocusProvider({
-      name: `vault:${vaultId}:doc:${documentId}`,
+      name: `doc:${documentId}`,
       document: this.document,
       websocketProvider: socket,
       token: () => api.token(),

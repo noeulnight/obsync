@@ -19,7 +19,11 @@ import { PrismaService } from '../database/prisma.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
 import type { CollaborationContext } from './types/collaboration-context.type';
 import type { CanvasData, CanvasItem } from './types/canvas-data.type';
-import { parseCollaborationRoom } from './types/collaboration-room.type';
+import {
+  parseCollaborationRoom,
+  parseStoredCollaborationRoom,
+  storedCollaborationRoom,
+} from './types/collaboration-room.type';
 import type { ManifestEntry } from './types/manifest.type';
 import { nextFileRevision } from './vault-file-version';
 import { VaultLinksService } from './vault-links.service';
@@ -32,7 +36,10 @@ export class CollaborationServerService
   implements OnApplicationBootstrap, BeforeApplicationShutdown
 {
   private readonly logger = new Logger(CollaborationServerService.name);
-  private readonly hocuspocus: Hocuspocus<CollaborationContext>;
+  private readonly hocuspocus = new Map<
+    string,
+    Hocuspocus<CollaborationContext>
+  >();
   private readonly websocketServer = new WebSocketServer({ noServer: true });
   private readonly pendingStores = new Set<Promise<void>>();
   private readonly storeChains = new Map<string, Promise<void>>();
@@ -45,14 +52,24 @@ export class CollaborationServerService
     private readonly prisma: PrismaService,
     private readonly access: VaultAccessService,
     private readonly links: VaultLinksService,
-  ) {
-    this.hocuspocus = new Hocuspocus<CollaborationContext>({
+  ) {}
+
+  private collaboration(vaultId: string) {
+    let hocuspocus = this.hocuspocus.get(vaultId);
+    if (hocuspocus) return hocuspocus;
+    hocuspocus = new Hocuspocus<CollaborationContext>({
       quiet: true,
       debounce: 250,
       maxDebounce: 1_000,
-      onAuthenticate: ({ documentName, token, connectionConfig }) =>
-        this.authenticate(documentName, token, connectionConfig),
-      onLoadDocument: ({ documentName }) => this.load(documentName),
+      onAuthenticate: ({ documentName, context, token, connectionConfig }) =>
+        this.authenticate(
+          documentName,
+          context.vaultId,
+          token,
+          connectionConfig,
+        ),
+      onLoadDocument: ({ documentName, context }) =>
+        this.load(documentName, context.vaultId),
       onStoreDocument: ({
         documentName,
         document,
@@ -61,11 +78,14 @@ export class CollaborationServerService
       }) =>
         this.trackStore(
           documentName,
+          lastContext.vaultId,
           document,
           lastContext.userId ?? 'server',
           clientsCount,
         ),
     });
+    this.hocuspocus.set(vaultId, hocuspocus);
+    return hocuspocus;
   }
 
   onApplicationBootstrap() {
@@ -76,9 +96,11 @@ export class CollaborationServerService
 
   async beforeApplicationShutdown() {
     this.server?.off('upgrade', this.handleUpgrade);
-    this.hocuspocus.closeConnections();
+    for (const hocuspocus of this.hocuspocus.values())
+      hocuspocus.closeConnections();
     this.websocketServer.clients.forEach((client) => client.terminate());
-    this.hocuspocus.flushPendingStores();
+    for (const hocuspocus of this.hocuspocus.values())
+      hocuspocus.flushPendingStores();
     await Promise.allSettled([...this.pendingStores]);
     this.websocketServer.close();
   }
@@ -93,17 +115,29 @@ export class CollaborationServerService
       socket.destroy();
       return;
     }
+    const room = parseCollaborationRoom(
+      'manifest',
+      url.searchParams.get('vaultId') ?? '',
+    );
+    if (!room) {
+      socket.destroy();
+      return;
+    }
 
     this.websocketServer.handleUpgrade(request, socket, head, (websocket) => {
-      this.handleConnection(websocket, request);
+      this.handleConnection(websocket, request, room.vaultId);
     });
   };
 
-  private handleConnection(websocket: WebSocket, request: IncomingMessage) {
-    const connection = this.hocuspocus.handleConnection(
+  private handleConnection(
+    websocket: WebSocket,
+    request: IncomingMessage,
+    vaultId: string,
+  ) {
+    const connection = this.collaboration(vaultId).handleConnection(
       websocket,
       this.toRequest(request),
-      {},
+      { vaultId },
     );
 
     websocket.on('message', (message) => {
@@ -117,10 +151,11 @@ export class CollaborationServerService
 
   private async authenticate(
     roomName: string,
+    vaultId: string,
     token: string,
     connectionConfig: { readOnly: boolean },
   ): Promise<CollaborationContext> {
-    const room = parseCollaborationRoom(roomName);
+    const room = parseCollaborationRoom(roomName, vaultId);
     if (!room) throw new UnauthorizedException();
 
     try {
@@ -138,13 +173,17 @@ export class CollaborationServerService
     }
   }
 
-  private async load(roomName: string): Promise<Uint8Array | Y.Doc> {
-    const room = parseCollaborationRoom(roomName);
+  private async load(
+    roomName: string,
+    vaultId: string,
+  ): Promise<Uint8Array | Y.Doc> {
+    const room = parseCollaborationRoom(roomName, vaultId);
     if (room?.kind === 'manifest') {
       return this.manifestDocument(room.vaultId);
     }
+    if (!room) throw new Error('Invalid collaboration room');
     const record = await this.prisma.yDocument.findUnique({
-      where: { roomName },
+      where: { roomName: storedCollaborationRoom(room) },
       select: { state: true },
     });
     return record?.state ?? new Y.Doc();
@@ -160,8 +199,8 @@ export class CollaborationServerService
   }
 
   async publishFiles(vaultId: string, files: VaultFile[]): Promise<void> {
-    const connection = await this.hocuspocus.openDirectConnection(
-      `vault:${vaultId}:manifest`,
+    const connection = await this.collaboration(vaultId).openDirectConnection(
+      'manifest',
       { vaultId, userId: 'server', role: 'OWNER' },
     );
     await connection.transact((document) => {
@@ -181,12 +220,15 @@ export class CollaborationServerService
   }
 
   async readDocument(vaultId: string, fileId: string) {
-    const roomName = `vault:${vaultId}:doc:${fileId}`;
-    const connection = await this.hocuspocus.openDirectConnection(roomName, {
-      vaultId,
-      userId: 'server',
-      role: 'OWNER',
-    });
+    const roomName = `doc:${fileId}`;
+    const connection = await this.collaboration(vaultId).openDirectConnection(
+      roomName,
+      {
+        vaultId,
+        userId: 'server',
+        role: 'OWNER',
+      },
+    );
     try {
       let content = '';
       await connection.transact((document) => {
@@ -204,12 +246,15 @@ export class CollaborationServerService
     content: string,
     userId: string,
   ) {
-    const roomName = `vault:${vaultId}:doc:${fileId}`;
-    const connection = await this.hocuspocus.openDirectConnection(roomName, {
-      vaultId,
-      userId,
-      role: 'OWNER',
-    });
+    const roomName = `doc:${fileId}`;
+    const connection = await this.collaboration(vaultId).openDirectConnection(
+      roomName,
+      {
+        vaultId,
+        userId,
+        role: 'OWNER',
+      },
+    );
     try {
       let currentState = Y.encodeStateAsUpdate(new Y.Doc());
       let changed = false;
@@ -229,8 +274,8 @@ export class CollaborationServerService
   }
 
   async readCanvas(vaultId: string, fileId: string) {
-    const connection = await this.hocuspocus.openDirectConnection(
-      `vault:${vaultId}:canvas:${fileId}`,
+    const connection = await this.collaboration(vaultId).openDirectConnection(
+      `canvas:${fileId}`,
       { vaultId, userId: 'server', role: 'OWNER' },
     );
     try {
@@ -250,8 +295,8 @@ export class CollaborationServerService
     data: CanvasData,
     userId: string,
   ) {
-    const connection = await this.hocuspocus.openDirectConnection(
-      `vault:${vaultId}:canvas:${fileId}`,
+    const connection = await this.collaboration(vaultId).openDirectConnection(
+      `canvas:${fileId}`,
       { vaultId, userId, role: 'OWNER' },
     );
     try {
@@ -278,21 +323,25 @@ export class CollaborationServerService
 
   private trackStore(
     roomName: string,
+    vaultId: string,
     document: Y.Doc,
     userId: string,
     clientsCount: number,
   ): Promise<void> {
     const state = Y.encodeStateAsUpdate(document);
-    const previous = this.storeChains.get(roomName) ?? Promise.resolve();
+    const room = parseCollaborationRoom(roomName, vaultId);
+    if (!room) return Promise.reject(new Error('Invalid collaboration room'));
+    const storedRoomName = storedCollaborationRoom(room);
+    const previous = this.storeChains.get(storedRoomName) ?? Promise.resolve();
     const pending = previous
       .catch(() => undefined)
-      .then(() => this.persist(roomName, state, userId, clientsCount));
-    this.storeChains.set(roomName, pending);
+      .then(() => this.persist(storedRoomName, state, userId, clientsCount));
+    this.storeChains.set(storedRoomName, pending);
     this.pendingStores.add(pending);
     const cleanup = () => {
       this.pendingStores.delete(pending);
-      if (this.storeChains.get(roomName) === pending)
-        this.storeChains.delete(roomName);
+      if (this.storeChains.get(storedRoomName) === pending)
+        this.storeChains.delete(storedRoomName);
     };
     void pending.then(cleanup, cleanup);
     return pending;
@@ -304,7 +353,7 @@ export class CollaborationServerService
     userId: string,
     clientsCount: number,
   ): Promise<void> {
-    const room = parseCollaborationRoom(roomName);
+    const room = parseStoredCollaborationRoom(roomName);
     if (!room) throw new Error('Invalid collaboration room');
 
     const storedState = Uint8Array.from(state);

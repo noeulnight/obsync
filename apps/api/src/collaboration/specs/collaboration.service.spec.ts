@@ -1,22 +1,23 @@
 import * as Y from 'yjs';
 import { replaceSharedText } from '../collaboration-server.service';
-import { parseCollaborationRoom } from '../types/collaboration-room.type';
+import {
+  parseCollaborationRoom,
+  storedCollaborationRoom,
+} from '../types/collaboration-room.type';
 
 const vaultId = '8f0d6f4e-6c5b-4af7-90c2-61a7aa3bb122';
 const documentId = '7c1aba21-81c8-5c82-bffd-794bad878623';
 
 describe('parseCollaborationRoom', () => {
   it('parses a manifest room', () => {
-    expect(parseCollaborationRoom(`vault:${vaultId}:manifest`)).toEqual({
+    expect(parseCollaborationRoom('manifest', vaultId)).toEqual({
       kind: 'manifest',
       vaultId,
     });
   });
 
   it('parses a document room', () => {
-    expect(
-      parseCollaborationRoom(`vault:${vaultId}:doc:${documentId}`),
-    ).toEqual({
+    expect(parseCollaborationRoom(`doc:${documentId}`, vaultId)).toEqual({
       kind: 'document',
       vaultId,
       documentId,
@@ -24,9 +25,7 @@ describe('parseCollaborationRoom', () => {
   });
 
   it('parses a canvas room', () => {
-    expect(
-      parseCollaborationRoom(`vault:${vaultId}:canvas:${documentId}`),
-    ).toEqual({
+    expect(parseCollaborationRoom(`canvas:${documentId}`, vaultId)).toEqual({
       kind: 'canvas',
       vaultId,
       documentId,
@@ -34,15 +33,22 @@ describe('parseCollaborationRoom', () => {
   });
 
   it.each([
-    `vault:${vaultId}:manifest:extra`,
-    `vault:${vaultId}:doc`,
-    `vault:${vaultId}:doc:not-a-uuid`,
-    `vault:${vaultId}:canvas:not-a-uuid`,
-    `other:${vaultId}:manifest`,
-    'vault:not-a-uuid:manifest',
+    'manifest:extra',
+    'doc',
+    'doc:not-a-uuid',
+    'canvas:not-a-uuid',
+    'other:manifest',
     '',
   ])('rejects invalid room %s', (roomName) => {
-    expect(parseCollaborationRoom(roomName)).toBeNull();
+    expect(parseCollaborationRoom(roomName, vaultId)).toBeNull();
+  });
+
+  it('rejects an invalid Vault query and preserves the stored room key', () => {
+    expect(parseCollaborationRoom('manifest', 'not-a-uuid')).toBeNull();
+    const room = parseCollaborationRoom(`doc:${documentId}`, vaultId);
+    expect(room && storedCollaborationRoom(room)).toBe(
+      `vault:${vaultId}:doc:${documentId}`,
+    );
   });
 });
 

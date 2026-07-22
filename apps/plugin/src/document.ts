@@ -35,7 +35,7 @@ export class DocumentSync {
       this.document,
     );
     this.provider = new HocuspocusProvider({
-      name: `vault:${connection.vaultId}:doc:${id}`,
+      name: `doc:${id}`,
       document: this.document,
       websocketProvider: socket,
       token: connection.token,

@@ -213,8 +213,8 @@ describe('MCP OAuth (e2e)', () => {
 
     const document = new Y.Doc();
     const provider = new HocuspocusProvider({
-      url: `${websocketUrl}/collaboration`,
-      name: `vault:${vaultId}:doc:${markdown?.id}`,
+      url: `${websocketUrl}/collaboration?vaultId=${vaultId}`,
+      name: `doc:${markdown?.id}`,
       document,
       token: accountToken,
     });

@@ -95,7 +95,7 @@ export class WebCanvas {
       this.document,
     );
     this.provider = new HocuspocusProvider({
-      name: `vault:${vaultId}:canvas:${documentId}`,
+      name: `canvas:${documentId}`,
       document: this.document,
       websocketProvider: socket,
       token: () => api.token(),

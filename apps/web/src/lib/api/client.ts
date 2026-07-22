@@ -492,11 +492,12 @@ export class ApiClient {
     localStorage.removeItem(vaultsCacheKey);
   }
 
-  websocketUrl() {
+  websocketUrl(vaultId?: string) {
     const url = new URL(this.baseUrl || location.origin);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = "/collaboration";
     url.search = "";
+    if (vaultId) url.searchParams.set("vaultId", vaultId);
     return url.toString();
   }
 

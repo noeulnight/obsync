@@ -1,5 +1,5 @@
 export type CollaborationContext = {
+  vaultId: string;
   userId?: string;
-  vaultId?: string;
   role?: 'OWNER' | 'EDITOR' | 'VIEWER';
 };
