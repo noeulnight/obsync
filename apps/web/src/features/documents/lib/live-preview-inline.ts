@@ -10,6 +10,7 @@ export function decorateLine(
   cursor: number,
   ranges: Range<Decoration>[],
   resolveAsset: AssetResolver,
+  assetRevision: number,
 ) {
   const heading = /^(#{1,6})\s/.exec(text);
   if (heading) {
@@ -30,7 +31,7 @@ export function decorateLine(
     if (image) {
       ranges.push(
         Decoration.replace({
-          widget: new ImageWidget(image, "", resolveAsset),
+          widget: new ImageWidget(image, "", resolveAsset, assetRevision),
         }).range(start, end),
       );
       continue;
@@ -51,7 +52,7 @@ export function decorateLine(
     if (editing(cursor, start, end)) continue;
     ranges.push(
       Decoration.replace({
-        widget: new ImageWidget(match[2], match[1], resolveAsset),
+        widget: new ImageWidget(match[2], match[1], resolveAsset, assetRevision),
       }).range(start, end),
     );
   }
@@ -101,12 +102,17 @@ class ImageWidget extends WidgetType {
     private readonly href: string,
     private readonly alt: string,
     private readonly resolveAsset: AssetResolver,
+    private readonly assetRevision: number,
   ) {
     super();
   }
 
   eq(other: ImageWidget) {
-    return other.href === this.href && other.alt === this.alt;
+    return (
+      other.href === this.href &&
+      other.alt === this.alt &&
+      other.assetRevision === this.assetRevision
+    );
   }
 
   toDOM() {

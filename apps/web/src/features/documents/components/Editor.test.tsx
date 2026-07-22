@@ -93,6 +93,48 @@ describe("Editor", () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
+  it("refreshes an image when its Vault entry arrives", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "![[photo.png]]\nEnd");
+    let available = false;
+    const resolveAsset = () =>
+      Promise.resolve(available ? "https://example.com/photo.png" : undefined);
+    const view = render(
+      <Editor
+        session={connected}
+        files={[]}
+        onNavigate={() => undefined}
+        resolveAsset={resolveAsset}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    await waitFor(() =>
+      expect(view.container.querySelector(".cm-live-image")?.textContent).toContain(
+        "Image not found",
+      ),
+    );
+    available = true;
+    view.rerender(
+      <Editor
+        session={connected}
+        files={[{ id: "photo", kind: "attachment", path: "photo.png", deleted: false }]}
+        onNavigate={() => undefined}
+        resolveAsset={resolveAsset}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(view.container.querySelector<HTMLImageElement>(".cm-live-image img")?.src).toBe(
+        "https://example.com/photo.png",
+      ),
+    );
+  });
+
   it("releases the session without destroying it during an editor remount", () => {
     const { connected, acquire, release, destroy } = session();
     const first = render(

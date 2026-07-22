@@ -6,7 +6,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 import { yCollab } from "y-codemirror.next";
-import { livePreview } from "../lib/live-preview";
+import { livePreview, refreshLivePreview } from "../lib/live-preview";
 import { markdownLinkOptions, type FileEntry } from "../lib/files";
 import type { WebDocument } from "../lib/sync";
 
@@ -26,6 +26,7 @@ export function Editor({
   readOnly?: boolean;
 }) {
   const parent = useRef<HTMLDivElement>(null);
+  const editor = useRef<EditorView | null>(null);
   const navigate = useRef(onNavigate);
   const asset = useRef(resolveAsset);
   const vaultFiles = useRef(files);
@@ -58,9 +59,17 @@ export function Editor({
         ],
       }),
     });
+    editor.current = view;
     if (!compact) view.focus();
-    return () => view.destroy();
+    return () => {
+      editor.current = null;
+      view.destroy();
+    };
   }, [session, compact, readOnly]);
+
+  useEffect(() => {
+    editor.current?.dispatch({ effects: refreshLivePreview.of(undefined) });
+  }, [files]);
 
   useEffect(() => {
     session.acquire();

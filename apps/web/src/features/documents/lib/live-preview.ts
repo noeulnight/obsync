@@ -1,9 +1,17 @@
-import type { Range } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, ViewPlugin } from "@codemirror/view";
+import { StateEffect, type Range } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  type ViewUpdate,
+  ViewPlugin,
+} from "@codemirror/view";
 import { codeBlocks, decorateCodeLine } from "./live-preview-code";
 import { type AssetResolver, editing } from "./live-preview-decoration";
 import { decorateLine } from "./live-preview-inline";
 import { frontmatter, propertyDecorations } from "./live-preview-properties";
+
+export const refreshLivePreview = StateEffect.define<void>();
 
 export function livePreview(onNavigate: (href: string) => void, resolveAsset: AssetResolver) {
   return [
@@ -11,19 +19,19 @@ export function livePreview(onNavigate: (href: string) => void, resolveAsset: As
     ViewPlugin.fromClass(
       class {
         decorations: DecorationSet;
+        private assetRevision = 0;
 
         constructor(view: EditorView) {
-          this.decorations = decorations(view, resolveAsset);
+          this.decorations = decorations(view, resolveAsset, this.assetRevision);
         }
 
-        update(update: {
-          view: EditorView;
-          docChanged: boolean;
-          selectionSet: boolean;
-          viewportChanged: boolean;
-        }) {
-          if (update.docChanged || update.selectionSet || update.viewportChanged) {
-            this.decorations = decorations(update.view, resolveAsset);
+        update(update: ViewUpdate) {
+          const refreshAssets = update.transactions.some((transaction) =>
+            transaction.effects.some((effect) => effect.is(refreshLivePreview)),
+          );
+          if (refreshAssets) this.assetRevision += 1;
+          if (update.docChanged || update.selectionSet || update.viewportChanged || refreshAssets) {
+            this.decorations = decorations(update.view, resolveAsset, this.assetRevision);
           }
         }
       },
@@ -43,7 +51,7 @@ export function livePreview(onNavigate: (href: string) => void, resolveAsset: As
   ];
 }
 
-function decorations(view: EditorView, resolveAsset: AssetResolver) {
+function decorations(view: EditorView, resolveAsset: AssetResolver, assetRevision: number) {
   const ranges: Range<Decoration>[] = [];
   const cursor = view.state.selection.main.head;
   const properties = frontmatter(view.state);
@@ -54,7 +62,7 @@ function decorations(view: EditorView, resolveAsset: AssetResolver) {
       if (!properties || line.to < properties.from || line.from > properties.to) {
         const block = blocks.find((item) => line.number >= item.start && line.number <= item.end);
         if (block) decorateCodeLine(line.from, line.to, line.number, cursor, block, ranges);
-        else decorateLine(view, line.from, line.text, cursor, ranges, resolveAsset);
+        else decorateLine(view, line.from, line.text, cursor, ranges, resolveAsset, assetRevision);
       } else if (editing(cursor, properties.from, properties.to)) {
         ranges.push(Decoration.line({ class: "cm-live-property-source" }).range(line.from));
       }
