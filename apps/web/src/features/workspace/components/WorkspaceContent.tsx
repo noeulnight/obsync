@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { SidebarInset } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import type { WebCanvas } from "@/features/canvas/lib/sync";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
@@ -27,6 +27,7 @@ export function WorkspaceContent({
   documentSession,
   canvasSession,
   canWrite,
+  canShare,
   graph,
   onRenamePath,
   onRename,
@@ -52,6 +53,7 @@ export function WorkspaceContent({
   documentSession?: WebDocument;
   canvasSession?: WebCanvas;
   canWrite: boolean;
+  canShare: boolean;
   graph: boolean;
   onRenamePath: (path: string) => void;
   onRename: () => void;
@@ -68,7 +70,8 @@ export function WorkspaceContent({
   onCreateGraphDocument: (path: string) => void;
 }) {
   return (
-    <SidebarInset className="h-svh min-w-0 overflow-hidden">
+    <SidebarInset className="relative h-svh min-w-0 overflow-hidden">
+      <SidebarTrigger className="absolute top-2 left-2 z-50 md:hidden" />
       <div className="min-h-0 flex-1 overflow-hidden">
         {graph ? (
           <VaultGraphView
@@ -102,6 +105,7 @@ export function WorkspaceContent({
                 if (entry) onOpenEntry(entry);
               }}
               readOnly={!canWrite}
+              canShare={canShare}
             />
           </Suspense>
         ) : canvasSession && activeEntry ? (
@@ -109,6 +113,8 @@ export function WorkspaceContent({
             <CanvasEditor
               key={active}
               session={canvasSession}
+              fileId={activeEntry.id}
+              vaultId={vaultId}
               vaultName={vaultName}
               path={activeEntry.path}
               onRename={onRename}
@@ -120,6 +126,7 @@ export function WorkspaceContent({
               files={entries}
               onAddFile={onAddCanvasFile}
               readOnly={!canWrite}
+              canShare={canShare}
             />
           </Suspense>
         ) : activeEntry?.kind === "attachment" ? (

@@ -10,6 +10,10 @@ import { livePreview, refreshLivePreview } from "../lib/live-preview";
 import { markdownLinkOptions, type FileEntry } from "../lib/files";
 import type { WebDocument } from "../lib/sync";
 
+export type EditorSession = Pick<WebDocument, "text" | "acquire" | "release"> & {
+  provider?: WebDocument["provider"];
+};
+
 export function Editor({
   session,
   onNavigate,
@@ -19,7 +23,7 @@ export function Editor({
   compact = false,
   readOnly = false,
 }: {
-  session: WebDocument;
+  session: EditorSession;
   onNavigate: (href: string) => void;
   resolveAsset: (href: string) => Promise<string | undefined>;
   onPasteImages?: (files: File[]) => Promise<string[]>;
@@ -75,7 +79,9 @@ export function Editor({
             (href) => navigate.current(href),
             (href) => asset.current(href),
           ),
-          yCollab(session.text, session.provider.awareness),
+          ...(!readOnly && session.provider
+            ? [yCollab(session.text, session.provider.awareness)]
+            : []),
         ],
       }),
     });

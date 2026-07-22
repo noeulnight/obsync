@@ -15,6 +15,7 @@ import { VaultsModule } from './vaults/vaults.module';
 import { StorageModule } from './storage/storage.module';
 import { McpModule } from './mcp/mcp.module';
 import { mcpConfig } from './config/configs/mcp.config';
+import { PublicSharesModule } from './public-shares/public-shares.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { mcpConfig } from './config/configs/mcp.config';
     HealthModule,
     HttpModule,
     McpModule,
+    PublicSharesModule,
   ],
 })
 export class AppModule {}

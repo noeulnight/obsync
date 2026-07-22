@@ -59,6 +59,10 @@ describe("App routes", () => {
     expect(tree).toContain('data-slot="context-menu-trigger"');
     expect(header).toContain('aria-label="File menu"');
   });
+
+  it("renders the anonymous public share route", () => {
+    expect(render("/s/public-slug")).toContain("Loading shared page…");
+  });
 });
 
 function render(path: string, session = false) {

@@ -546,8 +546,8 @@ describe('Collaboration WebSocket (e2e)', () => {
     };
     expect(graphBody.nodes).toEqual(
       expect.arrayContaining([
-        { id: sourceId, path: 'Source.md' },
-        { id: targetId, path: 'Notes/Target.md' },
+        expect.objectContaining({ id: sourceId, path: 'Source.md' }),
+        expect.objectContaining({ id: targetId, path: 'Notes/Target.md' }),
       ]),
     );
     expect(graphBody.edges).toEqual(

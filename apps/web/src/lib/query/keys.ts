@@ -19,4 +19,7 @@ export const queryKeys = {
     ["vaults", vaultId, "files", fileId, "versions", versionId] as const,
   attachment: (vaultId: string, attachmentId: string) =>
     ["attachments", vaultId, attachmentId] as const,
+  publicShareStatus: (vaultId: string, fileId: string) =>
+    ["vaults", vaultId, "files", fileId, "share"] as const,
+  publicShare: (slug: string) => ["public", "shares", slug] as const,
 };

@@ -7,6 +7,7 @@ import { BacklinksSheet } from "@/features/search/components/BacklinksSheet";
 import { VersionHistorySheet } from "@/features/history/components/VersionHistorySheet";
 import type { ApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/error";
+import { ShareButton } from "@/features/sharing/components/ShareButton";
 import { FileHeader } from "./FileHeader";
 
 export function DocumentEditor({
@@ -24,6 +25,7 @@ export function DocumentEditor({
   onPasteImages,
   onOpenDocument,
   readOnly = false,
+  canShare = false,
 }: {
   entry: FileEntry;
   api: ApiClient;
@@ -39,6 +41,7 @@ export function DocumentEditor({
   onPasteImages: (files: File[]) => Promise<string[]>;
   onOpenDocument: (fileId: string) => void;
   readOnly?: boolean;
+  canShare?: boolean;
 }) {
   const original = basename(entry.path);
   const [title, setTitle] = useState(original);
@@ -70,6 +73,7 @@ export function DocumentEditor({
         title={title}
         actions={
           <>
+            {canShare && <ShareButton vaultId={vaultId} fileId={entry.id} />}
             <BacklinksSheet
               api={api}
               vaultId={vaultId}

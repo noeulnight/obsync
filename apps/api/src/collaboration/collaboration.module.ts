@@ -10,6 +10,6 @@ import { VaultLinksService } from './vault-links.service';
   imports: [AuthModule, VaultsModule],
   controllers: [VaultFilesController],
   providers: [CollaborationServerService, VaultFilesService, VaultLinksService],
-  exports: [VaultFilesService],
+  exports: [CollaborationServerService, VaultFilesService],
 })
 export class CollaborationModule {}

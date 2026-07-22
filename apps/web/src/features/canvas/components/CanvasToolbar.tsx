@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { CanvasNode, WebCanvas } from "../lib/sync";
+import type { CanvasNode, CanvasSession } from "../lib/sync";
 import { canvasColor } from "./CanvasNode";
 
 const nodeColors = [
@@ -42,7 +42,7 @@ export function CanvasNodeToolbar({
   onEdit,
 }: {
   node: CanvasNode;
-  session: WebCanvas;
+  session: CanvasSession;
   zoom: number;
   onCenter: () => void;
   onEdit: () => void;
@@ -100,7 +100,7 @@ export function CanvasAddToolbar({
   session,
   onAddFile,
 }: {
-  session: WebCanvas;
+  session: CanvasSession;
   onAddFile: () => void;
 }) {
   return (
@@ -128,7 +128,7 @@ export function CanvasViewToolbar({
   onZoomOut,
   onToggleHelp,
 }: {
-  session: WebCanvas;
+  session: CanvasSession;
   readOnly: boolean;
   onToggleGrid: () => void;
   onZoomIn: () => void;

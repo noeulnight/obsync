@@ -9,7 +9,7 @@ import {
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
 import { edgeGeometry, edgePoint, nearestSide, previewEdgePath } from "../lib/canvas-geometry";
-import type { CanvasNode, CanvasSide, WebCanvas } from "../lib/sync";
+import type { CanvasNode, CanvasSession, CanvasSide } from "../lib/sync";
 import { CanvasNodeCard, canvasColor } from "./CanvasNode";
 import { CanvasAddToolbar, CanvasNodeToolbar, CanvasViewToolbar } from "./CanvasToolbar";
 
@@ -29,7 +29,7 @@ export function CanvasSurface({
   onAddFile,
   readOnly,
 }: {
-  session: WebCanvas;
+  session: CanvasSession;
   openDocument: (file: string) => WebDocument | undefined;
   onNavigate: (file: string, href: string) => void;
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;

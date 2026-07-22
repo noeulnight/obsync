@@ -43,6 +43,24 @@ export type CanvasPresence = {
   focusId?: string;
 };
 
+export type CanvasSession = {
+  provider?: HocuspocusProvider;
+  nodes: () => CanvasNode[];
+  edges: () => CanvasEdge[];
+  presence: () => CanvasPresence[];
+  text: (id: string) => Y.Text;
+  updateNode: WebCanvas["updateNode"];
+  setPresence: WebCanvas["setPresence"];
+  bringToFront: WebCanvas["bringToFront"];
+  connect: WebCanvas["connect"];
+  deleteEdge: WebCanvas["deleteEdge"];
+  deleteNode: WebCanvas["deleteNode"];
+  setColor: WebCanvas["setColor"];
+  addText: WebCanvas["addText"];
+  undo: WebCanvas["undo"];
+  redo: WebCanvas["redo"];
+};
+
 type AwarenessState = {
   canvas?: { path?: string; x?: number; y?: number; focusId?: string };
   user?: { name?: string; color?: string };

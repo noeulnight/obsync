@@ -97,6 +97,32 @@ export type VaultGraph = {
   edges: Array<{ source: string; target: string }>;
 };
 
+export type PublicShareStatus = { slug: string; createdAt: string };
+
+export type PublicShare = {
+  slug: string;
+  vaultName: string;
+  file: { id: string; kind: "markdown" | "canvas"; path: string };
+  content?: string;
+  canvas?: {
+    meta: Record<string, unknown>;
+    nodes: Array<
+      Record<string, unknown> & {
+        id: string;
+        type: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        text?: string;
+        file?: string;
+      }
+    >;
+    edges: Array<Record<string, unknown> & { id: string; fromNode: string; toNode: string }>;
+  };
+  attachments: Array<{ id: string; path: string; mimeType: string }>;
+};
+
 type UploadApproval = {
   attachment: { id: string };
   uploadUrl: string | null;
@@ -367,6 +393,39 @@ export class ApiClient {
       url: `/api/vaults/${vaultId}/files/reset`,
       method: "POST",
     });
+  }
+
+  publicShareStatus(vaultId: string, fileId: string) {
+    return this.request<PublicShareStatus | null>({
+      url: `/api/vaults/${vaultId}/files/${fileId}/share`,
+    });
+  }
+
+  publishFile(vaultId: string, fileId: string) {
+    return this.request<PublicShareStatus>({
+      url: `/api/vaults/${vaultId}/files/${fileId}/share`,
+      method: "POST",
+    });
+  }
+
+  async unpublishFile(vaultId: string, fileId: string) {
+    await this.request({
+      url: `/api/vaults/${vaultId}/files/${fileId}/share`,
+      method: "DELETE",
+    });
+  }
+
+  publicShare(slug: string) {
+    return this.publicRequest<PublicShare>({
+      url: `/api/public/shares/${encodeURIComponent(slug)}`,
+    });
+  }
+
+  async publicAttachmentUrl(slug: string, attachmentId: string) {
+    const value = await this.publicRequest<{ downloadUrl: string }>({
+      url: `/api/public/shares/${encodeURIComponent(slug)}/attachments/${attachmentId}`,
+    });
+    return value.downloadUrl;
   }
 
   fileVersions(vaultId: string, fileId: string) {

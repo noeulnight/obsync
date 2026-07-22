@@ -369,6 +369,7 @@ export function Workspace({
           documentSession={documentSession}
           canvasSession={canvasSession}
           canWrite={canWrite}
+          canShare={vault.role === "OWNER"}
           graph={graph}
           onRenamePath={(path) => canWrite && activeEntry && sync?.rename(activeEntry, path)}
           onRename={() => activeEntry && setRenameTarget(activeEntry)}

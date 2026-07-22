@@ -8,7 +8,7 @@ import { yCollab } from "y-codemirror.next";
 import { Editor } from "@/features/documents/components/Editor";
 import { imagePath, type FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
-import type { CanvasNode, CanvasSide, WebCanvas } from "../lib/sync";
+import type { CanvasNode, CanvasSession, CanvasSide } from "../lib/sync";
 
 const sideHandles: { side: CanvasSide; label: string; className: string }[] = [
   {
@@ -59,7 +59,7 @@ export function CanvasNodeCard({
 }: {
   node: CanvasNode;
   index: number;
-  session: WebCanvas;
+  session: CanvasSession;
   openDocument: (file: string) => WebDocument | undefined;
   onNavigate: (file: string, href: string) => void;
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
@@ -177,7 +177,7 @@ function CanvasNodeContent({
   editing,
 }: {
   node: CanvasNode;
-  session: WebCanvas;
+  session: CanvasSession;
   openDocument: (file: string) => WebDocument | undefined;
   onNavigate: (file: string, href: string) => void;
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
@@ -240,7 +240,7 @@ function CanvasTextEditor({
   readOnly,
 }: {
   node: CanvasNode;
-  session: WebCanvas;
+  session: CanvasSession;
   readOnly: boolean;
 }) {
   const parent = useRef<HTMLDivElement>(null);
@@ -259,7 +259,7 @@ function CanvasTextEditor({
           EditorView.lineWrapping,
           EditorView.editable.of(!readOnly),
           canvasTextTheme,
-          yCollab(text, session.provider.awareness),
+          ...(!readOnly && session.provider ? [yCollab(text, session.provider.awareness)] : []),
         ],
       }),
     });

@@ -134,6 +134,7 @@ model Vault {
   files          VaultFile[]
   fileOperations VaultFileOperation[]
   fileLinks      VaultFileLink[]
+  publicShares   PublicShare[]
 
   @@index([ownerId])
   @@map("vaults")
@@ -167,10 +168,24 @@ model VaultFile {
   operations     VaultFileOperation[]
   outgoingLinks  VaultFileLink[]      @relation("VaultFileLinkSource")
   incomingLinks  VaultFileLink[]      @relation("VaultFileLinkTarget")
+  publicShare    PublicShare?
 
   @@unique([vaultId, activePathKey])
   @@index([vaultId, deletedAt])
   @@map("vault_files")
+}
+
+model PublicShare {
+  id        String    @id @default(uuid()) @db.Uuid
+  vaultId   String    @map("vault_id") @db.Uuid
+  fileId    String    @unique @map("file_id") @db.Uuid
+  slug      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  vault     Vault     @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  file      VaultFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([vaultId])
+  @@map("public_shares")
 }
 
 model VaultFileLink {
