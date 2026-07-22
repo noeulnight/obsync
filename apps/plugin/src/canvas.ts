@@ -26,7 +26,7 @@ export class CanvasSync {
   private initialized = false;
   private persistenceSynced = false;
   private providerSynced = false;
-  private writePending = false;
+  private writeTimer?: number;
   private renderPending = false;
   private applyingView = false;
   private readonly bindings = new Map<CanvasController, () => void>();
@@ -73,10 +73,10 @@ export class CanvasSync {
       this.persistenceSynced = true;
       void this.initialize();
     });
-    this.document.on("update", (_update, origin) => {
+    this.document.on("update", (_update, origin, _document, transaction) => {
       if (origin !== localOrigin) {
         this.scheduleWrite();
-        this.scheduleRender();
+        if (!transaction.local) this.scheduleRender();
       }
     });
   }
@@ -128,6 +128,7 @@ export class CanvasSync {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.writeTimer !== undefined) window.clearTimeout(this.writeTimer);
     for (const unbind of this.bindings.values()) unbind();
     this.bindings.clear();
     this.provider.awareness?.setLocalStateField("cursor", null);
@@ -181,12 +182,11 @@ export class CanvasSync {
   }
 
   private scheduleWrite() {
-    if (this.writePending) return;
-    this.writePending = true;
-    queueMicrotask(() => {
-      this.writePending = false;
+    if (this.writeTimer !== undefined) window.clearTimeout(this.writeTimer);
+    this.writeTimer = window.setTimeout(() => {
+      this.writeTimer = undefined;
       void this.writeFile();
-    });
+    }, 300);
   }
 
   private scheduleRender() {

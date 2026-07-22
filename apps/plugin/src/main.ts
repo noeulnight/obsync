@@ -99,12 +99,6 @@ export default class ObsyncPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshViews()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshViews()));
     this.registerEvent(
-      this.app.workspace.on("editor-change", (editor, info) => {
-        if (info.file) this.bindEditor(info.file, editor as CodeMirrorEditor, true);
-        else this.bindCanvasTextEditor(info as CanvasTextInfo, editor as CodeMirrorEditor, true);
-      }),
-    );
-    this.registerEvent(
       this.app.vault.on("create", (file) => {
         void this.run(() => this.sync?.created(file));
       }),
@@ -412,22 +406,19 @@ export default class ObsyncPlugin extends Plugin {
     }
   }
 
-  private bindEditorView(view: EditorView) {
+  private bindEditorView(view: EditorView, changed = false) {
     const info = view.state.field(editorInfoField as never, false) as MarkdownFileInfo | undefined;
     if (!info) return;
-    if (info.file) this.bindEditor(info.file, { cm: view });
-    else this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view });
+    if (info.file) this.bindEditor(info.file, { cm: view }, changed);
+    else this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view }, changed);
   }
 
   private bindEditor(file: TFile | null, editor: CodeMirrorEditor, changed = false) {
     const view = editor.cm;
     if (!this.sync || !file || !view) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.extension(
-      file,
-      current,
-      changed && !this.boundEditors.has(view),
-      (key) => this.editorDetached(view, key),
+    const binding = this.sync.extension(file, current, changed, (key) =>
+      this.editorDetached(view, key),
     );
     this.applyEditorBinding(view, current, binding);
   }
@@ -438,12 +429,8 @@ export default class ObsyncPlugin extends Plugin {
     const canvasFile = info.node?.canvas?.view?.file;
     if (!this.sync || !view || !nodeId || !canvasFile) return;
     const current = view.state.doc.toString();
-    const binding = this.sync.canvasTextExtension(
-      canvasFile,
-      nodeId,
-      current,
-      changed && !this.boundEditors.has(view),
-      (key) => this.editorDetached(view, key),
+    const binding = this.sync.canvasTextExtension(canvasFile, nodeId, current, changed, (key) =>
+      this.editorDetached(view, key),
     );
     this.applyEditorBinding(view, current, binding);
   }
@@ -452,8 +439,8 @@ export default class ObsyncPlugin extends Plugin {
     if (this.boundEditors.get(view) !== key) return;
     this.boundEditors.delete(view);
     window.setTimeout(() => {
-      if (this.editorViews.has(view)) this.bindEditorView(view);
-    }, 0);
+      if (this.editorViews.has(view)) this.bindEditorView(view, true);
+    }, 300);
   }
 
   private applyEditorBinding(view: EditorView, current: string, binding: EditorBinding) {

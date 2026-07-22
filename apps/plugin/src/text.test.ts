@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import * as Y from "yjs";
 import { replaceText } from "@obsync/sync-core";
 import { type CanvasItemController, observeCanvas, renderCanvas } from "./canvas-controller";
@@ -130,6 +130,26 @@ describe("canvas controller", () => {
     expect(imports).toBe(0);
     expect(node.zIndex).toBe(0);
     expect(renders).toBe(1);
+  });
+
+  it("leaves a focused text node to its CodeMirror binding", () => {
+    const activeElement = {};
+    const nodeEl = {
+      ownerDocument: { activeElement },
+      contains: (element: unknown) => element === activeElement,
+    } as unknown as HTMLElement;
+    const setData = vi.fn();
+    const controller = {
+      nodes: new Map([["node", { nodeEl, setData }]]),
+      edges: new Map(),
+      getData: () => ({ nodes: [], edges: [] }),
+      importData: () => undefined,
+      requestSave: () => undefined,
+    };
+
+    renderCanvas(controller, { nodes: [{ id: "node", text: "remote" }], edges: [] });
+
+    expect(setData).not.toHaveBeenCalled();
   });
 });
 

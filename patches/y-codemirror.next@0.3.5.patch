@@ -13,7 +13,7 @@ index 0e510a9..f6a0e26 100644
 +        }
          const delta = event.delta
          const changes = []
-@@ -123,6 +127,21 @@ class YSyncPluginValue {
+@@ -123,6 +127,29 @@ class YSyncPluginValue {
          view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] })
        }
      }
@@ -24,8 +24,16 @@ index 0e510a9..f6a0e26 100644
 +      const current = view.state.doc.toString()
 +      const next = this._ytext.toString()
 +      if (current !== next) {
++        let from = 0
++        while (from < current.length && from < next.length && current[from] === next[from]) from++
++        let currentTo = current.length
++        let nextTo = next.length
++        while (currentTo > from && nextTo > from && current[currentTo - 1] === next[nextTo - 1]) {
++          currentTo--
++          nextTo--
++        }
 +        view.dispatch({
-+          changes: { from: 0, to: current.length, insert: next },
++          changes: { from, to: currentTo, insert: next.slice(from, nextTo) },
 +          annotations: [ySyncAnnotation.of(this.conf)]
 +        })
 +      }
