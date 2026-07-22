@@ -26,6 +26,7 @@ export class CanvasSync {
   private initialized = false;
   private persistenceSynced = false;
   private providerSynced = false;
+  private persistedCanvas?: CanvasData;
   private writeTimer?: number;
   private renderPending = false;
   private applyingView = false;
@@ -64,13 +65,21 @@ export class CanvasSync {
       },
       onAuthenticationFailed: () => setStatus("Authentication failed"),
     });
-    this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {
       name: connection.userName,
       color: presenceColor(this.document.clientID),
     });
     this.persistence.once("synced", () => {
+      if (this.destroyed) return;
+      this.persistedCanvas = snapshot(
+        this.document,
+        this.meta,
+        this.nodes,
+        this.zOrder,
+        this.edges,
+      );
       this.persistenceSynced = true;
+      this.provider.attach();
       void this.initialize();
     });
     this.document.on("update", (_update, origin, _document, transaction) => {
@@ -148,8 +157,9 @@ export class CanvasSync {
 
   private async initialize() {
     if (this.destroyed || this.initialized || !this.persistenceSynced) return;
-    if (this.seedMode !== "merge" && !this.providerSynced) return;
-    if (this.seedMode !== "server") await this.localChanged();
+    if (this.seedMode !== "local" && !this.providerSynced) return;
+    if (this.seedMode === "local") await this.localChanged();
+    else if (this.seedMode === "merge") await this.mergeLocalChanges();
     this.document.transact(() => {
       if (this.zOrder.size === 0) syncZOrder(this.zOrder, currentNodes(this.nodes));
       this.applyPendingText();
@@ -158,6 +168,15 @@ export class CanvasSync {
     this.onReady();
     this.renderViews();
     await this.writeFile();
+  }
+
+  private async mergeLocalChanges() {
+    const file = this.app.vault.getAbstractFileByPath(this.path);
+    if (!(file instanceof TFile)) return;
+    const local = parseCanvas(await this.app.vault.read(file));
+    if (!this.persistedCanvas || !sameCanvas(local, this.persistedCanvas)) {
+      await this.localChanged(local);
+    }
   }
 
   bindOpenViews() {

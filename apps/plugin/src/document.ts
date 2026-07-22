@@ -15,6 +15,7 @@ export class DocumentSync {
   private initialized = false;
   private persistenceSynced = false;
   private providerSynced = false;
+  private persistedText = "";
   private openEditors = 0;
   private readonly readOnly: boolean;
 
@@ -46,13 +47,15 @@ export class DocumentSync {
       },
       onAuthenticationFailed: () => setStatus("Authentication failed"),
     });
-    this.provider.attach();
     this.provider.awareness?.setLocalStateField("user", {
       name: connection.userName,
       color: presenceColor(this.document.clientID),
     });
     this.persistence.once("synced", () => {
+      if (this.destroyed) return;
+      this.persistedText = this.text.toJSON();
       this.persistenceSynced = true;
+      this.provider.attach();
       void this.initialize();
     });
     this.text.observe(() => this.scheduleWrite());
@@ -138,10 +141,18 @@ export class DocumentSync {
 
   private async initialize() {
     if (this.destroyed || this.initialized || !this.persistenceSynced) return;
-    if (this.seedMode !== "merge" && !this.providerSynced) return;
-    if (this.seedMode !== "server") await this.localChanged();
+    if (this.seedMode !== "local" && !this.providerSynced) return;
+    if (this.seedMode === "local") await this.localChanged();
+    else if (this.seedMode === "merge") await this.mergeLocalChanges();
     this.initialized = true;
     this.onReady();
     await this.writeFile();
+  }
+
+  private async mergeLocalChanges() {
+    const file = this.app.vault.getAbstractFileByPath(this.path);
+    if (!(file instanceof TFile)) return;
+    const local = await this.app.vault.read(file);
+    if (local !== this.persistedText) replaceText(this.text, local);
   }
 }
