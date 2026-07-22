@@ -62,6 +62,7 @@ export function Workspace({
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
   const [online, setOnline] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("Connecting");
   const [notice, setNotice] = useState("");
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
   const [deleteTarget, setDeleteTarget] = useState<FileEntry>();
@@ -85,11 +86,12 @@ export function Workspace({
   useEffect(() => {
     setEntries([]);
     setOnline(false);
+    setConnectionStatus("Connecting");
     const next = new WebVault(
       vault.id,
       api,
       userName,
-      () => undefined,
+      setConnectionStatus,
       setOnline,
       vault.role === "VIEWER",
     );
@@ -369,6 +371,7 @@ export function Workspace({
           documentSession={documentSession}
           canvasSession={canvasSession}
           canWrite={canWrite}
+          connectionStatus={connectionStatus}
           canShare={vault.role === "OWNER"}
           graph={graph}
           onRenamePath={(path) => canWrite && activeEntry && sync?.rename(activeEntry, path)}

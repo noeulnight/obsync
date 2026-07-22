@@ -6,6 +6,7 @@ import type { WebDocument } from "@/features/documents/lib/sync";
 import type { ApiClient } from "@/lib/api/client";
 import { VaultGraphView } from "@/features/graph/components/VaultGraphView";
 import { AttachmentPreview } from "./AttachmentPreview";
+import { ConnectionStatusChip } from "./ConnectionStatusChip";
 
 const DocumentEditor = lazy(() =>
   import("./DocumentEditor").then((module) => ({ default: module.DocumentEditor })),
@@ -27,6 +28,7 @@ export function WorkspaceContent({
   documentSession,
   canvasSession,
   canWrite,
+  connectionStatus,
   canShare,
   graph,
   onRenamePath,
@@ -53,6 +55,7 @@ export function WorkspaceContent({
   documentSession?: WebDocument;
   canvasSession?: WebCanvas;
   canWrite: boolean;
+  connectionStatus: string;
   canShare: boolean;
   graph: boolean;
   onRenamePath: (path: string) => void;
@@ -72,6 +75,7 @@ export function WorkspaceContent({
   const headerLeading = <SidebarTrigger className="mr-1 md:hidden" />;
   return (
     <SidebarInset className="h-svh min-w-0 overflow-hidden">
+      <ConnectionStatusChip status={connectionStatus} />
       <div className="min-h-0 flex-1 overflow-hidden">
         {graph ? (
           <VaultGraphView
