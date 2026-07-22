@@ -355,6 +355,20 @@ export class ApiClient {
     });
   }
 
+  rebuildVaultGraph(vaultId: string) {
+    return this.request<VaultGraph>({
+      url: `/api/vaults/${vaultId}/files/graph/rebuild`,
+      method: "POST",
+    });
+  }
+
+  resetVault(vaultId: string) {
+    return this.request<{ deleted: number }>({
+      url: `/api/vaults/${vaultId}/files/reset`,
+      method: "POST",
+    });
+  }
+
   fileVersions(vaultId: string, fileId: string) {
     return this.request<FileVersion[]>({
       url: `/api/vaults/${vaultId}/files/${fileId}/versions`,

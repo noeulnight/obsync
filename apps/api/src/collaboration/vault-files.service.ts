@@ -189,6 +189,24 @@ export class VaultFilesService {
     return this.links.graph(vaultId);
   }
 
+  async rebuildGraph(userId: string, vaultId: string) {
+    await this.access.requireOwner(userId, vaultId);
+    return this.links.rebuild(vaultId);
+  }
+
+  async reset(userId: string, vaultId: string) {
+    await this.access.requireOwner(userId, vaultId);
+    const files = await this.prisma.$transaction(async (transaction) => {
+      const active = await transaction.vaultFile.findMany({
+        where: { vaultId, deletedAt: null },
+      });
+      return this.deleteFiles(transaction, userId, vaultId, active);
+    });
+    if (files.length) await this.collaboration.publishFiles(vaultId, files);
+    await this.links.refreshTargets(vaultId);
+    return { deleted: files.length };
+  }
+
   async apply(userId: string, vaultId: string, input: FileOperationDto) {
     await this.access.requireWrite(userId, vaultId);
 
@@ -480,9 +498,27 @@ export class VaultFilesService {
             },
           })
         : [file];
+    const changed = await this.deleteFiles(
+      transaction,
+      userId,
+      vaultId,
+      affected,
+    );
+    await transaction.vaultFileOperation.create({
+      data: { id: operationId, vaultId, fileId: file.id },
+    });
+    return changed;
+  }
+
+  private async deleteFiles(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    vaultId: string,
+    files: VaultFile[],
+  ) {
     const now = new Date();
     const changed: VaultFile[] = [];
-    for (const entry of affected) {
+    for (const entry of files) {
       const version = entry.version + 1;
       changed.push(
         await transaction.vaultFile.update({
@@ -505,9 +541,6 @@ export class VaultFilesService {
         }),
       );
     }
-    await transaction.vaultFileOperation.create({
-      data: { id: operationId, vaultId, fileId: file.id },
-    });
     return changed;
   }
 

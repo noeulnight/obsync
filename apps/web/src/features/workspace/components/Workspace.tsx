@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMatch, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useUploadAttachment } from "@/features/attachments/queries/use-attachments";
 import {
@@ -193,6 +194,9 @@ export function Workspace({
         open(await addAttachment(file, validVaultPath(file.name)));
       }
       setNotice("");
+      toast.success(
+        files.length === 1 ? "Attachment uploaded." : `${files.length} attachments uploaded.`,
+      );
     } catch (reason) {
       setNotice(`Attachment upload failed: ${errorMessage(reason)}`);
     } finally {
@@ -211,6 +215,7 @@ export function Workspace({
         await addAttachment(file, path);
         paths.push(path);
       }
+      toast.success(files.length === 1 ? "Image pasted." : `${files.length} images pasted.`);
       return paths;
     } catch (reason) {
       setNotice(`Image paste failed: ${errorMessage(reason)}`);

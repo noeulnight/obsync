@@ -99,7 +99,9 @@ export class VaultLinksService {
       ...new Map(
         links.flatMap((link) => {
           const resolved =
-            link.target?.kind === 'MARKDOWN' && !link.target.deletedAt;
+            (link.target?.kind === 'MARKDOWN' ||
+              link.target?.kind === 'CANVAS') &&
+            !link.target.deletedAt;
           let target = link.targetFileId!;
           if (!resolved) {
             const fallback = resolveMarkdownTarget(
@@ -128,6 +130,17 @@ export class VaultLinksService {
       ).values(),
     ];
     return { nodes: [...nodes, ...missing.values()], edges };
+  }
+
+  async rebuild(vaultId: string) {
+    await this.prisma.$transaction([
+      this.prisma.vaultFileLink.deleteMany({ where: { vaultId } }),
+      this.prisma.vaultFile.updateMany({
+        where: { vaultId, kind: 'MARKDOWN', deletedAt: null },
+        data: { linksIndexedAt: null },
+      }),
+    ]);
+    return this.graph(vaultId);
   }
 
   private async ensureIndexed(vaultId: string) {
@@ -193,8 +206,12 @@ export class VaultLinksService {
 
   private files(vaultId: string) {
     return this.prisma.vaultFile.findMany({
-      where: { vaultId, kind: 'MARKDOWN', deletedAt: null },
-      select: { id: true, path: true },
+      where: {
+        vaultId,
+        kind: { in: ['MARKDOWN', 'CANVAS'] },
+        deletedAt: null,
+      },
+      select: { id: true, path: true, kind: true },
       orderBy: { path: 'asc' },
     });
   }

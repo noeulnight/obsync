@@ -70,13 +70,7 @@ export function AccountSettings({ enabled, onLogout }: { enabled: boolean; onLog
     return <p className="text-sm text-muted-foreground">Loading account…</p>;
   }
 
-  const error =
-    account.error ??
-    sessions.error ??
-    updateAccount.error ??
-    changePassword.error ??
-    revokeSession.error ??
-    deleteAccount.error;
+  const error = account.error ?? sessions.error;
 
   return (
     <section className="mx-auto max-w-xl">

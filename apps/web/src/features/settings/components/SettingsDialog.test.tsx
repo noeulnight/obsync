@@ -56,6 +56,11 @@ describe("settings", () => {
     const vault = { id: "vault-1", name: "Personal", role: "OWNER" as const };
     const rename = vi.spyOn(api, "updateVault").mockResolvedValue({ ...vault, name: "Work" });
     const remove = vi.spyOn(api, "deleteVault").mockResolvedValue();
+    const rebuild = vi.spyOn(api, "rebuildVaultGraph").mockResolvedValue({
+      nodes: [],
+      edges: [],
+    });
+    const reset = vi.spyOn(api, "resetVault").mockResolvedValue({ deleted: 2 });
     const select = vi.fn();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(queryKeys.account, {
@@ -69,7 +74,7 @@ describe("settings", () => {
       <QueryClientProvider client={client}>
         <SettingsDialog
           open
-          section="vaults"
+          section="vault"
           vaults={[vault]}
           selected={vault.id}
           onOpenChange={() => undefined}
@@ -84,8 +89,15 @@ describe("settings", () => {
     fireEvent.click(screen.getByText("Save"));
     await waitFor(() => expect(rename).toHaveBeenCalledWith(vault.id, "Work"));
 
-    fireEvent.click(screen.getByLabelText("Delete Personal"));
-    fireEvent.click(await screen.findByText("Delete", { selector: "button" }));
+    fireEvent.click(screen.getByText("Rebuild", { selector: "button" }));
+    await waitFor(() => expect(rebuild).toHaveBeenCalledWith(vault.id));
+
+    fireEvent.click(screen.getByText("Reset", { selector: "button" }));
+    fireEvent.click(await screen.findByText("Reset Vault", { selector: "button" }));
+    await waitFor(() => expect(reset).toHaveBeenCalledWith(vault.id));
+
+    fireEvent.click(screen.getByText("Delete", { selector: "button" }));
+    fireEvent.click(await screen.findByText("Delete Vault", { selector: "button" }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith(vault.id));
     expect(select).toHaveBeenCalledWith("");
   });

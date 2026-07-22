@@ -14,6 +14,7 @@ export function useAccount(enabled: boolean) {
 export function useUpdateAccount() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Account updated." },
     mutationFn: (input: { displayName?: string; email?: string; currentPassword?: string }) =>
       api.updateAccount(input),
     onSuccess: (account) => client.setQueryData(queryKeys.account, account),
@@ -22,6 +23,7 @@ export function useUpdateAccount() {
 
 export function useChangePassword() {
   return useMutation({
+    meta: { successMessage: "Password changed." },
     mutationFn: ({
       currentPassword,
       newPassword,
@@ -43,6 +45,7 @@ export function useAccountSessions(enabled: boolean) {
 export function useRevokeSession() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Session revoked." },
     mutationFn: (id: string) => api.revokeSession(id),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: queryKeys.accountSessions });

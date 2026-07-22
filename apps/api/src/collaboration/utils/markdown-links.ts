@@ -53,12 +53,18 @@ export function unresolvedMarkdownPath(sourcePath: string, rawTarget: string) {
     if (part === '..') path.pop();
     else path.push(part);
   }
-  return `${path.join('/').replace(/\.md$/i, '')}.md`;
+  const target = path.join('/');
+  return /\.(?:md|canvas)$/i.test(target) ? target : `${target}.md`;
 }
 
 function linkTarget(value: string) {
   const decoded = decodeLink(value).split('|')[0].split('#')[0].trim();
   if (!decoded || /^[a-z][a-z\d+.-]*:/i.test(decoded)) return undefined;
+  const extension = decoded
+    .split('/')
+    .at(-1)
+    ?.match(/\.([^.]+)$/)?.[1];
+  if (extension && !/^(?:md|canvas)$/i.test(extension)) return undefined;
   return decoded;
 }
 

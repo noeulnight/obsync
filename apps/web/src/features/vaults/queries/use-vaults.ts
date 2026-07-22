@@ -14,6 +14,7 @@ export function useVaults(enabled: boolean) {
 export function useCreateVault() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Vault created." },
     mutationFn: (name: string) => api.createVault(name),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: queryKeys.vaults });
@@ -24,6 +25,7 @@ export function useCreateVault() {
 export function useUpdateVault() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Vault name updated." },
     mutationFn: ({ id, name }: { id: string; name: string }) => api.updateVault(id, name),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: queryKeys.vaults });
@@ -34,6 +36,7 @@ export function useUpdateVault() {
 export function useDeleteVault() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Vault deleted." },
     mutationFn: (id: string) => api.deleteVault(id),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: queryKeys.vaults });

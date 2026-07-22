@@ -45,15 +45,7 @@ export function VaultMembers({ vault, enabled }: { vault?: Vault; enabled: boole
     setEmail("");
   }
 
-  const error =
-    members.error ??
-    invitations.error ??
-    pending.error ??
-    invite.error ??
-    update.error ??
-    remove.error ??
-    cancel.error ??
-    answer.error;
+  const error = members.error ?? invitations.error ?? pending.error;
 
   return (
     <section className="mx-auto max-w-xl">

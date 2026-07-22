@@ -13,6 +13,7 @@ export function useSession() {
     staleTime: Infinity,
   });
   const authenticate = useMutation({
+    meta: { toast: false },
     mutationFn: ({ email, password, action }: Credentials) => api[action](email, password),
     onSuccess: async () => {
       client.setQueryData(queryKeys.session, true);
@@ -45,6 +46,7 @@ export function useOidcConfig() {
 
 export function useApproveDevice(userCode: string) {
   return useMutation({
+    meta: { toast: false },
     mutationFn: () => api.approveDevice(userCode),
   });
 }

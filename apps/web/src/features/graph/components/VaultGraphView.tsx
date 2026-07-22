@@ -349,7 +349,7 @@ function neighbors(data: VaultGraph) {
 }
 
 function name(path: string) {
-  return (path.split("/").at(-1) ?? path).replace(/\.md$/i, "");
+  return (path.split("/").at(-1) ?? path).replace(/\.(?:md|canvas)$/i, "");
 }
 
 function Message({ children }: { children: string }) {

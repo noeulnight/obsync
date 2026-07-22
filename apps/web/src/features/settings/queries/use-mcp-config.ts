@@ -21,6 +21,7 @@ export function useMcpApps(enabled: boolean) {
 export function useRevokeMcpApp() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "MCP access revoked." },
     mutationFn: (clientId: string) => api.revokeMcpApp(clientId),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.mcpApps }),
   });

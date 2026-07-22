@@ -45,6 +45,22 @@ export class VaultFilesController {
     return this.files.graph(request.user.id, vaultId);
   }
 
+  @Post('graph/rebuild')
+  rebuildGraph(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+  ) {
+    return this.files.rebuildGraph(request.user.id, vaultId);
+  }
+
+  @Post('reset')
+  reset(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+  ) {
+    return this.files.reset(request.user.id, vaultId);
+  }
+
   @Post('operations')
   apply(
     @Req() request: AuthenticatedRequest,

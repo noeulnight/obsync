@@ -22,6 +22,7 @@ export function useFileVersion(api: ApiClient, vaultId: string, fileId: string, 
 export function useRestoreFileVersion(api: ApiClient, vaultId: string, fileId: string) {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Version restored." },
     mutationFn: (versionId: string) => api.restoreFileVersion(vaultId, fileId, versionId),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: queryKeys.fileVersions(vaultId, fileId) }),

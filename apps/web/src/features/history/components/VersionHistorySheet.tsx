@@ -21,7 +21,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { ApiClient, FileVersion } from "@/lib/api/client";
-import { errorMessage } from "@/lib/error";
 import {
   useFileVersion,
   useFileVersions,
@@ -41,7 +40,6 @@ export function VersionHistorySheet({
 }) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
-  const [restoreError, setRestoreError] = useState("");
   const [width, setWidth] = useState(() => Math.min(672, window.innerWidth - 24));
   const versions = useFileVersions(api, vaultId, fileId, open);
   const items = versions.data ?? [];
@@ -134,14 +132,7 @@ export function VersionHistorySheet({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => {
-                          setRestoreError("");
-                          restore.mutate(selectedItem.id, {
-                            onError: (reason) => setRestoreError(errorMessage(reason)),
-                          });
-                        }}
-                      >
+                      <AlertDialogAction onClick={() => restore.mutate(selectedItem.id)}>
                         Restore version
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -149,7 +140,6 @@ export function VersionHistorySheet({
                 </AlertDialog>
               )}
             </div>
-            {restoreError && <p className="px-4 pt-3 text-sm text-destructive">{restoreError}</p>}
             <div className="min-h-0 flex-1 overflow-auto p-5">
               {selected.isPending ? (
                 <Message>Loading version…</Message>

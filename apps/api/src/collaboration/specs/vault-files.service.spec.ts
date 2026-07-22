@@ -194,6 +194,51 @@ describe('VaultFilesService', () => {
     );
   });
 
+  it('resets every active file through owner-only manifest tombstones', async () => {
+    const first = file({ path: 'First.md' });
+    const second = file({ id: childId, kind: 'CANVAS', path: 'Board.canvas' });
+    const deletedFirst = {
+      ...first,
+      deletedAt: new Date(),
+      activePathKey: null,
+    };
+    const deletedSecond = {
+      ...second,
+      deletedAt: new Date(),
+      activePathKey: null,
+    };
+    const transaction = transactionMock();
+    transaction.vaultFile.findMany.mockResolvedValue([first, second]);
+    transaction.vaultFile.update
+      .mockResolvedValueOnce(deletedFirst)
+      .mockResolvedValueOnce(deletedSecond);
+    const { service, requireOwner, publishFiles, refreshTargets } =
+      setup(transaction);
+
+    await expect(service.reset(userId, vaultId)).resolves.toEqual({
+      deleted: 2,
+    });
+
+    expect(requireOwner).toHaveBeenCalledWith(userId, vaultId);
+    expect(publishFiles).toHaveBeenCalledWith(vaultId, [
+      deletedFirst,
+      deletedSecond,
+    ]);
+    expect(refreshTargets).toHaveBeenCalledWith(vaultId);
+  });
+
+  it('rebuilds the graph index for the Vault owner', async () => {
+    const { service, requireOwner, rebuild } = setup(transactionMock());
+
+    await expect(service.rebuildGraph(userId, vaultId)).resolves.toEqual({
+      nodes: [],
+      edges: [],
+    });
+
+    expect(requireOwner).toHaveBeenCalledWith(userId, vaultId);
+    expect(rebuild).toHaveBeenCalledWith(vaultId);
+  });
+
   it('updates a ready attachment and records its next version', async () => {
     const current = file({
       kind: 'ATTACHMENT',
@@ -491,19 +536,26 @@ function setup(
   };
   const requireRead = jest.fn().mockResolvedValue(undefined);
   const requireWrite = jest.fn().mockResolvedValue(undefined);
+  const requireOwner = jest.fn().mockResolvedValue(undefined);
   const publishFiles = jest.fn().mockResolvedValue(undefined);
   const restoreDocument = jest.fn().mockResolvedValue(undefined);
   const refreshTargets = jest.fn().mockResolvedValue(undefined);
   const backlinks = jest.fn().mockResolvedValue([]);
   const graph = jest.fn().mockResolvedValue({ nodes: [], edges: [] });
+  const rebuild = jest.fn().mockResolvedValue({ nodes: [], edges: [] });
   const service = new VaultFilesService(
     prisma as unknown as PrismaService,
-    { requireRead, requireWrite } as unknown as VaultAccessService,
+    {
+      requireRead,
+      requireWrite,
+      requireOwner,
+    } as unknown as VaultAccessService,
     { publishFiles, restoreDocument } as unknown as CollaborationServerService,
     {
       refreshTargets,
       backlinks,
       graph,
+      rebuild,
     } as unknown as VaultLinksService,
   );
   return {
@@ -516,6 +568,8 @@ function setup(
     graph,
     requireRead,
     requireWrite,
+    requireOwner,
+    rebuild,
   };
 }
 

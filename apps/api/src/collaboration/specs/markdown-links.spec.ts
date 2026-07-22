@@ -7,12 +7,12 @@ import {
 describe('Markdown links', () => {
   it('extracts internal links and resolves relative paths', () => {
     const links = markdownLinkTargets(
-      '[[Roadmap|Plan]] [today](../Daily/Today.md#notes) [site](https://example.com)',
+      '[[Roadmap|Plan]] [today](../Daily/Today.md#notes) [[Board.canvas]] ![[photo.png]] [site](https://example.com)',
     );
 
-    expect(links).toEqual(['Roadmap', '../Daily/Today.md']);
+    expect(links).toEqual(['Roadmap', 'Board.canvas', '../Daily/Today.md']);
     expect(
-      resolveMarkdownTarget('Projects/Source.md', links[1], [
+      resolveMarkdownTarget('Projects/Source.md', links[2], [
         { id: 'today', path: 'Daily/Today.md' },
       ]),
     ).toEqual({ id: 'today', path: 'Daily/Today.md' });
@@ -27,6 +27,9 @@ describe('Markdown links', () => {
     );
     expect(unresolvedMarkdownPath('Projects/Source.md', 'Shared/Plan.md')).toBe(
       'Shared/Plan.md',
+    );
+    expect(unresolvedMarkdownPath('Projects/Source.md', 'Board.canvas')).toBe(
+      'Projects/Board.canvas',
     );
   });
 });

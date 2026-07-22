@@ -29,6 +29,7 @@ export function usePendingInvitations(enabled: boolean) {
 export function useInviteToVault(vaultId: string) {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Invitation sent." },
     mutationFn: ({ email, role }: { email: string; role: VaultRole }) =>
       api.inviteToVault(vaultId, email, role),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.vaultInvitations(vaultId) }),
@@ -38,6 +39,7 @@ export function useInviteToVault(vaultId: string) {
 export function useUpdateVaultMember(vaultId: string) {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Member role updated." },
     mutationFn: ({ userId, role }: { userId: string; role: VaultRole }) =>
       api.updateVaultMember(vaultId, userId, role),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.vaultMembers(vaultId) }),
@@ -47,6 +49,7 @@ export function useUpdateVaultMember(vaultId: string) {
 export function useRemoveVaultMember(vaultId: string) {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Member removed." },
     mutationFn: (userId: string) => api.removeVaultMember(vaultId, userId),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.vaultMembers(vaultId) }),
   });
@@ -55,6 +58,7 @@ export function useRemoveVaultMember(vaultId: string) {
 export function useCancelVaultInvitation(vaultId: string) {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Invitation canceled." },
     mutationFn: (invitationId: string) => api.cancelVaultInvitation(vaultId, invitationId),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.vaultInvitations(vaultId) }),
   });
@@ -63,6 +67,7 @@ export function useCancelVaultInvitation(vaultId: string) {
 export function useAnswerInvitation() {
   const client = useQueryClient();
   return useMutation({
+    meta: { successMessage: "Invitation updated." },
     mutationFn: async ({ id, accept }: { id: string; accept: boolean }) => {
       if (accept) await api.acceptInvitation(id);
       else await api.rejectInvitation(id);

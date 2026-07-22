@@ -126,7 +126,7 @@ export function WorkspaceApp() {
           onSelect={select}
           onCreate={() => setSettings("vaults")}
           onSettings={() => setSettings("account")}
-          onVaultSettings={() => setSettings("vaults")}
+          onVaultSettings={() => setSettings("vault")}
           onLogout={() => void signOut()}
         />
       </Suspense>

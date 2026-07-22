@@ -12,6 +12,7 @@ export function useMcpAuthorization(id: string) {
 
 export function useMcpAuthorizationDecision(id: string) {
   return useMutation({
+    meta: { toast: false },
     mutationFn: (decision: "approve" | "deny") => api.mcpAuthorizationDecision(id, decision),
     onSuccess: ({ redirectUrl }) => window.location.assign(redirectUrl),
   });
