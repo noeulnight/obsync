@@ -304,7 +304,7 @@ export function CanvasSurface({
           showGrid
             ? {
                 backgroundImage: "radial-gradient(circle, var(--border) 1px, transparent 1px)",
-                backgroundSize: `${16 * zoom}px ${16 * zoom}px`,
+                backgroundSize: `${Math.max(16, 24 * zoom)}px ${Math.max(16, 24 * zoom)}px`,
                 backgroundPosition: `${viewport.x}px ${viewport.y}px`,
               }
             : undefined

@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Editor, type EditorSession } from "@/features/documents/components/Editor";
 import { imagePath, type FileEntry } from "@/features/documents/lib/files";
 import type { CanvasNode, CanvasSession, CanvasSide } from "../lib/sync";
@@ -278,6 +279,7 @@ function CanvasAttachment({
   resolve: (file: string) => Promise<string | undefined>;
 }) {
   const [url, setUrl] = useState<string>();
+  const [loadedUrl, setLoadedUrl] = useState<string>();
 
   useEffect(() => {
     let active = true;
@@ -287,8 +289,25 @@ function CanvasAttachment({
     };
   }, [file, resolve]);
 
-  if (url && imagePath(file)) {
-    return <img className="size-full object-cover" src={url} alt={file} />;
+  if (imagePath(file)) {
+    return (
+      <div className="relative size-full overflow-hidden">
+        {(!url || loadedUrl !== url) && (
+          <Skeleton
+            data-testid="canvas-image-skeleton"
+            className="absolute inset-0 size-full rounded-none"
+          />
+        )}
+        {url && (
+          <img
+            className={`size-full object-cover transition-opacity ${loadedUrl === url ? "opacity-100" : "opacity-0"}`}
+            src={url}
+            alt={file}
+            onLoad={() => setLoadedUrl(url)}
+          />
+        )}
+      </div>
+    );
   }
   return (
     <div className="grid size-full place-items-center gap-2 p-4 text-center text-sm text-muted-foreground">

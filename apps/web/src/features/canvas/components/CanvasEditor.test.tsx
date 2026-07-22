@@ -48,6 +48,7 @@ describe("CanvasEditor", () => {
     );
 
     const surface = screen.getByTestId("canvas-surface");
+    expect(surface.style.backgroundSize).toBe("24px 24px");
     fireEvent.pointerDown(surface, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
     fireEvent.pointerMove(surface, { pointerId: 1, clientX: 20, clientY: 10 });
     fireEvent.pointerUp(surface, { pointerId: 1, clientX: 20, clientY: 10 });
@@ -305,9 +306,12 @@ describe("CanvasEditor", () => {
       />,
     );
 
+    expect(screen.getByTestId("canvas-image-skeleton")).toBeTruthy();
     const image = await screen.findByRole("img", { name: "photo.png" });
     expect(image.className).toContain("object-cover");
     expect(image.className).not.toContain("object-contain");
+    fireEvent.load(image);
+    expect(screen.queryByTestId("canvas-image-skeleton")).toBeNull();
   });
 
   it("changes color, zooms to, and edits a selected node", async () => {
