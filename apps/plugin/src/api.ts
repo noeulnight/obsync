@@ -111,15 +111,18 @@ export class ApiClient {
   }
 
   async logout() {
-    if (this.refreshToken) {
-      await this.raw("/api/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refreshToken: this.refreshToken }),
-      });
+    try {
+      if (this.refreshToken) {
+        await this.raw("/api/auth/logout", {
+          method: "POST",
+          body: JSON.stringify({ refreshToken: this.refreshToken }),
+        });
+      }
+    } finally {
+      this.accessToken = undefined;
+      this.refreshToken = "";
+      await this.saveRefreshToken("");
     }
-    this.accessToken = undefined;
-    this.refreshToken = "";
-    await this.saveRefreshToken("");
   }
 
   async token() {

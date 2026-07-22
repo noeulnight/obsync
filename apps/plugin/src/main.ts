@@ -38,7 +38,9 @@ export default class ObsyncPlugin extends Plugin {
   private statusText = "Starting";
 
   async onload() {
-    const saved = (await this.loadData()) as Partial<PluginSettings> | null;
+    const saved = (await this.loadData()) as
+      | (Partial<PluginSettings> & { initializedVaultIds?: string[] })
+      | null;
     this.settings = {
       apiUrl: saved?.apiUrl ?? DEFAULT_SETTINGS.apiUrl,
       refreshToken: saved?.refreshToken ?? "",
@@ -46,7 +48,10 @@ export default class ObsyncPlugin extends Plugin {
       vaultName: saved?.vaultName ?? "",
       vaultRole: saved?.vaultRole ?? "",
       userName: saved?.userName ?? "",
-      initializedVaultIds: saved?.initializedVaultIds ?? [],
+      initializedVaultId:
+        saved?.initializedVaultId ||
+        (saved?.initializedVaultIds?.includes(saved?.vaultId ?? "") ? saved?.vaultId : "") ||
+        "",
     };
     this.api = new ApiClient(
       this.settings.apiUrl,
@@ -176,7 +181,7 @@ export default class ObsyncPlugin extends Plugin {
       this.settings.vaultName = "";
       this.settings.vaultRole = "";
       this.settings.userName = "";
-      this.settings.initializedVaultIds = [];
+      this.settings.initializedVaultId = "";
       this.account = undefined;
       this.vaults = [];
       await this.saveData(this.settings);
@@ -192,24 +197,65 @@ export default class ObsyncPlugin extends Plugin {
 
   async selectVault(id: string) {
     const vault = this.vaults.find((item) => item.id === id);
+    if (!vault) {
+      this.settings.vaultId = "";
+      this.settings.vaultName = "";
+      this.settings.vaultRole = "";
+      await this.saveData(this.settings);
+      this.disconnect();
+      this.setStatus("Select a Vault");
+      return;
+    }
+    const previous = this.vaults.find((item) => item.id === this.settings.vaultId);
     this.settings.vaultId = vault?.id ?? "";
     this.settings.vaultName = vault?.name ?? "";
     this.settings.vaultRole = vault?.role ?? "";
     await this.saveData(this.settings);
-    await this.connect();
+    if (await this.connect()) return;
+    this.settings.vaultId = previous?.id ?? "";
+    this.settings.vaultName = previous?.name ?? "";
+    this.settings.vaultRole = previous?.role ?? "";
+    await this.saveData(this.settings);
+    if (previous) await this.connect();
   }
 
-  async saveSettings() {
-    this.settings.apiUrl = this.settings.apiUrl.replace(/\/+$/, "");
-    this.api.setBaseUrl(this.settings.apiUrl);
+  async saveSettings(apiUrl: string) {
+    const nextApiUrl = apiUrl.replace(/\/+$/, "");
+    if (nextApiUrl !== this.settings.apiUrl) {
+      this.disconnect();
+      try {
+        await this.api.logout();
+      } catch {
+        // The old server may be unavailable; the local session is still cleared.
+      }
+      this.settings.apiUrl = nextApiUrl;
+      this.settings.vaultId = "";
+      this.settings.vaultName = "";
+      this.settings.vaultRole = "";
+      this.settings.userName = "";
+      this.settings.initializedVaultId = "";
+      this.account = undefined;
+      this.vaults = [];
+      this.api.setBaseUrl(nextApiUrl);
+      await this.saveData(this.settings);
+      this.setStatus("Sign in required");
+      return;
+    }
+    this.api.setBaseUrl(nextApiUrl);
     await this.saveData(this.settings);
     await this.connect();
   }
 
   async connect() {
     this.disconnect();
-    if (!this.api.hasSession()) return this.setStatus("Sign in required");
-    if (!this.settings.vaultId) return this.setStatus("Select a Vault");
+    if (!this.api.hasSession()) {
+      this.setStatus("Sign in required");
+      return false;
+    }
+    if (!this.settings.vaultId) {
+      this.setStatus("Select a Vault");
+      return false;
+    }
     const vaultId = this.settings.vaultId;
     try {
       await this.loadAccount();
@@ -220,9 +266,12 @@ export default class ObsyncPlugin extends Plugin {
     const role = selected?.role || this.settings.vaultRole;
     const readOnly = role === "VIEWER";
     let initialMode: InitialSyncMode | undefined;
-    if (!this.settings.initializedVaultIds.includes(vaultId)) {
+    if (this.settings.initializedVaultId !== vaultId) {
       initialMode = await this.chooseInitialSync(readOnly);
-      if (!initialMode) return this.setStatus("Choose initial synchronization");
+      if (!initialMode) {
+        this.setStatus("Vault switch cancelled");
+        return false;
+      }
     }
     this.sync = new VaultSync(
       this.app,
@@ -238,14 +287,15 @@ export default class ObsyncPlugin extends Plugin {
       (status) => this.setStatus(status),
       () => this.refreshViews(),
       async () => {
-        if (!this.settings.initializedVaultIds.includes(vaultId)) {
-          this.settings.initializedVaultIds.push(vaultId);
+        if (this.settings.initializedVaultId !== vaultId) {
+          this.settings.initializedVaultId = vaultId;
           await this.saveData(this.settings);
         }
       },
     );
     this.setStatus("Connecting");
     this.refreshViews();
+    return true;
   }
 
   private async chooseInitialSync(readOnly: boolean) {
@@ -391,7 +441,7 @@ export default class ObsyncPlugin extends Plugin {
     this.status?.setText(`Obsync: ${status}`);
   }
 
-  private async run(work: () => void | Promise<void> | undefined) {
+  private async run(work: () => unknown) {
     try {
       await work();
     } catch (error) {

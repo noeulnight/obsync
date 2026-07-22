@@ -10,7 +10,7 @@ export type PluginSettings = {
   vaultName: string;
   vaultRole: VaultSummary["role"] | "";
   userName: string;
-  initializedVaultIds: string[];
+  initializedVaultId: string;
 };
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   vaultName: "",
   vaultRole: "",
   userName: "",
-  initializedVaultIds: [],
+  initializedVaultId: "",
 };
 
 export class InitialSyncModal extends Modal {
@@ -124,12 +124,14 @@ export class ServerReplaceConfirmModal extends Modal {
 
 export class ObsyncSettingTab extends PluginSettingTab {
   private newVaultName = "";
+  private apiUrl = "";
 
   constructor(private readonly plugin: ObsyncPlugin) {
     super(plugin.app, plugin);
   }
 
   display() {
+    this.apiUrl = this.plugin.settings.apiUrl;
     void this.render();
   }
 
@@ -143,7 +145,7 @@ export class ObsyncSettingTab extends PluginSettingTab {
       .setDesc("Synchronization server URL")
       .addText((text) =>
         text.setValue(this.plugin.settings.apiUrl).onChange((value) => {
-          this.plugin.settings.apiUrl = value.trim();
+          this.apiUrl = value.trim();
         }),
       );
 
@@ -158,6 +160,7 @@ export class ObsyncSettingTab extends PluginSettingTab {
             .onClick(async () => {
               button.setDisabled(true);
               try {
+                await this.plugin.saveSettings(this.apiUrl);
                 await this.plugin.authenticateDevice();
                 await this.render();
               } catch (error) {
@@ -244,8 +247,9 @@ export class ObsyncSettingTab extends PluginSettingTab {
           .setCta()
           .onClick(async () => {
             try {
-              await this.plugin.saveSettings();
+              await this.plugin.saveSettings(this.apiUrl);
               new Notice("Obsync settings saved.");
+              await this.render();
             } catch (error) {
               this.notice(error);
             }
