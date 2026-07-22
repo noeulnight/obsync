@@ -60,12 +60,8 @@ describe('Attachments (e2e)', () => {
   }
 
   async function registerAndLogin(email: string) {
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, password: 'password123' })
-      .expect(201);
     const response = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/auth/register')
       .send({ email, password: 'password123' })
       .expect(200);
     return stringField(record(response.text), 'accessToken');

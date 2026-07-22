@@ -45,6 +45,8 @@ pnpm --filter web dev --host 0.0.0.0
 
 - Web: `http://localhost:5173`
 - API 상태: `http://localhost:3000/api/health`
+- API 문서: `http://localhost:3000/api/docs`
+- OpenAPI JSON: `http://localhost:3000/api/openapi.json`
 - 파일 저장소 API: `http://localhost:9000`
 - 파일 저장소 콘솔: `http://localhost:9001`
 - MCP 엔드포인트: 개발 환경은 `http://localhost:3000/mcp`, Compose 환경은 `http://localhost:8080/mcp`

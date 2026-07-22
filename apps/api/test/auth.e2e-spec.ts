@@ -58,7 +58,7 @@ describe('Authentication (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/api/auth/register')
       .send({ email: 'AUTH-E2E@EXAMPLE.COM', password: 'password123' })
-      .expect(201);
+      .expect(200);
     expect(response.text).not.toContain('password');
 
     const user = await prisma.user.findUniqueOrThrow({ where: { email } });
@@ -85,34 +85,22 @@ describe('Authentication (e2e)', () => {
       });
   });
 
-  it('protects me and rotates, expires, and revokes refresh tokens', async () => {
+  it('protects me and rejects expired device refresh tokens', async () => {
     await request(app.getHttpServer()).get('/api/auth/me').expect(401);
 
     const login = await request(app.getHttpServer())
       .post('/api/auth/login')
       .send({ email, password: 'password123' })
       .expect(200);
-    const first = parseTokens(login.text);
+    const accessToken = parseWebAccess(login.text).accessToken;
 
     await request(app.getHttpServer())
       .get('/api/auth/me')
-      .set('authorization', `Bearer ${first.accessToken}`)
+      .set('authorization', `Bearer ${accessToken}`)
       .expect(200)
       .expect((response) => {
         expect(response.text).not.toContain('passwordHash');
       });
-
-    const refreshed = await request(app.getHttpServer())
-      .post('/api/auth/refresh')
-      .send({ refreshToken: first.refreshToken })
-      .expect(200);
-    const second = parseTokens(refreshed.text);
-    expect(second.refreshToken).not.toBe(first.refreshToken);
-
-    await request(app.getHttpServer())
-      .post('/api/auth/refresh')
-      .send({ refreshToken: first.refreshToken })
-      .expect(401);
 
     const user = await prisma.user.findUniqueOrThrow({ where: { email } });
     const expired = await app.get(JwtService).signAsync(
@@ -123,33 +111,24 @@ describe('Authentication (e2e)', () => {
       },
     );
     await request(app.getHttpServer())
-      .post('/api/auth/refresh')
+      .post('/api/auth/device/refresh')
       .send({ refreshToken: expired })
-      .expect(401);
-
-    await request(app.getHttpServer())
-      .post('/api/auth/logout')
-      .send({ refreshToken: second.refreshToken })
-      .expect(204);
-    await request(app.getHttpServer())
-      .post('/api/auth/refresh')
-      .send({ refreshToken: second.refreshToken })
       .expect(401);
   });
 
   it('keeps the web refresh token in a rotating HttpOnly cookie', async () => {
     const login = await request(app.getHttpServer())
-      .post('/api/auth/web/login')
+      .post('/api/auth/login')
       .send({ email, password: 'password123' })
       .expect(200);
     expect(parseWebAccess(login.text).accessToken).toBeTruthy();
     const firstCookie = webCookie(login.headers['set-cookie']);
     expect(firstCookie).toContain('HttpOnly');
     expect(firstCookie).toContain('SameSite=Lax');
-    expect(firstCookie).toContain('Path=/api/auth/web');
+    expect(firstCookie).toContain('Path=/api/auth');
 
     const refreshed = await request(app.getHttpServer())
-      .post('/api/auth/web/refresh')
+      .post('/api/auth/refresh')
       .set('cookie', firstCookie)
       .expect(200);
     expect(parseWebAccess(refreshed.text).accessToken).toBeTruthy();
@@ -157,11 +136,11 @@ describe('Authentication (e2e)', () => {
     expect(secondCookie).not.toBe(firstCookie);
 
     await request(app.getHttpServer())
-      .post('/api/auth/web/refresh')
+      .post('/api/auth/refresh')
       .set('cookie', firstCookie)
       .expect(401);
     await request(app.getHttpServer())
-      .post('/api/auth/web/logout')
+      .post('/api/auth/logout')
       .set('cookie', secondCookie)
       .expect(204)
       .expect((response) => {
@@ -170,14 +149,14 @@ describe('Authentication (e2e)', () => {
         );
       });
     await request(app.getHttpServer())
-      .post('/api/auth/web/refresh')
+      .post('/api/auth/refresh')
       .set('cookie', secondCookie)
       .expect(401);
   });
 
   it('authorizes an Obsidian device without exposing tokens in the browser', async () => {
     const webLogin = await request(app.getHttpServer())
-      .post('/api/auth/web/login')
+      .post('/api/auth/login')
       .send({ email, password: 'password123' })
       .expect(200);
     const webAccessToken = parseWebAccess(webLogin.text).accessToken;
@@ -212,7 +191,26 @@ describe('Authentication (e2e)', () => {
       .post('/api/auth/device/token')
       .send({ deviceCode: authorization.deviceCode })
       .expect(200);
-    expect(parseTokens(authorized.text).accessToken).toBeTruthy();
+    const first = parseTokens(authorized.text);
+    expect(first.accessToken).toBeTruthy();
+    const refreshed = await request(app.getHttpServer())
+      .post('/api/auth/device/refresh')
+      .send({ refreshToken: first.refreshToken })
+      .expect(200);
+    const second = parseTokens(refreshed.text);
+    expect(second.refreshToken).not.toBe(first.refreshToken);
+    await request(app.getHttpServer())
+      .post('/api/auth/device/refresh')
+      .send({ refreshToken: first.refreshToken })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/auth/device/logout')
+      .send({ refreshToken: second.refreshToken })
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/auth/device/refresh')
+      .send({ refreshToken: second.refreshToken })
+      .expect(401);
     await request(app.getHttpServer())
       .post('/api/auth/device/token')
       .send({ deviceCode: authorization.deviceCode })
@@ -241,8 +239,8 @@ describe('Authentication (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/auth/register')
       .send({ email: accountEmail, password: 'password123' })
-      .expect(201);
-    const first = parseTokens(
+      .expect(200);
+    const first = parseWebAccess(
       (
         await request(app.getHttpServer())
           .post('/api/auth/login')
@@ -284,15 +282,12 @@ describe('Authentication (e2e)', () => {
         }),
       );
 
-    const second = parseTokens(
-      (
-        await request(app.getHttpServer())
-          .post('/api/auth/login')
-          .set('user-agent', 'Obsidian')
-          .send({ email: 'changed-e2e@example.com', password: 'password123' })
-          .expect(200)
-      ).text,
-    );
+    const secondLogin = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .set('user-agent', 'Obsidian')
+      .send({ email: 'changed-e2e@example.com', password: 'password123' })
+      .expect(200);
+    const secondCookie = webCookie(secondLogin.headers['set-cookie']);
     const sessions = await request(app.getHttpServer())
       .get('/api/auth/sessions')
       .set('authorization', authorization)
@@ -313,7 +308,7 @@ describe('Authentication (e2e)', () => {
       .expect(204);
     await request(app.getHttpServer())
       .post('/api/auth/refresh')
-      .send({ refreshToken: second.refreshToken })
+      .set('cookie', secondCookie)
       .expect(401);
 
     await request(app.getHttpServer())
@@ -325,7 +320,7 @@ describe('Authentication (e2e)', () => {
       .post('/api/auth/login')
       .send({ email: 'changed-e2e@example.com', password: 'password123' })
       .expect(401);
-    const final = parseTokens(
+    const final = parseWebAccess(
       (
         await request(app.getHttpServer())
           .post('/api/auth/login')

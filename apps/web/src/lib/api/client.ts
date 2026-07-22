@@ -164,7 +164,7 @@ export class ApiClient {
 
   async login(email: string, password: string) {
     const value = await this.publicRequest<{ accessToken: string }>({
-      url: "/api/auth/web/login",
+      url: "/api/auth/login",
       method: "POST",
       data: { email, password },
     });
@@ -173,7 +173,7 @@ export class ApiClient {
 
   async register(email: string, password: string) {
     const value = await this.publicRequest<{ accessToken: string }>({
-      url: "/api/auth/web/register",
+      url: "/api/auth/register",
       method: "POST",
       data: { email, password },
     });
@@ -486,7 +486,7 @@ export class ApiClient {
   }
 
   async logout() {
-    await this.publicRequest({ url: "/api/auth/web/logout", method: "POST" });
+    await this.publicRequest({ url: "/api/auth/logout", method: "POST" });
     this.accessToken = undefined;
     localStorage.removeItem(accountCacheKey);
     localStorage.removeItem(vaultsCacheKey);
@@ -530,7 +530,7 @@ export class ApiClient {
     this.refreshing ??= (async () => {
       try {
         const value = await this.publicRequest<{ accessToken: string }>({
-          url: "/api/auth/web/refresh",
+          url: "/api/auth/refresh",
           method: "POST",
         });
         this.setAccessToken(value);

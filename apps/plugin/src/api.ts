@@ -81,24 +81,6 @@ export class ApiClient {
     }
   }
 
-  async register(email: string, password: string) {
-    await this.raw("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
-    await this.login(email, password);
-  }
-
-  async login(email: string, password: string) {
-    const tokens = this.tokens(
-      await this.raw("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      }),
-    );
-    await this.setTokens(tokens);
-  }
-
   async startDeviceAuthorization(): Promise<DeviceAuthorization> {
     const response = await this.raw("/api/auth/device/code", { method: "POST" });
     const value = this.body<DeviceCodeResponse>(response.text);
@@ -127,7 +109,7 @@ export class ApiClient {
   async logout() {
     try {
       if (this.refreshToken) {
-        await this.raw("/api/auth/logout", {
+        await this.raw("/api/auth/device/logout", {
           method: "POST",
           body: JSON.stringify({ refreshToken: this.refreshToken }),
         });
@@ -240,7 +222,7 @@ export class ApiClient {
     this.refreshing ??= (async () => {
       try {
         const tokens = this.tokens(
-          await this.raw("/api/auth/refresh", {
+          await this.raw("/api/auth/device/refresh", {
             method: "POST",
             body: JSON.stringify({ refreshToken: this.refreshToken }),
           }),

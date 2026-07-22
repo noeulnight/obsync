@@ -16,6 +16,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiFoundResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import {
@@ -24,6 +33,16 @@ import {
   UpdateAccountDto,
 } from './dto/account.dto';
 import { DeviceApprovalDto, DeviceTokenDto } from './dto/device-auth.dto';
+import {
+  AccessTokenResponseDto,
+  AuthorizedDeviceTokenResponseDto,
+  AuthTokensResponseDto,
+  DeviceCodeResponseDto,
+  OidcConfigResponseDto,
+  PendingDeviceTokenResponseDto,
+  SessionResponseDto,
+  UserResponseDto,
+} from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -32,6 +51,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { OidcService, type OidcTransaction } from './oidc.service';
 
 @Controller('auth')
+@ApiTags('Authentication')
+@ApiExtraModels(PendingDeviceTokenResponseDto, AuthorizedDeviceTokenResponseDto)
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
@@ -40,6 +61,7 @@ export class AuthController {
   ) {}
 
   @Get('oidc/config')
+  @ApiOkResponse({ type: OidcConfigResponseDto })
   oidcConfig() {
     return {
       enabled: this.oidc.enabled(),
@@ -50,6 +72,7 @@ export class AuthController {
   }
 
   @Get('oidc/start')
+  @ApiFoundResponse({ description: 'Redirects to the identity provider.' })
   async oidcStart(
     @Query('return_to') returnTo: string | undefined,
     @Res() response: Response,
@@ -67,6 +90,7 @@ export class AuthController {
   }
 
   @Get('oidc/callback')
+  @ApiFoundResponse({ description: 'Sets the web session and redirects back.' })
   async oidcCallback(@Req() request: Request, @Res() response: Response) {
     const transaction = decodeTransaction(cookie(request, oidcCookieName));
     response.clearCookie(oidcCookieName, this.oidcCookieOptions());
@@ -93,55 +117,9 @@ export class AuthController {
   }
 
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.auth.register(body.email, body.password);
-  }
-
-  @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() body: LoginDto, @Req() request: Request) {
-    return this.auth.login(body.email, body.password, userAgent(request));
-  }
-
-  @Post('device/code')
-  deviceCode() {
-    return this.auth.startDeviceAuthorization();
-  }
-
-  @Post('device/approve')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
-  async approveDevice(
-    @Body() body: DeviceApprovalDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    await this.auth.approveDeviceAuthorization(request.user.id, body.userCode);
-  }
-
-  @Post('device/token')
-  @HttpCode(HttpStatus.OK)
-  deviceToken(@Body() body: DeviceTokenDto, @Req() request: Request) {
-    return this.auth.pollDeviceAuthorization(
-      body.deviceCode,
-      userAgent(request),
-    );
-  }
-
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  refresh(@Body() body: RefreshDto, @Req() request: Request) {
-    return this.auth.refresh(body.refreshToken, userAgent(request));
-  }
-
-  @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  logout(@Body() body: RefreshDto) {
-    return this.auth.logout(body.refreshToken);
-  }
-
-  @Post('web/register')
-  @HttpCode(HttpStatus.OK)
-  async webRegister(
+  @ApiOkResponse({ type: AccessTokenResponseDto })
+  async register(
     @Body() body: RegisterDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -153,9 +131,10 @@ export class AuthController {
     );
   }
 
-  @Post('web/login')
+  @Post('login')
   @HttpCode(HttpStatus.OK)
-  async webLogin(
+  @ApiOkResponse({ type: AccessTokenResponseDto })
+  async login(
     @Body() body: LoginDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -166,9 +145,58 @@ export class AuthController {
     );
   }
 
-  @Post('web/refresh')
+  @Post('device/code')
+  @ApiCreatedResponse({ type: DeviceCodeResponseDto })
+  deviceCode() {
+    return this.auth.startDeviceAuthorization();
+  }
+
+  @Post('device/approve')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @UseGuards(JwtAuthGuard)
+  async approveDevice(
+    @Body() body: DeviceApprovalDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    await this.auth.approveDeviceAuthorization(request.user.id, body.userCode);
+  }
+
+  @Post('device/token')
   @HttpCode(HttpStatus.OK)
-  async webRefresh(
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(PendingDeviceTokenResponseDto) },
+        { $ref: getSchemaPath(AuthorizedDeviceTokenResponseDto) },
+      ],
+    },
+  })
+  deviceToken(@Body() body: DeviceTokenDto, @Req() request: Request) {
+    return this.auth.pollDeviceAuthorization(
+      body.deviceCode,
+      userAgent(request),
+    );
+  }
+
+  @Post('device/refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: AuthTokensResponseDto })
+  deviceRefresh(@Body() body: RefreshDto, @Req() request: Request) {
+    return this.auth.refresh(body.refreshToken, userAgent(request));
+  }
+
+  @Post('device/logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  deviceLogout(@Body() body: RefreshDto) {
+    return this.auth.logout(body.refreshToken);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: AccessTokenResponseDto })
+  async refresh(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -180,9 +208,10 @@ export class AuthController {
     );
   }
 
-  @Post('web/logout')
+  @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async webLogout(
+  @ApiNoContentResponse()
+  async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -192,12 +221,14 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiOkResponse({ type: UserResponseDto })
   @UseGuards(JwtAuthGuard)
   me(@Req() request: AuthenticatedRequest) {
     return this.auth.me(request.user.id);
   }
 
   @Patch('me')
+  @ApiOkResponse({ type: UserResponseDto })
   @UseGuards(JwtAuthGuard)
   updateMe(
     @Req() request: AuthenticatedRequest,
@@ -208,6 +239,7 @@ export class AuthController {
 
   @Patch('password')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
   @UseGuards(JwtAuthGuard)
   async changePassword(
     @Req() request: AuthenticatedRequest,
@@ -223,6 +255,7 @@ export class AuthController {
   }
 
   @Get('sessions')
+  @ApiOkResponse({ type: SessionResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard)
   sessions(@Req() request: AuthenticatedRequest) {
     return this.auth.sessions(request.user.id, request.user.sessionId);
@@ -230,6 +263,7 @@ export class AuthController {
 
   @Delete('sessions/:sessionId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
   @UseGuards(JwtAuthGuard)
   revokeSession(
     @Req() request: AuthenticatedRequest,
@@ -240,6 +274,7 @@ export class AuthController {
 
   @Delete('me')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
   @UseGuards(JwtAuthGuard)
   async deleteMe(
     @Req() request: AuthenticatedRequest,
@@ -267,7 +302,7 @@ export class AuthController {
       httpOnly: true,
       sameSite: 'lax' as const,
       secure: this.config.getOrThrow<string>('app.nodeEnv') === 'production',
-      path: '/api/auth/web',
+      path: '/api/auth',
     };
   }
 

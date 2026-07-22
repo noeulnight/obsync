@@ -38,12 +38,8 @@ describe('Vaults (e2e)', () => {
   }
 
   async function registerAndLogin(email: string) {
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, password: 'password123' })
-      .expect(201);
     const response = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/auth/register')
       .send({ email, password: 'password123' })
       .expect(200);
     const token = json(response.text).accessToken;
@@ -133,7 +129,7 @@ describe('Vaults (e2e)', () => {
       .patch(`/api/vaults/${vaultA1}/members/${member.id}`)
       .set('authorization', `Bearer ${tokenA}`)
       .send({ role: 'VIEWER' })
-      .expect(200);
+      .expect(204);
     await request(app.getHttpServer())
       .delete(`/api/vaults/${vaultA1}/members/${member.id}`)
       .set('authorization', `Bearer ${tokenA}`)

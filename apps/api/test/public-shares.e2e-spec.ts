@@ -30,12 +30,8 @@ describe('Public shares (e2e)', () => {
   });
 
   it('publishes and revokes an anonymous document URL', async () => {
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, password: 'password123' })
-      .expect(201);
     const login = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/auth/register')
       .send({ email, password: 'password123' })
       .expect(200);
     const token = response(login.text).accessToken;

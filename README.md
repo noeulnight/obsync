@@ -45,6 +45,8 @@ pnpm --filter web dev --host 0.0.0.0
 
 - Web: `http://localhost:5173`
 - API health: `http://localhost:3000/api/health`
+- API docs: `http://localhost:3000/api/docs`
+- OpenAPI JSON: `http://localhost:3000/api/openapi.json`
 - Storage API: `http://localhost:9000`
 - Storage console: `http://localhost:9001`
 - MCP endpoint: `http://localhost:3000/mcp` in development, or `http://localhost:8080/mcp` with Compose

@@ -182,10 +182,8 @@ POST /api/auth/device/approve
 POST /api/auth/device/token
 POST /api/auth/refresh
 POST /api/auth/logout
-POST /api/auth/web/register
-POST /api/auth/web/login
-POST /api/auth/web/refresh
-POST /api/auth/web/logout
+POST /api/auth/device/refresh
+POST /api/auth/device/logout
 GET  /api/auth/me
 PATCH /api/auth/me
 PATCH /api/auth/password

@@ -44,12 +44,8 @@ describe('MCP OAuth (e2e)', () => {
       where: { email: { in: [email, otherEmail] } },
     });
 
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, password: 'password123' })
-      .expect(201);
     const login = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/auth/register')
       .send({ email, password: 'password123' })
       .expect(200);
     accountToken = json<{ accessToken: string }>(login.text).accessToken;
@@ -60,12 +56,8 @@ describe('MCP OAuth (e2e)', () => {
       .expect(201);
     vaultId = json<{ id: string }>(vault.text).id;
 
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email: otherEmail, password: 'password123' })
-      .expect(201);
     const otherLogin = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/auth/register')
       .send({ email: otherEmail, password: 'password123' })
       .expect(200);
     const otherVault = await request(app.getHttpServer())
@@ -332,7 +324,7 @@ describe('MCP OAuth (e2e)', () => {
     await request(app.getHttpServer())
       .delete(`/api/auth/mcp/apps/${clientId}`)
       .set('authorization', `Bearer ${accountToken}`)
-      .expect(200);
+      .expect(204);
     await request(app.getHttpServer())
       .post('/mcp')
       .set('authorization', `Bearer ${mcpToken}`)

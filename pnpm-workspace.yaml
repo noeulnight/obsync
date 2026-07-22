@@ -26,6 +26,7 @@ catalog:
   prisma: 7.8.0
   '@types/pg': 8.16.0
   '@nestjs/jwt': 11.0.2
+  '@nestjs/swagger': 11.4.6
   argon2: 0.45.0
   '@aws-sdk/client-s3': 3.1090.0
   '@aws-sdk/s3-request-presigner': 3.1090.0
@@ -80,6 +81,7 @@ peerDependencyRules:
     vitest: "*"
 allowBuilds:
   '@prisma/engines': true
+  '@scarf/scarf': false
   argon2: true
   prisma: true
   unrs-resolver: true
