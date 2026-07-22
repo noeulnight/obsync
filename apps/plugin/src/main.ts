@@ -485,18 +485,7 @@ export default class ObsyncPlugin extends Plugin {
     this.status.dataset.state = state;
     this.status.setAttribute("aria-label", `Obsync: ${status}`);
     this.status.setAttribute("title", `Obsync: ${status}`);
-    setIcon(
-      this.status,
-      state === "synced"
-        ? "check-circle"
-        : state === "offline"
-          ? "cloud-off"
-          : state === "error"
-            ? "alert-triangle"
-            : state === "idle"
-              ? "circle-dashed"
-              : "refresh-cw",
-    );
+    setIcon(this.status, statusIcon(state));
   }
 
   private async run(work: () => unknown) {
@@ -512,12 +501,27 @@ export default class ObsyncPlugin extends Plugin {
 }
 
 function statusState(status: string) {
-  if (["Synced", "Read only", "Server changes applied"].includes(status)) return "synced";
+  if (["Synced", "Server changes applied"].includes(status)) return "synced";
+  if (status === "Read only") return "readonly";
   if (["Offline", "Waiting to reconnect"].includes(status)) return "offline";
   if (["Error", "Authentication failed"].includes(status)) return "error";
-  if (["Sign in required", "Select a Vault", "Vault switch cancelled"].includes(status))
-    return "idle";
+  if (status === "Sign in required") return "signin";
+  if (["Select a Vault", "Vault switch cancelled"].includes(status)) return "setup";
+  if (status.toLowerCase().includes("conflict copy")) return "conflict";
   return "syncing";
+}
+
+function statusIcon(state: ReturnType<typeof statusState>) {
+  return {
+    synced: "check-circle",
+    readonly: "lock",
+    offline: "cloud-off",
+    error: "alert-triangle",
+    signin: "log-in",
+    setup: "folder-open",
+    conflict: "copy",
+    syncing: "refresh-cw",
+  }[state];
 }
 
 function delay(milliseconds: number) {

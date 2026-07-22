@@ -115,9 +115,49 @@ describe("CanvasEditor", () => {
     expect(release).toHaveBeenCalledOnce();
   });
 
+  it("renders Markdown styling in text nodes", async () => {
+    const document = new Y.Doc();
+    const text = document.getText("canvas-node:note:text");
+    text.insert(0, "# 제목\n**굵게**");
+    const session = {
+      nodes: () => [
+        { id: "note", type: "text", x: 100, y: 100, width: 280, height: 160, text: text.toJSON() },
+      ],
+      edges: () => [],
+      presence: () => [],
+      subscribe: () => () => undefined,
+      subscribePresence: () => () => undefined,
+      destroy: () => undefined,
+      setPresence: () => undefined,
+      text: () => text,
+    } as unknown as WebCanvas;
+
+    const view = render(
+      <CanvasEditor
+        session={session}
+        vaultName="Vault"
+        path="Test.canvas"
+        onRename={() => undefined}
+        onDelete={() => undefined}
+        openDocument={() => undefined}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        resolveFileAsset={() => Promise.resolve(undefined)}
+        files={[]}
+        onAddFile={() => undefined}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(view.container.querySelector(".cm-live-heading-1")).not.toBeNull();
+      expect(view.container.querySelector(".cm-live-strong")).not.toBeNull();
+    });
+  });
+
   it("connects nodes by dragging from the connection handle", () => {
     HTMLElement.prototype.setPointerCapture = vi.fn();
     const connect = vi.fn();
+    const document = new Y.Doc();
     const nodes = [
       { id: "one", type: "text", x: 100, y: 100, width: 280, height: 160, text: "One" },
       { id: "two", type: "text", x: 500, y: 100, width: 280, height: 160, text: "Two" },
@@ -130,6 +170,7 @@ describe("CanvasEditor", () => {
       subscribePresence: () => () => undefined,
       destroy: () => undefined,
       setPresence: () => undefined,
+      text: (id: string) => document.getText(`canvas-node:${id}:text`),
       bringToFront: () => undefined,
       connect,
     } as unknown as WebCanvas;
@@ -168,7 +209,7 @@ describe("CanvasEditor", () => {
       .getAllByRole("button", { name: "Left connection point" })
       .find((handle) => handle.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId === "two");
     expect(targetHandle?.className.includes("opacity-100")).toBe(true);
-    fireEvent.pointerUp(sourceHandle, {
+    fireEvent.pointerUp(target, {
       pointerId: 2,
       clientX: 500,
       clientY: 180,

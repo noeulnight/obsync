@@ -7,7 +7,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import type { FileEntry } from "@/features/documents/lib/files";
-import type { WebDocument } from "@/features/documents/lib/sync";
+import type { EditorSession } from "@/features/documents/components/Editor";
 import { edgeGeometry, edgePoint, nearestSide, previewEdgePath } from "../lib/canvas-geometry";
 import type { CanvasNode, CanvasSession, CanvasSide } from "../lib/sync";
 import { CanvasNodeCard, canvasColor } from "./CanvasNode";
@@ -30,7 +30,7 @@ export function CanvasSurface({
   readOnly,
 }: {
   session: CanvasSession;
-  openDocument: (file: string) => WebDocument | undefined;
+  openDocument: (file: string) => EditorSession | undefined;
   onNavigate: (file: string, href: string) => void;
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveFileAsset: (file: string) => Promise<string | undefined>;

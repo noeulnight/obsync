@@ -65,11 +65,45 @@ describe('PublicSharesService', () => {
       ],
     });
   });
+
+  it('includes Markdown documents embedded by a shared Canvas', async () => {
+    const { service, prisma, collaboration } = setup();
+    prisma.publicShare.findUnique.mockResolvedValue({
+      vaultId,
+      vault: { name: 'Shared Vault' },
+      file: {
+        id: fileId,
+        path: 'Boards/Public.canvas',
+        kind: 'CANVAS',
+        deletedAt: null,
+      },
+    });
+    collaboration.readCanvas.mockResolvedValue({
+      meta: {},
+      nodes: [{ id: 'node', type: 'file', file: '../Notes/Embedded.md' }],
+      edges: [],
+    });
+    prisma.attachment.findMany.mockResolvedValue([]);
+    prisma.vaultFile.findMany.mockResolvedValue([
+      { id: '55555555-5555-4555-8555-555555555555', path: 'Notes/Embedded.md' },
+    ]);
+    collaboration.readDocument.mockResolvedValue('# Embedded');
+
+    await expect(service.read('public-canvas')).resolves.toMatchObject({
+      documents: [
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          path: 'Notes/Embedded.md',
+          content: '# Embedded',
+        },
+      ],
+    });
+  });
 });
 
 function setup() {
   const prisma = {
-    vaultFile: { findFirst: jest.fn() },
+    vaultFile: { findFirst: jest.fn(), findMany: jest.fn() },
     publicShare: {
       findUnique: jest.fn(),
       upsert: jest.fn(),

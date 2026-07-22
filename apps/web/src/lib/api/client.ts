@@ -120,6 +120,7 @@ export type PublicShare = {
     >;
     edges: Array<Record<string, unknown> & { id: string; fromNode: string; toNode: string }>;
   };
+  documents: Array<{ id: string; path: string; content: string }>;
   attachments: Array<{ id: string; path: string; mimeType: string }>;
 };
 

@@ -4,6 +4,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { CollaborationServerService } from '../collaboration/collaboration-server.service';
 import type { CanvasData } from '../collaboration/types/canvas-data.type';
+import { resolveMarkdownTarget } from '../collaboration/utils/markdown-links';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
@@ -62,6 +63,9 @@ export class PublicSharesService {
       content,
       canvas,
     );
+    const documents = canvas
+      ? await this.referencedDocuments(shared.vaultId, shared.file.path, canvas)
+      : [];
     return {
       slug,
       vaultName: shared.vault.name,
@@ -72,6 +76,7 @@ export class PublicSharesService {
       },
       content,
       canvas,
+      documents,
       attachments: attachments.map(({ id, path, mimeType }) => ({
         id,
         path,
@@ -166,6 +171,30 @@ export class PublicSharesService {
       if (attachment) referenced.set(attachment.id, attachment);
     }
     return [...referenced.values()];
+  }
+
+  private async referencedDocuments(
+    vaultId: string,
+    sourcePath: string,
+    canvas: CanvasData,
+  ) {
+    const files = await this.prisma.vaultFile.findMany({
+      where: { vaultId, kind: 'MARKDOWN', deletedAt: null },
+      select: { id: true, path: true },
+    });
+    const referenced = new Map<string, (typeof files)[number]>();
+    for (const node of canvas.nodes) {
+      if (node.type !== 'file' || !node.file) continue;
+      const file = resolveMarkdownTarget(sourcePath, node.file, files);
+      if (file) referenced.set(file.id, file);
+    }
+    return Promise.all(
+      [...referenced.values()].map(async (file) => ({
+        id: file.id,
+        path: file.path,
+        content: await this.collaboration.readDocument(vaultId, file.id),
+      })),
+    );
   }
 
   private response(share: { slug: string; createdAt: Date }) {

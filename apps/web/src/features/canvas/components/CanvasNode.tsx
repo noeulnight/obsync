@@ -1,13 +1,7 @@
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
-import { EditorState } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
 import { FileText } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { yCollab } from "y-codemirror.next";
-import { Editor } from "@/features/documents/components/Editor";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Editor, type EditorSession } from "@/features/documents/components/Editor";
 import { imagePath, type FileEntry } from "@/features/documents/lib/files";
-import type { WebDocument } from "@/features/documents/lib/sync";
 import type { CanvasNode, CanvasSession, CanvasSide } from "../lib/sync";
 
 const sideHandles: { side: CanvasSide; label: string; className: string }[] = [
@@ -60,7 +54,7 @@ export function CanvasNodeCard({
   node: CanvasNode;
   index: number;
   session: CanvasSession;
-  openDocument: (file: string) => WebDocument | undefined;
+  openDocument: (file: string) => EditorSession | undefined;
   onNavigate: (file: string, href: string) => void;
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveFileAsset: (file: string) => Promise<string | undefined>;
@@ -133,7 +127,7 @@ export function CanvasNodeCard({
             className="absolute inset-0 cursor-grab active:cursor-grabbing"
             onPointerDown={(event) => onStartMove(event, node)}
             onPointerUp={(event) => onFinishConnection(event, node)}
-            onDoubleClick={() => onEdit(node.id)}
+            onDoubleClick={() => !readOnly && onEdit(node.id)}
           />
         )}
       </div>
@@ -178,7 +172,7 @@ function CanvasNodeContent({
 }: {
   node: CanvasNode;
   session: CanvasSession;
-  openDocument: (file: string) => WebDocument | undefined;
+  openDocument: (file: string) => EditorSession | undefined;
   onNavigate: (file: string, href: string) => void;
   resolveAsset: (file: string, href: string) => Promise<string | undefined>;
   resolveFileAsset: (file: string) => Promise<string | undefined>;
@@ -187,8 +181,7 @@ function CanvasNodeContent({
   editing: boolean;
 }) {
   if (node.type === "text") {
-    if (editing) return <CanvasTextEditor node={node} session={session} readOnly={readOnly} />;
-    return <div className="whitespace-pre-wrap p-4 text-base leading-6">{node.text}</div>;
+    return <CanvasTextEditor node={node} session={session} readOnly={readOnly || !editing} />;
   }
   if (node.type === "file") {
     const file = node.file;
@@ -243,43 +236,26 @@ function CanvasTextEditor({
   session: CanvasSession;
   readOnly: boolean;
 }) {
-  const parent = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!parent.current) return;
-    const text = session.text(node.id);
-    const view = new EditorView({
-      parent: parent.current,
-      state: EditorState.create({
-        doc: text.toJSON(),
-        extensions: [
-          history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
-          markdown(),
-          EditorView.lineWrapping,
-          EditorView.editable.of(!readOnly),
-          canvasTextTheme,
-          ...(!readOnly && session.provider ? [yCollab(text, session.provider.awareness)] : []),
-        ],
-      }),
-    });
-    view.focus();
-    return () => view.destroy();
-  }, [node.id, readOnly, session]);
-
-  return <div ref={parent} className="size-full" />;
+  const editorSession = useMemo<EditorSession>(
+    () => ({
+      text: session.text(node.id),
+      provider: session.provider,
+      acquire: () => undefined,
+      release: () => undefined,
+    }),
+    [node.id, session],
+  );
+  return (
+    <Editor
+      session={editorSession}
+      compact
+      readOnly={readOnly}
+      files={[]}
+      onNavigate={() => undefined}
+      resolveAsset={() => Promise.resolve(undefined)}
+    />
+  );
 }
-
-const canvasTextTheme = EditorView.theme(
-  {
-    "&": { height: "100%", backgroundColor: "transparent" },
-    "&.cm-focused": { outline: "none" },
-    ".cm-scroller": { overflow: "auto", fontFamily: "inherit" },
-    ".cm-content": { minHeight: "100%", padding: "16px", fontSize: "16px", lineHeight: "1.5" },
-    ".cm-line": { padding: "0" },
-  },
-  { dark: true },
-);
 
 function CanvasAttachment({
   file,
