@@ -11,6 +11,7 @@ export function AttachmentPreview({
   vaultName,
   onRename,
   onDelete,
+  headerLeading,
 }: {
   api: ApiClient;
   vaultId: string;
@@ -18,6 +19,7 @@ export function AttachmentPreview({
   vaultName: string;
   onRename?: () => void;
   onDelete?: () => void;
+  headerLeading?: ReactNode;
 }) {
   const attachmentId = entry.attachmentId ?? "";
   const download = useAttachmentDownload(api, vaultId, attachmentId);
@@ -28,6 +30,7 @@ export function AttachmentPreview({
         <FileHeader
           vaultName={vaultName}
           path={entry.path}
+          leading={headerLeading}
           onRename={onRename}
           onDelete={onDelete}
         />
@@ -43,6 +46,7 @@ export function AttachmentPreview({
         <FileHeader
           vaultName={vaultName}
           path={entry.path}
+          leading={headerLeading}
           onRename={onRename}
           onDelete={onDelete}
         />
@@ -52,7 +56,13 @@ export function AttachmentPreview({
   }
   return (
     <div className="flex h-full flex-col">
-      <FileHeader vaultName={vaultName} path={entry.path} onRename={onRename} onDelete={onDelete} />
+      <FileHeader
+        vaultName={vaultName}
+        path={entry.path}
+        leading={headerLeading}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
       {imagePath(entry.path) ? (
         <div className="grid min-h-0 flex-1 place-items-center overflow-auto p-6">
           <img
@@ -77,3 +87,4 @@ export function AttachmentPreview({
 function basename(path: string) {
   return path.split("/").at(-1) ?? path;
 }
+import type { ReactNode } from "react";

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Editor } from "@/features/documents/components/Editor";
 import { renamedMarkdownPath, type FileEntry } from "@/features/documents/lib/files";
@@ -26,6 +26,7 @@ export function DocumentEditor({
   onOpenDocument,
   readOnly = false,
   canShare = false,
+  headerLeading,
 }: {
   entry: FileEntry;
   api: ApiClient;
@@ -42,6 +43,7 @@ export function DocumentEditor({
   onOpenDocument: (fileId: string) => void;
   readOnly?: boolean;
   canShare?: boolean;
+  headerLeading?: ReactNode;
 }) {
   const original = basename(entry.path);
   const [title, setTitle] = useState(original);
@@ -71,6 +73,7 @@ export function DocumentEditor({
         vaultName={vaultName}
         path={entry.path}
         title={title}
+        leading={headerLeading}
         actions={
           <>
             {canShare && <ShareButton vaultId={vaultId} fileId={entry.id} />}

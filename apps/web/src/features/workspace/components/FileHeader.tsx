@@ -12,6 +12,7 @@ export function FileHeader({
   vaultName,
   path,
   title,
+  leading,
   actions,
   onRename,
   onDelete,
@@ -19,6 +20,7 @@ export function FileHeader({
   vaultName: string;
   path: string;
   title?: string;
+  leading?: ReactNode;
   actions?: ReactNode;
   onRename?: () => void;
   onDelete?: () => void;
@@ -27,7 +29,8 @@ export function FileHeader({
   const parts = [vaultName, ...path.split("/").slice(0, -1), name];
   return (
     <header className="grid h-10 shrink-0 grid-cols-[1fr_auto] items-center px-3">
-      <nav className="min-w-0 justify-self-start" aria-label="Document path">
+      <nav className="flex min-w-0 items-center justify-self-start" aria-label="Document path">
+        {leading}
         <ol className="flex min-w-0 items-center gap-1 text-[13px] text-muted-foreground">
           {parts.map((part, index) => (
             <li key={`${index}-${part}`} className="flex min-w-0 items-center gap-1">

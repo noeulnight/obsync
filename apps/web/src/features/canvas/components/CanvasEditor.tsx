@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
 import { FileHeader } from "@/features/workspace/components/FileHeader";
@@ -22,6 +22,7 @@ export function CanvasEditor({
   onAddFile,
   readOnly = false,
   canShare = false,
+  headerLeading,
 }: {
   session: WebCanvas;
   fileId?: string;
@@ -38,6 +39,7 @@ export function CanvasEditor({
   onAddFile: () => void;
   readOnly?: boolean;
   canShare?: boolean;
+  headerLeading?: ReactNode;
 }) {
   const [, render] = useState(0);
 
@@ -50,6 +52,7 @@ export function CanvasEditor({
       <FileHeader
         vaultName={vaultName}
         path={path}
+        leading={headerLeading}
         actions={canShare && vaultId && fileId && <ShareButton vaultId={vaultId} fileId={fileId} />}
         onRename={readOnly ? undefined : onRename}
         onDelete={readOnly ? undefined : onDelete}

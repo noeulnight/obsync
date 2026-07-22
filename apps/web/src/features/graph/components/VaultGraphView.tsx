@@ -11,7 +11,15 @@ import {
   type SimulationNodeDatum,
 } from "d3-force";
 import { LocateFixed, ZoomIn, ZoomOut } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+  type WheelEvent,
+} from "react";
 import { Button } from "@/components/ui/button";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { ApiClient, VaultGraph } from "@/lib/api/client";
@@ -28,6 +36,7 @@ export function VaultGraphView({
   entries,
   open,
   create,
+  headerLeading,
 }: {
   api: ApiClient;
   vaultId: string;
@@ -35,12 +44,14 @@ export function VaultGraphView({
   entries: FileEntry[];
   open: (entry: FileEntry) => void;
   create: (path: string) => void;
+  headerLeading?: ReactNode;
 }) {
   const graph = useVaultGraph(api, vaultId);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-10 shrink-0 items-center px-4 text-[13px]">
+        {headerLeading}
         <span className="text-muted-foreground">{vaultName}</span>
         <span className="px-2 text-muted-foreground/50">/</span>
         <span>Graph</span>

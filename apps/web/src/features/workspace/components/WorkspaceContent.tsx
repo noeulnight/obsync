@@ -69,9 +69,9 @@ export function WorkspaceContent({
   onOpenEntry: (entry: FileEntry) => void;
   onCreateGraphDocument: (path: string) => void;
 }) {
+  const headerLeading = <SidebarTrigger className="mr-1 md:hidden" />;
   return (
-    <SidebarInset className="relative h-svh min-w-0 overflow-hidden">
-      <SidebarTrigger className="absolute top-2 left-2 z-50 md:hidden" />
+    <SidebarInset className="h-svh min-w-0 overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden">
         {graph ? (
           <VaultGraphView
@@ -81,6 +81,7 @@ export function WorkspaceContent({
             entries={entries}
             open={onOpenEntry}
             create={onCreateGraphDocument}
+            headerLeading={headerLeading}
           />
         ) : notice ? (
           <EmptyState>{notice}</EmptyState>
@@ -106,6 +107,7 @@ export function WorkspaceContent({
               }}
               readOnly={!canWrite}
               canShare={canShare}
+              headerLeading={headerLeading}
             />
           </Suspense>
         ) : canvasSession && activeEntry ? (
@@ -127,6 +129,7 @@ export function WorkspaceContent({
               onAddFile={onAddCanvasFile}
               readOnly={!canWrite}
               canShare={canShare}
+              headerLeading={headerLeading}
             />
           </Suspense>
         ) : activeEntry?.kind === "attachment" ? (
@@ -137,6 +140,7 @@ export function WorkspaceContent({
             entry={activeEntry}
             onRename={canWrite ? onRename : undefined}
             onDelete={canWrite ? onDelete : undefined}
+            headerLeading={headerLeading}
           />
         ) : (
           <EmptyState>Select a document from the sidebar.</EmptyState>
