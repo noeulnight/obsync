@@ -2,36 +2,9 @@ import type { FileEntry } from "./sync-types";
 
 export type RemoteChange = { entry: FileEntry; previous?: FileEntry };
 
-class ApplyingPaths extends Set<string> {
-  private readonly counts = new Map<string, number>();
-
-  override add(path: string) {
-    const count = (this.counts.get(path) ?? 0) + 1;
-    this.counts.set(path, count);
-    if (count === 1) super.add(path);
-    return this;
-  }
-
-  override delete(path: string) {
-    const count = this.counts.get(path) ?? 0;
-    if (count > 1) {
-      this.counts.set(path, count - 1);
-      return true;
-    }
-    this.counts.delete(path);
-    return super.delete(path);
-  }
-
-  override clear() {
-    this.counts.clear();
-    super.clear();
-  }
-}
-
 export class RemoteFileApplier {
-  readonly applying = new ApplyingPaths();
-  // ponytail: serialize Vault I/O; split by non-overlapping roots only if profiling requires it.
-  private queueChain: Promise<void> = Promise.resolve();
+  readonly applying = new Set<string>();
+  private readonly queues = new Map<string, Promise<void>>();
   private chain: Promise<unknown> = Promise.resolve();
   private readonly attempts = new Map<string, number>();
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -53,7 +26,6 @@ export class RemoteFileApplier {
     const next = this.chain
       .catch(() => undefined)
       .then(async () => {
-        if (this.destroyed) return true;
         changes.sort(({ entry: left }, { entry: right }) => {
           if (left.deleted !== right.deleted) return left.deleted ? 1 : -1;
           if (left.kind === "folder" && right.kind !== "folder") return left.deleted ? 1 : -1;
@@ -80,13 +52,14 @@ export class RemoteFileApplier {
     return next;
   }
 
-  queue(_path: string, work: () => Promise<void>) {
-    const next = this.queueChain
-      .catch(() => undefined)
-      .then(() => {
-        if (!this.destroyed) return work();
-      });
-    this.queueChain = next;
+  queue(path: string, work: () => Promise<void>) {
+    const previous = this.queues.get(path) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(work);
+    this.queues.set(path, next);
+    const cleanup = () => {
+      if (this.queues.get(path) === next) this.queues.delete(path);
+    };
+    void next.then(cleanup, cleanup);
     return next;
   }
 

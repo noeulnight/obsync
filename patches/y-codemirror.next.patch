@@ -17,7 +17,7 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
          const delta = event.delta
          const changes = []
          let pos = 0
-@@ -123,8 +131,60 @@ class YSyncPluginValue {
+@@ -123,8 +131,61 @@ class YSyncPluginValue {
          view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] })
        }
      }
@@ -66,10 +66,11 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
 +      }
 +      document?.destroy()
 +    }
-+    this._finishComposition = () => setTimeout(() => {
++    this._finishComposition = () => queueMicrotask(() => {
 +      this._flushComposition()
-+      this._flushRemote(true)
-+    }, 0)
++      if (view.composing) setTimeout(() => this._flushRemote(true), 0)
++      else this._flushRemote()
++    })
      this._ytext = this.conf.ytext
      this._ytext.observe(this._observer)
 +    view.contentDOM.addEventListener('compositionstart', this._compositionStart)
@@ -78,7 +79,7 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
    }
  
    /**
-@@ -134,13 +194,18 @@ class YSyncPluginValue {
+@@ -134,13 +195,18 @@ class YSyncPluginValue {
      if (!update.docChanged || (update.transactions.length > 0 && update.transactions[0].annotation(ySyncAnnotation) === this.conf)) {
        return
      }
@@ -99,7 +100,7 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
          const insertText = insert.sliceString(0, insert.length, '\n')
          if (fromA !== toA) {
            ytext.delete(fromA + adj, toA - fromA)
-@@ -155,6 +220,10 @@ class YSyncPluginValue {
+@@ -155,6 +221,10 @@ class YSyncPluginValue {
  
    destroy () {
      this._ytext.unobserve(this._observer)

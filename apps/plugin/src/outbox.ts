@@ -4,6 +4,7 @@ import {
   activePaths,
   cleanupConfirmedOperations,
   confirmOperation,
+  conflictPath,
   operationRequest,
   projectEntries,
   rebaseOperation,
@@ -28,7 +29,6 @@ export class FileOperationOutbox {
     private readonly manifest: Y.Map<FileEntry>,
     private readonly localPaths: () => string[],
     private readonly moveLocalConflict: (from: string, to: string) => Promise<void>,
-    private readonly mergeCreate: (operation: FileOperation, file: RemoteFile) => Promise<void>,
     private readonly setStatus: (status: string) => void,
     private readonly report: (error: unknown) => void,
   ) {
@@ -71,7 +71,7 @@ export class FileOperationOutbox {
   }
 
   private async flush() {
-    if (this.destroyed || this.flushing || !this.synced || this.connection.readOnly) return;
+    if (this.flushing || !this.synced || this.connection.readOnly) return;
     this.flushing = true;
     try {
       while (true) {
@@ -84,11 +84,9 @@ export class FileOperationOutbox {
             this.connection.vaultId,
             operationRequest(operation),
           );
-          if (this.destroyed) return;
           this.retryDelay = 1_000;
           this.confirm(index, operation, result.files);
         } catch (error) {
-          if (this.destroyed) return;
           if (error instanceof ApiRequestError && error.status === 409) {
             try {
               await this.recoverConflict(index, operation);
@@ -122,19 +120,22 @@ export class FileOperationOutbox {
       this.confirm(index, operation, [result.file]);
       return;
     }
-    if (result.type === "merge") {
-      await this.mergeCreate(operation, result.file);
-      this.operations.delete(index, 1);
-      this.setStatus(
-        operation.kind === "folder"
-          ? "Merged with existing folder"
-          : "Merged with existing document",
-      );
-      return;
-    }
     if (result.type === "discard") {
       this.operations.delete(index, 1);
       this.setStatus("Server changes applied");
+      return;
+    }
+    if (result.type === "merge") {
+      const from = operation.path!;
+      const to = conflictPath(from, operation.fileId, this.occupiedPaths(files));
+      await this.moveLocalConflict(from, to);
+      this.rewritePendingPaths(from, to);
+      this.replaceOperation(index, {
+        ...operation,
+        operationId: crypto.randomUUID(),
+        path: to,
+      });
+      this.setStatus("Creating conflict copy");
       return;
     }
     if (result.conflict) {

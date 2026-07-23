@@ -2,7 +2,7 @@ import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/pro
 import type { Extension } from "@codemirror/state";
 import { TFile, TFolder, type App, type TAbstractFile } from "obsidian";
 import * as Y from "yjs";
-import { isWithin, type FileOperation, type RemoteFile } from "@obsync/sync-core";
+import { isWithin } from "@obsync/sync-core";
 import { sha256, uploadAttachment } from "./attachment-sync";
 import { InitialVaultSync } from "./initial-sync";
 import { FileOperationOutbox } from "./outbox";
@@ -48,7 +48,6 @@ export class VaultSync {
       maxDelay: 5_000,
       maxAttempts: 0,
       onStatus: ({ status }) => {
-        if (this.destroyed) return;
         if (status === "disconnected") {
           this.manifestSynced = false;
           this.outbox?.setSynced(false);
@@ -60,8 +59,7 @@ export class VaultSync {
       connection,
       this.manifest,
       () => this.app.vault.getAllLoadedFiles().map((file) => file.path),
-      (from, to) => this.moveQueuedFile(from, to),
-      (operation, file) => this.mergeCreate(operation, file),
+      (from, to) => this.writer.moveLocalConflict(from, to),
       setStatus,
       (error) => this.report(error),
     );
@@ -139,7 +137,6 @@ export class VaultSync {
     changed = false,
     onDetached?: () => void,
   ): { key?: string; extension: Extension; text: string; ready: boolean } {
-    if (this.initialMode) return { extension: [], text: editorText, ready: false };
     const existing = this.files.findPath(file.path);
     if (!existing && !this.manifestLoaded) {
       return { extension: [], text: editorText, ready: false };
@@ -173,9 +170,6 @@ export class VaultSync {
     changed = false,
     onDetached?: () => void,
   ) {
-    if (this.initialMode) {
-      return { extension: [] as Extension, text: editorText, ready: false };
-    }
     const entry = this.files.findPath(canvasFile.path);
     if (entry?.kind !== "canvas" || entry.deleted) {
       return { extension: [] as Extension, text: editorText, ready: false };
@@ -194,11 +188,11 @@ export class VaultSync {
     if (!(file instanceof TFile)) return;
     if (file.extension === "md") {
       const entry = this.files.ensureMarkdown(file.path);
-      await this.sessions.document(entry, "local").localChanged();
+      await this.sessions.document(entry).localChanged();
       return;
     }
     if (file.extension === "canvas") {
-      await this.sessions.canvas(this.files.ensureCanvas(file.path), "local").localChanged();
+      await this.sessions.canvas(this.files.ensureCanvas(file.path)).localChanged();
       return;
     }
     await this.remote.queue(file.path, () => this.upload(file));
@@ -210,11 +204,11 @@ export class VaultSync {
     if (!this.manifestLoaded && !this.files.findPath(file.path)) return;
     if (file.extension === "md") {
       const entry = this.files.ensureMarkdown(file.path);
-      await this.sessions.document(entry, "local").localChanged(false);
+      await this.sessions.document(entry).localChanged(false);
       return;
     }
     if (file.extension === "canvas") {
-      await this.sessions.canvas(this.files.ensureCanvas(file.path), "local").fileChanged();
+      await this.sessions.canvas(this.files.ensureCanvas(file.path)).fileChanged();
       return;
     }
     await this.remote.queue(file.path, () => this.upload(file));
@@ -310,11 +304,9 @@ export class VaultSync {
       websocketProvider: this.socket,
       token: this.connection.token,
       onSynced: ({ state }) => {
-        if (state && !this.destroyed) synced?.();
+        if (state) synced?.();
       },
-      onAuthenticationFailed: () => {
-        if (!this.destroyed) this.setStatus("Authentication failed");
-      },
+      onAuthenticationFailed: () => this.setStatus("Authentication failed"),
     });
     provider.attach();
     return provider;
@@ -388,61 +380,6 @@ export class VaultSync {
     const current = this.files.findPath(file.path);
     const operation = await uploadAttachment(this.app, this.connection, file, current);
     if (operation) this.outbox.enqueue(operation);
-  }
-
-  private async moveQueuedFile(from: string, to: string) {
-    const entry = this.files.findPath(from);
-    await this.writer.moveLocalConflict(from, to);
-    if (entry) this.sessions.rename(entry, to);
-  }
-
-  private async mergeCreate(operation: FileOperation, file: RemoteFile) {
-    if (operation.kind === "folder") return;
-    if (operation.kind !== "markdown" && operation.kind !== "canvas") {
-      throw new Error("Merge target is unavailable.");
-    }
-    this.sessions.delete({
-      id: operation.fileId,
-      kind: operation.kind,
-      path: operation.path!,
-      deleted: false,
-      updatedAt: operation.createdAt,
-      version: 0,
-    });
-    const existing = this.manifest.get(file.id);
-    if (operation.kind === "markdown") {
-      if (existing && existing.kind !== "markdown") throw new Error("Merge target is unavailable.");
-      await this.sessions
-        .document(
-          existing ?? {
-            id: file.id,
-            kind: "markdown",
-            path: file.path,
-            deleted: false,
-            updatedAt: Date.now(),
-            version: file.version,
-          },
-          "merge",
-        )
-        .localChanged();
-      this.refreshEditors();
-      return;
-    }
-    if (existing && existing.kind !== "canvas") throw new Error("Merge target is unavailable.");
-    await this.sessions
-      .canvas(
-        existing ?? {
-          id: file.id,
-          kind: "canvas",
-          path: file.path,
-          deleted: false,
-          updatedAt: Date.now(),
-          version: file.version,
-        },
-        "merge",
-      )
-      .localChanged();
-    this.refreshEditors();
   }
 
   private isApplying(path: string) {

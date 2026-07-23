@@ -28,7 +28,7 @@ describe("remote file applier", () => {
     applier.destroy();
   });
 
-  it("serializes all Vault work and releases applying markers", async () => {
+  it("serializes work for the same path and releases applying markers", async () => {
     let release!: () => void;
     let markStarted!: () => void;
     const first = new Promise<void>((resolve) => {
@@ -45,7 +45,7 @@ describe("remote file applier", () => {
       await first;
       order.push("first-end");
     });
-    const next = applier.queue("other/folder", async () => {
+    const next = applier.queue("note.md", async () => {
       order.push("second");
     });
 
@@ -62,31 +62,6 @@ describe("remote file applier", () => {
       }),
     ).rejects.toThrow("write failed");
     expect(applier.applying.size).toBe(0);
-
-    await applier.whileApplying(["note.md"], async () => {
-      await applier.whileApplying(["note.md"], async () => {
-        expect(applier.applying.has("note.md")).toBe(true);
-      });
-      expect(applier.applying.has("note.md")).toBe(true);
-    });
-    expect(applier.applying.has("note.md")).toBe(false);
     applier.destroy();
-  });
-
-  it("drops queued Vault work after the synchronizer is destroyed", async () => {
-    let release!: () => void;
-    const blocker = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const applier = new RemoteFileApplier(vi.fn(), vi.fn(), vi.fn());
-    const first = applier.queue("first", () => blocker);
-    const skipped = vi.fn().mockResolvedValue(undefined);
-    const second = applier.queue("second", skipped);
-
-    applier.destroy();
-    release();
-    await Promise.all([first, second]);
-
-    expect(skipped).not.toHaveBeenCalled();
   });
 });

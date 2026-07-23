@@ -40,7 +40,7 @@ export class InitialVaultSync {
       if (!this.options.isApplying(folder.path)) this.options.ensureFolder(folder.path);
     }
 
-    const seedMode = initialMode === "local" || initialMode === "merge" ? initialMode : "server";
+    const seedMode = initialMode === "local" ? "local" : "merge";
     for (const file of app.vault.getFiles()) {
       if (!this.options.isApplying(file.path)) await this.options.syncFile(file, seedMode);
     }
@@ -104,7 +104,7 @@ export class InitialVaultSync {
 }
 
 export function effectiveInitialMode(mode: InitialSyncMode | undefined, readOnly: boolean) {
-  return readOnly ? "server" : mode;
+  return readOnly && mode === "local" ? "merge" : mode;
 }
 
 function depth(path: string) {
