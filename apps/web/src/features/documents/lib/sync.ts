@@ -123,6 +123,10 @@ export class WebVault {
     return this.projectedEntries().filter((entry) => !entry.deleted);
   }
 
+  deletedEntries() {
+    return this.projectedEntries().filter((entry) => entry.deleted);
+  }
+
   subscribe(listener: () => void) {
     this.listeners.add(listener);
     listener();

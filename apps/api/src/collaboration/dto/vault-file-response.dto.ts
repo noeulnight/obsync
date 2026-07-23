@@ -25,6 +25,10 @@ export class ResetVaultResponseDto {
   deleted!: number;
 }
 
+export class PermanentDeleteResponseDto {
+  deleted!: number;
+}
+
 export class GraphNodeResponseDto {
   id!: string;
   path!: string;

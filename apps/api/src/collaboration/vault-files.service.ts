@@ -317,6 +317,101 @@ export class VaultFilesService {
     return { deleted: files.length };
   }
 
+  async restore(userId: string, vaultId: string, fileId: string) {
+    await this.access.requireWrite(userId, vaultId);
+    const files = await this.prisma.$transaction(
+      async (transaction) => {
+        const root = await transaction.vaultFile.findFirst({
+          where: { id: fileId, vaultId, deletedAt: { not: null } },
+        });
+        if (!root) throw new NotFoundException('Deleted file not found');
+        const affected = await this.deletedFiles(transaction, vaultId, root);
+        const collision = await transaction.vaultFile.findFirst({
+          where: {
+            vaultId,
+            deletedAt: null,
+            activePathKey: {
+              in: affected.map((file) => vaultPathKey(file.path)),
+            },
+          },
+          select: { id: true },
+        });
+        if (collision) {
+          throw new ConflictException('A file with this name already exists.');
+        }
+
+        const restored: VaultFile[] = [];
+        for (const file of affected) {
+          const version = file.version + 1;
+          restored.push(
+            await transaction.vaultFile.update({
+              where: { id: file.id },
+              data: {
+                activePathKey: vaultPathKey(file.path),
+                deletedAt: null,
+                version,
+                versions: {
+                  create: await versionSnapshot(transaction, userId, vaultId, {
+                    fileId: file.id,
+                    kind: clientKind(file.kind),
+                    version,
+                    path: file.path,
+                    attachmentId: file.attachmentId,
+                  }),
+                },
+              },
+            }),
+          );
+        }
+        const attachmentIds = restored.flatMap((file) =>
+          file.attachmentId ? [file.attachmentId] : [],
+        );
+        if (attachmentIds.length) {
+          await transaction.attachment.updateMany({
+            where: { id: { in: attachmentIds } },
+            data: { status: 'READY', deletedAt: null },
+          });
+        }
+        return restored;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    await this.collaboration.publishFiles(vaultId, files);
+    await this.links.refreshTargets(vaultId);
+    return { files: files.map(fileResponse) };
+  }
+
+  async permanentlyDelete(userId: string, vaultId: string, fileId: string) {
+    await this.access.requireOwner(userId, vaultId);
+    const ids = await this.prisma.$transaction(async (transaction) => {
+      const root = await transaction.vaultFile.findFirst({
+        where: { id: fileId, vaultId, deletedAt: { not: null } },
+      });
+      if (!root) throw new NotFoundException('Deleted file not found');
+      const files = await this.deletedFiles(transaction, vaultId, root);
+      const roomNames = files.flatMap((file) => {
+        if (file.kind === 'MARKDOWN')
+          return [`vault:${vaultId}:doc:${file.id}`];
+        if (file.kind === 'CANVAS')
+          return [`vault:${vaultId}:canvas:${file.id}`];
+        return [];
+      });
+      if (roomNames.length) {
+        await transaction.yDocument.deleteMany({
+          where: { roomName: { in: roomNames } },
+        });
+      }
+      const fileIds = files.map((file) => file.id);
+      await transaction.vaultFile.deleteMany({
+        where: { id: { in: fileIds } },
+      });
+      return fileIds;
+    });
+    await this.collaboration.removeFiles(vaultId, ids);
+    await this.links.refreshTargets(vaultId);
+    return { deleted: ids.length };
+  }
+
   async apply(userId: string, vaultId: string, input: FileOperationDto) {
     await this.access.requireWrite(userId, vaultId);
 
@@ -473,6 +568,22 @@ export class VaultFilesService {
       ];
     }
     return this.delete(transaction, userId, vaultId, file, input.operationId);
+  }
+
+  private deletedFiles(
+    transaction: Prisma.TransactionClient,
+    vaultId: string,
+    root: VaultFile,
+  ) {
+    if (root.kind !== 'FOLDER') return Promise.resolve([root]);
+    return transaction.vaultFile.findMany({
+      where: {
+        vaultId,
+        deletedAt: root.deletedAt,
+        OR: [{ path: root.path }, { path: { startsWith: `${root.path}/` } }],
+      },
+      orderBy: { path: 'asc' },
+    });
   }
 
   private async create(

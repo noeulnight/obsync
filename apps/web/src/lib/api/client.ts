@@ -451,6 +451,20 @@ export class ApiClient {
     });
   }
 
+  restoreDeletedFile(vaultId: string, fileId: string) {
+    return this.request<FileOperationResult>({
+      url: `/api/vaults/${vaultId}/files/${fileId}/restore`,
+      method: "POST",
+    });
+  }
+
+  permanentlyDeleteFile(vaultId: string, fileId: string) {
+    return this.request<{ deleted: number }>({
+      url: `/api/vaults/${vaultId}/files/${fileId}`,
+      method: "DELETE",
+    });
+  }
+
   async uploadAttachment(vaultId: string, file: File, path: string): Promise<UploadedAttachment> {
     const data = await file.arrayBuffer();
     const sha256 = await hash(data);

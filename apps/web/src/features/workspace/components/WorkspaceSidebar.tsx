@@ -8,6 +8,7 @@ import {
   Plus,
   Settings2,
   Search,
+  Trash2,
   Upload,
 } from "lucide-react";
 import type { RefObject } from "react";
@@ -55,6 +56,7 @@ export function WorkspaceSidebar({
   onCreateVault,
   onSearch,
   graph,
+  trash,
   onOpen,
   onRename,
   onDelete,
@@ -74,6 +76,7 @@ export function WorkspaceSidebar({
   onCreateVault: () => void;
   onSearch: () => void;
   graph: boolean;
+  trash: boolean;
   onOpen: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
@@ -128,6 +131,14 @@ export function WorkspaceSidebar({
                   <Search />
                   <span>Search</span>
                   <kbd className="ml-auto text-[10px] text-muted-foreground">⌘⇧F</kbd>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Trash" isActive={trash}>
+                  <Link to={`/vaults/${vault.id}/trash`}>
+                    <Trash2 />
+                    <span>Trash</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>

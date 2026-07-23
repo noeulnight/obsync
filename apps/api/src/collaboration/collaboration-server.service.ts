@@ -210,6 +210,18 @@ export class CollaborationServerService
     await connection.disconnect({ unloadImmediately: true });
   }
 
+  async removeFiles(vaultId: string, fileIds: string[]): Promise<void> {
+    const connection = await this.collaboration(vaultId).openDirectConnection(
+      'manifest',
+      { vaultId, userId: 'server', role: 'OWNER' },
+    );
+    await connection.transact((document) => {
+      const manifest = document.getMap<ManifestEntry>('files');
+      for (const fileId of fileIds) manifest.delete(fileId);
+    });
+    await connection.disconnect({ unloadImmediately: true });
+  }
+
   async restoreDocument(
     vaultId: string,
     fileId: string,

@@ -56,8 +56,11 @@ export function Workspace({
   }>();
   const graphRoute = useMatch("/vaults/:vaultId/graph");
   const graph = graphRoute?.params.vaultId === vault.id;
+  const trashRoute = useMatch("/vaults/:vaultId/trash");
+  const trash = trashRoute?.params.vaultId === vault.id;
   const [sync, setSync] = useState<WebVault>();
   const [entries, setEntries] = useState<FileEntry[]>([]);
+  const [deletedEntries, setDeletedEntries] = useState<FileEntry[]>([]);
   const [active, setActive] = useState(() =>
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
@@ -95,7 +98,10 @@ export function Workspace({
       setOnline,
       vault.role === "VIEWER",
     );
-    const unsubscribe = next.subscribe(() => setEntries(next.entries()));
+    const unsubscribe = next.subscribe(() => {
+      setEntries(next.entries());
+      setDeletedEntries(next.deletedEntries());
+    });
     setSync(next);
     setActive("");
     return () => {
@@ -122,11 +128,11 @@ export function Workspace({
   }, [activeEntry?.kind, canWrite]);
 
   useEffect(() => {
-    if (graph) return;
+    if (graph || trash) return;
     if (active && entries.some((entry) => entry.id === active)) return;
     const first = entries.find((entry) => entry.kind === "markdown");
     if (first) open(first, true);
-  }, [entries, active, graph, open]);
+  }, [entries, active, graph, trash, open]);
 
   useEffect(() => {
     if (routeVaultId === vault.id) setActive(routeFileId ?? "");
@@ -249,6 +255,24 @@ export function Workspace({
     }
   }
 
+  async function restore(entry: FileEntry) {
+    try {
+      await api.restoreDeletedFile(vault.id, entry.id);
+      toast.success(`${entry.path} restored.`);
+    } catch (reason) {
+      toast.error(`Restore failed: ${errorMessage(reason)}`);
+    }
+  }
+
+  async function permanentlyDelete(entry: FileEntry) {
+    try {
+      await api.permanentlyDeleteFile(vault.id, entry.id);
+      toast.success(`${entry.path} permanently deleted.`);
+    } catch (reason) {
+      toast.error(`Permanent deletion failed: ${errorMessage(reason)}`);
+    }
+  }
+
   const navigate = useCallback(
     (href: string) => {
       if (/^[a-z][a-z\d+.-]*:/i.test(href)) {
@@ -351,6 +375,7 @@ export function Workspace({
           onCreateVault={onCreate}
           onSearch={() => setSearchMode("search")}
           graph={graph}
+          trash={trash}
           onOpen={open}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
@@ -374,6 +399,11 @@ export function Workspace({
           connectionStatus={connectionStatus}
           canShare={vault.role === "OWNER"}
           graph={graph}
+          trash={trash}
+          deletedEntries={deletedEntries}
+          onRestore={restore}
+          onPermanentlyDelete={permanentlyDelete}
+          canPermanentlyDelete={vault.role === "OWNER" && online}
           onRenamePath={(path) => canWrite && activeEntry && sync?.rename(activeEntry, path)}
           onRename={() => activeEntry && setRenameTarget(activeEntry)}
           onDelete={() => activeEntry && setDeleteTarget(activeEntry)}

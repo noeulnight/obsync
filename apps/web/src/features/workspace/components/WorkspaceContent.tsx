@@ -7,6 +7,7 @@ import type { ApiClient } from "@/lib/api/client";
 import { VaultGraphView } from "@/features/graph/components/VaultGraphView";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { ConnectionStatusChip } from "./ConnectionStatusChip";
+import { TrashView } from "./TrashView";
 
 const DocumentEditor = lazy(() =>
   import("./DocumentEditor").then((module) => ({ default: module.DocumentEditor })),
@@ -31,6 +32,11 @@ export function WorkspaceContent({
   connectionStatus,
   canShare,
   graph,
+  trash,
+  deletedEntries,
+  onRestore,
+  onPermanentlyDelete,
+  canPermanentlyDelete,
   onRenamePath,
   onRename,
   onDelete,
@@ -58,6 +64,11 @@ export function WorkspaceContent({
   connectionStatus: string;
   canShare: boolean;
   graph: boolean;
+  trash: boolean;
+  deletedEntries: FileEntry[];
+  onRestore: (entry: FileEntry) => Promise<void>;
+  onPermanentlyDelete: (entry: FileEntry) => Promise<void>;
+  canPermanentlyDelete: boolean;
   onRenamePath: (path: string) => void;
   onRename: () => void;
   onDelete: () => void;
@@ -77,7 +88,18 @@ export function WorkspaceContent({
     <SidebarInset className="h-svh min-w-0 overflow-hidden">
       <ConnectionStatusChip status={connectionStatus} />
       <div className="min-h-0 flex-1 overflow-hidden">
-        {graph ? (
+        {trash ? (
+          <TrashView
+            api={api}
+            vaultId={vaultId}
+            entries={deletedEntries}
+            canRestore={canWrite}
+            canPermanentlyDelete={canPermanentlyDelete}
+            restore={onRestore}
+            permanentlyDelete={onPermanentlyDelete}
+            headerLeading={headerLeading}
+          />
+        ) : graph ? (
           <VaultGraphView
             api={api}
             vaultId={vaultId}

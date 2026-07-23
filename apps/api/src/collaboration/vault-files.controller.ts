@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -19,6 +20,7 @@ import {
   FileOperationResponseDto,
   FileVersionDetailResponseDto,
   FileVersionResponseDto,
+  PermanentDeleteResponseDto,
   ResetVaultResponseDto,
   RestoreFileVersionResponseDto,
   SearchFileResponseDto,
@@ -87,6 +89,26 @@ export class VaultFilesController {
     @Body() body: FileOperationDto,
   ) {
     return this.files.apply(request.user.id, vaultId, body);
+  }
+
+  @Post(':fileId/restore')
+  @ApiCreatedResponse({ type: FileOperationResponseDto })
+  restore(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    return this.files.restore(request.user.id, vaultId, fileId);
+  }
+
+  @Delete(':fileId')
+  @ApiOkResponse({ type: PermanentDeleteResponseDto })
+  permanentlyDelete(
+    @Req() request: AuthenticatedRequest,
+    @Param('vaultId', new ParseUUIDPipe()) vaultId: string,
+    @Param('fileId', new ParseUUIDPipe()) fileId: string,
+  ) {
+    return this.files.permanentlyDelete(request.user.id, vaultId, fileId);
   }
 
   @Get(':fileId/versions')

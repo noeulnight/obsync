@@ -227,6 +227,54 @@ describe('VaultFilesService', () => {
     expect(refreshTargets).toHaveBeenCalledWith(vaultId);
   });
 
+  it('restores a deleted file with its identity and history intact', async () => {
+    const deletedAt = new Date('2026-07-22T00:00:00.000Z');
+    const deleted = file({ deletedAt, activePathKey: null, version: 2 });
+    const restored = file({ version: 3 });
+    const transaction = transactionMock();
+    transaction.vaultFile.findFirst
+      .mockResolvedValueOnce(deleted)
+      .mockResolvedValueOnce(null);
+    let updatedWith: Prisma.VaultFileUpdateArgs | undefined;
+    transaction.vaultFile.update.mockImplementation(
+      (input: Prisma.VaultFileUpdateArgs) => {
+        updatedWith = input;
+        return Promise.resolve(restored);
+      },
+    );
+    const { service, requireWrite, publishFiles } = setup(transaction);
+
+    await expect(service.restore(userId, vaultId, fileId)).resolves.toEqual({
+      files: [response(restored)],
+    });
+
+    expect(requireWrite).toHaveBeenCalledWith(userId, vaultId);
+    expect(updatedWith?.where).toEqual({ id: fileId });
+    expect(updatedWith?.data).toMatchObject({
+      activePathKey: 'note.md',
+      deletedAt: null,
+      version: 3,
+    });
+    expect(publishFiles).toHaveBeenCalledWith(vaultId, [restored]);
+  });
+
+  it('permanently deletes a tombstone and removes it from the manifest', async () => {
+    const deleted = file({ deletedAt: new Date(), activePathKey: null });
+    const transaction = transactionMock();
+    transaction.vaultFile.findFirst.mockResolvedValue(deleted);
+    const { service, requireOwner, removeFiles } = setup(transaction);
+
+    await expect(
+      service.permanentlyDelete(userId, vaultId, fileId),
+    ).resolves.toEqual({ deleted: 1 });
+
+    expect(requireOwner).toHaveBeenCalledWith(userId, vaultId);
+    expect(transaction.vaultFile.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: [fileId] } },
+    });
+    expect(removeFiles).toHaveBeenCalledWith(vaultId, [fileId]);
+  });
+
   it('rebuilds the graph index for the Vault owner', async () => {
     const { service, requireOwner, rebuild } = setup(transactionMock());
 
@@ -371,7 +419,7 @@ describe('VaultFilesService', () => {
   it('searches document text and resolves wiki backlinks', async () => {
     const project = file({ path: 'Projects/Roadmap.md' });
     const daily = file({ id: childId, path: 'Daily/Today.md' });
-    const { service, prisma, requireRead, backlinks } =
+    const { service, prisma, requireRead, backlinks, graph } =
       setup(transactionMock());
     prisma.vaultFile.findMany.mockResolvedValue([daily, project]);
     prisma.vaultFile.findFirst.mockResolvedValue({ path: project.path });
@@ -382,6 +430,13 @@ describe('VaultFilesService', () => {
     backlinks.mockResolvedValue([
       { source: { id: daily.id, path: daily.path } },
     ]);
+    graph.mockResolvedValue({
+      nodes: [
+        { id: project.id, path: project.path, exists: true },
+        { id: daily.id, path: daily.path, exists: true },
+      ],
+      edges: [{ source: daily.id, target: project.id }],
+    });
 
     await expect(service.search(userId, vaultId, 'alpha')).resolves.toEqual([
       {
@@ -402,6 +457,22 @@ describe('VaultFilesService', () => {
         excerpt: 'Continue [[Roadmap]] after the alpha review.',
       },
     ]);
+    await expect(
+      service.context(userId, vaultId, 'alpha roadmap', 1, 200),
+    ).resolves.toEqual({
+      question: 'alpha roadmap',
+      documents: [
+        {
+          id: fileId,
+          path: 'Projects/Roadmap.md',
+          score: 6,
+          excerpt: '# Roadmap Alpha release',
+          content: '# Roadmap\nAlpha release',
+          truncated: false,
+        },
+      ],
+      related: [{ id: childId, path: 'Daily/Today.md', exists: true }],
+    });
     expect(requireRead).toHaveBeenCalledWith(userId, vaultId);
   });
 });
@@ -484,6 +555,7 @@ function transactionMock() {
         jest.fn<(input: Prisma.VaultFileCreateArgs) => Promise<VaultFile>>(),
       update:
         jest.fn<(input: Prisma.VaultFileUpdateArgs) => Promise<VaultFile>>(),
+      deleteMany: jest.fn(),
     },
     vaultFileOperation: {
       create:
@@ -507,6 +579,7 @@ function transactionMock() {
         jest.fn<
           (input: Prisma.AttachmentFindFirstArgs) => Promise<Attachment | null>
         >(),
+      updateMany: jest.fn(),
     },
     yDocument: {
       findUnique: jest
@@ -514,6 +587,7 @@ function transactionMock() {
           (input: Prisma.YDocumentFindUniqueArgs) => Promise<YDocument | null>
         >()
         .mockResolvedValue(null),
+      deleteMany: jest.fn(),
     },
   };
 }
@@ -538,6 +612,7 @@ function setup(
   const requireWrite = jest.fn().mockResolvedValue(undefined);
   const requireOwner = jest.fn().mockResolvedValue(undefined);
   const publishFiles = jest.fn().mockResolvedValue(undefined);
+  const removeFiles = jest.fn().mockResolvedValue(undefined);
   const restoreDocument = jest.fn().mockResolvedValue(undefined);
   const refreshTargets = jest.fn().mockResolvedValue(undefined);
   const backlinks = jest.fn().mockResolvedValue([]);
@@ -550,7 +625,11 @@ function setup(
       requireWrite,
       requireOwner,
     } as unknown as VaultAccessService,
-    { publishFiles, restoreDocument } as unknown as CollaborationServerService,
+    {
+      publishFiles,
+      removeFiles,
+      restoreDocument,
+    } as unknown as CollaborationServerService,
     {
       refreshTargets,
       backlinks,
@@ -562,6 +641,7 @@ function setup(
     service,
     prisma,
     publishFiles,
+    removeFiles,
     restoreDocument,
     refreshTargets,
     backlinks,
