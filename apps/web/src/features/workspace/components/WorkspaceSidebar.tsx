@@ -60,6 +60,7 @@ export function WorkspaceSidebar({
   onOpen,
   onRename,
   onDelete,
+  onMove,
   onCreateEntry,
   onUpload,
   onSettings,
@@ -80,6 +81,7 @@ export function WorkspaceSidebar({
   onOpen: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
+  onMove: (entry: FileEntry, parentPath: string) => void;
   onCreateEntry: (kind: CreateEntryKind) => void;
   onUpload: (files: FileList | null) => void;
   onSettings: () => void;
@@ -206,6 +208,7 @@ export function WorkspaceSidebar({
               open={onOpen}
               rename={onRename}
               remove={onDelete}
+              move={onMove}
               canManage={canWrite}
             />
           </SidebarGroupContent>

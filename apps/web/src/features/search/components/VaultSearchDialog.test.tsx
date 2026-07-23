@@ -52,6 +52,27 @@ describe("VaultSearchDialog", () => {
 
     expect(screen.getByText("Board")).toBeTruthy();
   });
+
+  it("runs quick actions from an empty quick opener", () => {
+    const action = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <VaultSearchDialog
+          api={{ searchVault: vi.fn() } as unknown as ApiClient}
+          vaultId="vault"
+          mode="open"
+          entries={[...entries]}
+          actions={[{ label: "Open graph", run: action }]}
+          close={() => undefined}
+          open={() => undefined}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open graph" }));
+    expect(action).toHaveBeenCalledOnce();
+  });
 });
 
 function renderDialog(

@@ -21,6 +21,7 @@ describe("file actions", () => {
             open={() => undefined}
             rename={rename}
             remove={() => undefined}
+            move={() => undefined}
           />
         </SidebarProvider>
       </TooltipProvider>,
@@ -30,6 +31,34 @@ describe("file actions", () => {
     fireEvent.click(await screen.findByText("Rename"));
 
     await waitFor(() => expect(rename).toHaveBeenCalledWith(expect.objectContaining({ id: "1" })));
+  });
+
+  it("moves a file when dropped on a folder", () => {
+    const move = vi.fn();
+    render(
+      <TooltipProvider>
+        <SidebarProvider>
+          <FileTree
+            entries={[
+              { id: "folder", kind: "folder", path: "notes", deleted: false },
+              { id: "note", kind: "markdown", path: "note.md", deleted: false },
+            ]}
+            active="note"
+            open={() => undefined}
+            rename={() => undefined}
+            remove={() => undefined}
+            move={move}
+          />
+        </SidebarProvider>
+      </TooltipProvider>,
+    );
+
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn() };
+    fireEvent.dragStart(screen.getByText("note").closest("button")!, { dataTransfer });
+    fireEvent.dragOver(screen.getByText("notes").closest("button")!, { dataTransfer });
+    fireEvent.drop(screen.getByText("notes").closest("button")!, { dataTransfer });
+
+    expect(move).toHaveBeenCalledWith(expect.objectContaining({ id: "note" }), "notes");
   });
 
   it("submits the new name from the rename dialog", () => {

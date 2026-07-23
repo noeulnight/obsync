@@ -212,6 +212,7 @@ const compactEditorTheme = EditorView.theme(
 
 const baseEditorTheme = EditorView.theme({
   "&.cm-focused": { outline: "none" },
+  ".cm-content": { cursor: "text" },
   ".cm-scroller": { fontFamily: "inherit" },
   ".cm-line": { padding: "0" },
   ".cm-selectionBackground, .cm-content ::selection": {
@@ -307,7 +308,16 @@ const livePreviewTheme = EditorView.theme({
     padding: "0.35rem 0.5rem",
     borderRight: "1px solid var(--border)",
   },
-  ".cm-live-table-cell:last-child": { borderRight: "0" },
+  '.cm-live-table-row > .cm-widgetBuffer, .cm-live-table-row > span[contenteditable="false"]:empty':
+    {
+      position: "absolute",
+      width: "0",
+      height: "0",
+      overflow: "hidden",
+    },
+  ".cm-live-table-cell:last-child, .cm-live-table-cell:not(:has(~ .cm-live-table-cell))": {
+    borderRight: "0",
+  },
   ".cm-live-table-separator": {
     height: "0",
     overflow: "hidden",

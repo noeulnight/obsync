@@ -34,7 +34,7 @@ function session(document = new Y.Doc()) {
     clearCursor: vi.fn(),
     destroy,
   } as unknown as WebDocument;
-  return { connected, acquire, release, destroy };
+  return { connected, awareness, acquire, release, destroy };
 }
 
 describe("Editor", () => {
@@ -126,6 +126,18 @@ describe("Editor", () => {
     expect(rendered.container.querySelectorAll(".cm-live-table-cell")).toHaveLength(4);
     expect(rendered.container.querySelector(".cm-live-table-separator")).toBeTruthy();
     expect(rendered.container.querySelector(".cm-live-horizontal-rule")).toBeTruthy();
+
+    const row = rendered.container.querySelector<HTMLElement>(".cm-live-table-row");
+    if (!row) throw new Error("Table row was not rendered");
+    const helpers = [...row.children].filter(
+      (child) =>
+        child.classList.contains("cm-widgetBuffer") ||
+        child.matches('span[contenteditable="false"]:empty'),
+    );
+    expect(helpers.length).toBeGreaterThan(0);
+    for (const helper of helpers) {
+      expect(getComputedStyle(helper).position).toBe("absolute");
+    }
   });
 
   it("keeps pointer placement on the clicked DOM line when measured coordinates drift", () => {
@@ -177,6 +189,31 @@ describe("Editor", () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
+  it("clears the shared cursor when the editor loses focus", async () => {
+    const { connected, awareness } = session();
+    connected.text.insert(0, "cursor");
+    const hasFocus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    editor.focus();
+    editor.dispatch({ selection: { anchor: 3 } });
+    await waitFor(() => expect(awareness.getLocalState().cursor).toBeTruthy());
+
+    editor.contentDOM.blur();
+    await waitFor(() => expect(awareness.getLocalState().cursor).toBeNull());
+    hasFocus.mockRestore();
+  });
+
   it("defers remote changes until IME composition ends", async () => {
     const { connected } = session();
     connected.text.insert(0, "local");
@@ -203,7 +240,7 @@ describe("Editor", () => {
     expect(editor.state.selection.main.anchor).toBe(2);
   });
 
-  it("flushes queued remote changes when compositionend precedes CodeMirror state", async () => {
+  it("waits for CodeMirror composition to end before flushing remote changes", async () => {
     const { connected } = session();
     connected.text.insert(0, "local");
     const view = render(
@@ -223,7 +260,36 @@ describe("Editor", () => {
     connected.document.transact(() => connected.text.insert(5, " remote"), "remote");
 
     editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(editor.state.doc.toString()).toBe("local");
 
+    Object.defineProperty(editor, "composing", { configurable: true, value: false });
+    await waitFor(() => expect(editor.state.doc.toString()).toBe("local remote"));
+  });
+
+  it("flushes remote changes received after compositionend once CodeMirror finishes", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "local");
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    editor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+    connected.document.transact(() => connected.text.insert(5, " remote"), "remote");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(editor.state.doc.toString()).toBe("local");
+
+    Object.defineProperty(editor, "composing", { configurable: true, value: false });
     await waitFor(() => expect(editor.state.doc.toString()).toBe("local remote"));
   });
 
@@ -328,6 +394,62 @@ describe("Editor", () => {
     await waitFor(() => expect(editor.state.doc.toString()).toBe(connected.text.toJSON()));
     expect(connected.text.toJSON().replaceAll("\n", "")).toBe("한");
     expect(connected.text.toJSON().match(/\n/g)).toHaveLength(2);
+  });
+
+  it("keeps Korean composition intact while a peer repeatedly inserts line breaks", async () => {
+    const firstDocument = new Y.Doc();
+    const secondDocument = new Y.Doc();
+    firstDocument.on("update", (update, origin) => {
+      if (origin !== "peer") Y.applyUpdate(secondDocument, update, "peer");
+    });
+    secondDocument.on("update", (update, origin) => {
+      if (origin !== "peer") Y.applyUpdate(firstDocument, update, "peer");
+    });
+    const first = session(firstDocument).connected;
+    const second = session(secondDocument).connected;
+    first.text.insert(0, "top\nbelow");
+    const firstView = render(
+      <Editor
+        session={first}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const secondView = render(
+      <Editor
+        session={second}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const firstEditor = EditorView.findFromDOM(
+      firstView.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    const secondEditor = EditorView.findFromDOM(
+      secondView.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!firstEditor || !secondEditor) throw new Error("Editors were not mounted");
+
+    secondEditor.dispatch({ selection: { anchor: secondEditor.state.doc.length } });
+    secondEditor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    Object.defineProperty(secondEditor, "composing", { configurable: true, value: true });
+    secondEditor.dispatch({ changes: { from: 9, insert: "ㅎ" } });
+    secondEditor.dispatch({ changes: { from: 9, to: 10, insert: "한" } });
+
+    let cursor = 3;
+    for (let index = 0; index < 20; index += 1) {
+      firstEditor.dispatch({
+        changes: { from: cursor, insert: "\n" },
+        selection: { anchor: cursor + 1 },
+      });
+      cursor += 1;
+    }
+
+    Object.defineProperty(secondEditor, "composing", { configurable: true, value: false });
+    secondEditor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+
+    await waitFor(() => expect(secondEditor.state.doc.toString()).toBe(first.text.toJSON()));
+    expect(first.text.toJSON().replaceAll("\n", "")).toBe("topbelow한");
   });
 
   it("recomposes an existing Korean syllable without duplicating it", async () => {

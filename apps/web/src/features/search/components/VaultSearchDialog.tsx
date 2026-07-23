@@ -7,11 +7,18 @@ import type { ApiClient, DocumentSearchResult } from "@/lib/api/client";
 
 export type SearchMode = "open" | "search" | "canvas";
 
+export type VaultQuickAction = {
+  label: string;
+  shortcut?: string;
+  run: () => void;
+};
+
 export function VaultSearchDialog({
   api,
   vaultId,
   mode,
   entries,
+  actions = [],
   close,
   open,
 }: {
@@ -19,6 +26,7 @@ export function VaultSearchDialog({
   vaultId: string;
   mode?: SearchMode;
   entries: FileEntry[];
+  actions?: VaultQuickAction[];
   close: () => void;
   open: (entry: FileEntry) => void;
 }) {
@@ -106,6 +114,26 @@ export function VaultSearchDialog({
             }
           }}
         />
+        {mode === "open" && !query.trim() && actions.length > 0 && (
+          <div className="border-t p-1">
+            {actions.map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+                onClick={() => {
+                  close();
+                  action.run();
+                }}
+              >
+                {action.label}
+                {action.shortcut && (
+                  <span className="text-xs text-muted-foreground">{action.shortcut}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="max-h-[min(420px,60vh)] overflow-y-auto border-t p-1">
           {mode === "search" && !query.trim() ? (
             <Message>Type to search the Vault.</Message>

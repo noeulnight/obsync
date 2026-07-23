@@ -1,7 +1,7 @@
 import { hotkeysCoreFeature, selectionFeature, syncDataLoaderFeature } from "@headless-tree/core";
 import { useTree } from "@headless-tree/react";
 import { ChevronRight, File, FileImage, FileText, Pencil, Trash2 } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/context-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { fileTree, type FileEntry, type TreeNode } from "../lib/files";
+import { fileTree, isWithin, type FileEntry, type TreeNode } from "../lib/files";
 
 const ROOT_ID = "\0root";
 
@@ -20,6 +20,7 @@ export function FileTree({
   open,
   rename,
   remove,
+  move,
   canManage = true,
 }: {
   entries: FileEntry[];
@@ -27,8 +28,11 @@ export function FileTree({
   open: (entry: FileEntry) => void;
   rename: (entry: FileEntry) => void;
   remove: (entry: FileEntry) => void;
+  move: (entry: FileEntry, parentPath: string) => void;
   canManage?: boolean;
 }) {
+  const [dragging, setDragging] = useState<FileEntry>();
+  const [dropPath, setDropPath] = useState("");
   const indexed = useMemo(() => {
     const root: TreeNode = { name: "Vault", path: ROOT_ID, children: fileTree(entries) };
     const items = new Map<string, TreeNode>([[ROOT_ID, root]]);
@@ -68,6 +72,19 @@ export function FileTree({
     previousIndex.current = indexed;
   }
 
+  const canDrop = (entry: FileEntry, path: string) =>
+    entry.path.split("/").slice(0, -1).join("/") !== path &&
+    !(entry.kind === "folder" && (path === entry.path || isWithin(path, entry.path)));
+  const clearDrag = () => {
+    setDragging(undefined);
+    setDropPath("");
+  };
+  const startDrag = (event: DragEvent, entry: FileEntry) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", entry.id);
+    setDragging(entry);
+  };
+
   return (
     <SidebarMenu {...tree.getContainerProps("Vault files")}>
       {tree.getItems().map((item) => {
@@ -77,7 +94,34 @@ export function FileTree({
         const button = (
           <SidebarMenuButton
             {...item.getProps()}
-            className="h-7 rounded-sm pr-2 text-[13px]"
+            draggable={Boolean(entry && canManage)}
+            onDragStart={entry ? (event) => startDrag(event, entry) : undefined}
+            onDragEnd={clearDrag}
+            onDragOver={
+              folder && dragging && canDrop(dragging, node.path)
+                ? (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropPath(node.path);
+                  }
+                : undefined
+            }
+            onDragLeave={() => dropPath === node.path && setDropPath("")}
+            onDrop={
+              folder && dragging && canDrop(dragging, node.path)
+                ? (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    move(dragging, node.path);
+                    clearDrag();
+                  }
+                : undefined
+            }
+            className={cn(
+              "h-7 rounded-sm pr-2 text-[13px]",
+              dropPath === node.path && "bg-sidebar-accent ring-1 ring-sidebar-ring",
+            )}
             style={{ paddingLeft: `${8 + item.getItemMeta().level * 16}px` }}
             isActive={node.entry?.id === active}
             tooltip={displayName(node)}

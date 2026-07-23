@@ -44,6 +44,7 @@ describe("App routes", () => {
             open={() => undefined}
             rename={() => undefined}
             remove={() => undefined}
+            move={() => undefined}
           />
         </SidebarProvider>
       </TooltipProvider>,

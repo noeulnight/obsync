@@ -6,6 +6,7 @@ import { useUploadAttachment } from "@/features/attachments/queries/use-attachme
 import {
   renamedFilePath,
   renamedMarkdownPath,
+  isWithin,
   newEntryPath,
   resolveFileLink,
   resolveMarkdownLink,
@@ -170,6 +171,24 @@ export function Workspace({
       sync?.rename(entry, path);
     } catch (reason) {
       return errorMessage(reason);
+    }
+  }
+
+  function move(entry: FileEntry, parentPath: string) {
+    if (!canWrite) return setNotice("Editing is unavailable while offline.");
+    if (
+      entry.kind === "folder" &&
+      (parentPath === entry.path || isWithin(parentPath, entry.path))
+    ) {
+      return setNotice("A folder cannot be moved into itself.");
+    }
+    const name = entry.path.split("/").at(-1)!;
+    const path = parentPath ? `${parentPath}/${name}` : name;
+    if (path === entry.path) return;
+    try {
+      sync?.rename(entry, path);
+    } catch (reason) {
+      setNotice(errorMessage(reason));
     }
   }
 
@@ -391,6 +410,7 @@ export function Workspace({
           onOpen={open}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
+          onMove={move}
           onCreateEntry={setCreateKind}
           onUpload={(files) => void upload(files)}
           onSettings={onSettings}
@@ -435,6 +455,18 @@ export function Workspace({
         vaultId={vault.id}
         mode={searchMode}
         entries={entries}
+        actions={[
+          {
+            label: "Search Vault",
+            shortcut: "⌘⇧F",
+            run: () => setSearchMode("search"),
+          },
+          {
+            label: "Open graph",
+            run: () => void navigateRoute(`/vaults/${vault.id}/graph`),
+          },
+          { label: "Vault settings", run: onVaultSettings },
+        ]}
         close={() => setSearchMode(undefined)}
         open={(entry) => {
           if (searchMode === "canvas") canvasSession?.addFile(entry.path);

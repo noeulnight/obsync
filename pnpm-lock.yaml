@@ -190,7 +190,7 @@ overrides:
   vite: npm:@voidzero-dev/vite-plus-core@latest
 
 patchedDependencies:
-  y-codemirror.next: ba337690314e2bd66fcd9fb42be6f965d022a5f25263f4f4c9e2f23e1a9a491b
+  y-codemirror.next: da1a5248d016f8288dcc0797de09a302ba8f7065b98c546922cad8f5e7a46358
 
 importers:
 
@@ -364,7 +364,7 @@ importers:
         version: link:../../packages/sync-core
       y-codemirror.next:
         specifier: 'catalog:'
-        version: 0.3.5(patch_hash=ba337690314e2bd66fcd9fb42be6f965d022a5f25263f4f4c9e2f23e1a9a491b)(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)(yjs@13.6.31)
+        version: 0.3.5(patch_hash=da1a5248d016f8288dcc0797de09a302ba8f7065b98c546922cad8f5e7a46358)(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)(yjs@13.6.31)
       y-indexeddb:
         specifier: 'catalog:'
         version: 9.0.12(yjs@13.6.31)
@@ -470,7 +470,7 @@ importers:
         version: 1.4.0
       y-codemirror.next:
         specifier: 'catalog:'
-        version: 0.3.5(patch_hash=ba337690314e2bd66fcd9fb42be6f965d022a5f25263f4f4c9e2f23e1a9a491b)(@codemirror/state@6.7.1)(@codemirror/view@6.43.6)(yjs@13.6.31)
+        version: 0.3.5(patch_hash=da1a5248d016f8288dcc0797de09a302ba8f7065b98c546922cad8f5e7a46358)(@codemirror/state@6.7.1)(@codemirror/view@6.43.6)(yjs@13.6.31)
       y-indexeddb:
         specifier: 'catalog:'
         version: 9.0.12(yjs@13.6.31)
@@ -13678,14 +13678,14 @@ snapshots:
 
   xtend@4.0.2: {}
 
-  y-codemirror.next@0.3.5(patch_hash=ba337690314e2bd66fcd9fb42be6f965d022a5f25263f4f4c9e2f23e1a9a491b)(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)(yjs@13.6.31):
+  y-codemirror.next@0.3.5(patch_hash=da1a5248d016f8288dcc0797de09a302ba8f7065b98c546922cad8f5e7a46358)(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)(yjs@13.6.31):
     dependencies:
       '@codemirror/state': 6.5.0
       '@codemirror/view': 6.38.6
       lib0: 0.2.117
       yjs: 13.6.31
 
-  y-codemirror.next@0.3.5(patch_hash=ba337690314e2bd66fcd9fb42be6f965d022a5f25263f4f4c9e2f23e1a9a491b)(@codemirror/state@6.7.1)(@codemirror/view@6.43.6)(yjs@13.6.31):
+  y-codemirror.next@0.3.5(patch_hash=da1a5248d016f8288dcc0797de09a302ba8f7065b98c546922cad8f5e7a46358)(@codemirror/state@6.7.1)(@codemirror/view@6.43.6)(yjs@13.6.31):
     dependencies:
       '@codemirror/state': 6.7.1
       '@codemirror/view': 6.43.6

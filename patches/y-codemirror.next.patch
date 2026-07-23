@@ -2,12 +2,13 @@ diff --git a/src/y-sync.js b/src/y-sync.js
 index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50ddd38a48 100644
 --- a/src/y-sync.js
 +++ b/src/y-sync.js
-@@ -106,6 +106,14 @@ class YSyncPluginValue {
+@@ -106,6 +106,15 @@ class YSyncPluginValue {
      this.conf = view.state.facet(ySyncFacet)
      this._observer = (event, tr) => {
        if (tr.origin !== this.conf) {
 +        if (view.composing || this._compositionDocument != null) {
 +          this._pendingRemote = true
++          this._waitForCompositionEnd()
 +          return
 +        }
 +        if (this._pendingRemote) {
@@ -17,7 +18,7 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
          const delta = event.delta
          const changes = []
          let pos = 0
-@@ -123,8 +131,61 @@ class YSyncPluginValue {
+@@ -123,8 +132,72 @@ class YSyncPluginValue {
          view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] })
        }
      }
@@ -25,8 +26,9 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
 +    this._compositionDocument = null
 +    this._compositionText = null
 +    this._compositionStateVector = null
-+    this._flushRemote = (force = false) => {
-+      if (!this._pendingRemote || (!force && (view.composing || this._compositionDocument != null))) return
++    this._flushTimer = null
++    this._flushRemote = () => {
++      if (!this._pendingRemote || view.composing || this._compositionDocument != null) return
 +      this._pendingRemote = false
 +      const current = view.state.doc.toString()
 +      const next = this._ytext.toString()
@@ -68,9 +70,19 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
 +    }
 +    this._finishComposition = () => queueMicrotask(() => {
 +      this._flushComposition()
-+      if (view.composing) setTimeout(() => this._flushRemote(true), 0)
-+      else this._flushRemote()
++      this._waitForCompositionEnd()
 +    })
++    this._waitForCompositionEnd = () => {
++      if (!this._pendingRemote || this._flushTimer != null) return
++      if (view.composing || this._compositionDocument != null) {
++        this._flushTimer = setTimeout(() => {
++          this._flushTimer = null
++          this._waitForCompositionEnd()
++        }, 16)
++        return
++      }
++      this._flushRemote()
++    }
      this._ytext = this.conf.ytext
      this._ytext.observe(this._observer)
 +    view.contentDOM.addEventListener('compositionstart', this._compositionStart)
@@ -79,7 +91,7 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
    }
  
    /**
-@@ -134,13 +195,18 @@ class YSyncPluginValue {
+@@ -134,13 +207,18 @@ class YSyncPluginValue {
      if (!update.docChanged || (update.transactions.length > 0 && update.transactions[0].annotation(ySyncAnnotation) === this.conf)) {
        return
      }
@@ -100,14 +112,22 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
          const insertText = insert.sliceString(0, insert.length, '\n')
          if (fromA !== toA) {
            ytext.delete(fromA + adj, toA - fromA)
-@@ -155,6 +221,10 @@ class YSyncPluginValue {
+@@ -155,6 +233,11 @@ class YSyncPluginValue {
  
    destroy () {
      this._ytext.unobserve(this._observer)
 +    this.view.contentDOM.removeEventListener('compositionstart', this._compositionStart)
 +    this.view.contentDOM.removeEventListener('compositionend', this._finishComposition)
 +    this.view.contentDOM.removeEventListener('blur', this._finishComposition)
++    if (this._flushTimer != null) clearTimeout(this._flushTimer)
 +    this._compositionDocument?.destroy()
    }
  }
  
+diff --git a/src/y-remote-selections.js b/src/y-remote-selections.js
+index 6e2c0d1c7c0f91f5b033a8ccf4f7aa955693d74d..101fe5f71110669ca2b5396fa2488ff41ce2c711 100644
+--- a/src/y-remote-selections.js
++++ b/src/y-remote-selections.js
+@@ -175 +175 @@ export class YRemoteSelectionsPluginValue {
+-      } else if (localAwarenessState.cursor != null && hasFocus) {
++      } else if (localAwarenessState.cursor != null) {
