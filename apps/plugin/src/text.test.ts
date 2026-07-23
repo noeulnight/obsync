@@ -256,6 +256,27 @@ describe("replaceText", () => {
 
     expect(firstText.toJSON()).toBe(secondText.toJSON());
   });
+
+  it("converges three clients after offline Korean, newline, and Latin edits", () => {
+    const clients = [new Y.Doc(), new Y.Doc(), new Y.Doc()];
+    const texts = clients.map((document) => document.getText("content"));
+    texts[0].insert(0, "start\nmiddle\nend");
+    for (const client of clients.slice(1)) {
+      Y.applyUpdate(client, Y.encodeStateAsUpdate(clients[0]));
+    }
+
+    texts[0].insert(6, "한글 ");
+    texts[1].insert(13, "\n");
+    texts[2].insert(texts[2].length, " offline");
+    for (const target of clients) {
+      for (const source of clients) Y.applyUpdate(target, Y.encodeStateAsUpdate(source));
+    }
+
+    const content = texts.map((text) => text.toJSON());
+    expect(new Set(content).size).toBe(1);
+    expect(content[0]).toContain("한글");
+    expect(content[0]).toContain("offline");
+  });
 });
 
 describe("editorBindingKey", () => {

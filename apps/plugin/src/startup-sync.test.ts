@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { TFile, type App } from "obsidian";
+import { MarkdownView, TFile, type App } from "obsidian";
 import { replaceText } from "@obsync/sync-core";
 import * as Y from "yjs";
 
@@ -290,5 +290,89 @@ describe("startup synchronization", () => {
     await sync.syncInitialFile(file, "merge");
 
     expect(localChanged).not.toHaveBeenCalled();
+  });
+
+  it("drops a delayed Markdown read after the document path changes", async () => {
+    let resolveRead!: (content: string) => void;
+    const file = new TFile();
+    const read = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    const vault = {
+      getAbstractFileByPath: () => file,
+      getAllLoadedFiles: () => [],
+      read,
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new DocumentSync(
+      {
+        vault,
+        workspace: {
+          getLeavesOfType: () => [
+            {
+              view: Object.assign(new MarkdownView({} as never), { file: { path: "Renamed.md" } }),
+            },
+          ],
+        },
+      } as unknown as App,
+      "id",
+      "Note.md",
+      "server",
+      connection,
+      {} as never,
+      vi.fn(),
+      new Set(),
+      vi.fn(),
+    );
+    sync.openEditor();
+    mocks.persistenceCallbacks[0]?.();
+    mocks.providers[0]?.options.onSynced?.({ state: true });
+    await vi.waitFor(() => expect(sync.ready).toBe(true));
+
+    const pending = sync.localChanged();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledOnce());
+    sync.rename("Renamed.md");
+    resolveRead("content from the old path");
+    await pending;
+
+    expect(sync.text.toJSON()).toBe("");
+    sync.destroy();
+  });
+
+  it("drops a queued Canvas snapshot after the document path changes", async () => {
+    const sync = new CanvasSync(
+      {
+        vault: { getAbstractFileByPath: () => undefined },
+        workspace: { getLeavesOfType: () => [] },
+      } as unknown as App,
+      "id",
+      "Board.canvas",
+      "server",
+      connection,
+      {} as never,
+      new Set(),
+      vi.fn(),
+      vi.fn(),
+    );
+    mocks.persistenceCallbacks[0]?.();
+    mocks.providers[0]?.options.onSynced?.({ state: true });
+    await vi.waitFor(() =>
+      expect((sync as unknown as { initialized: boolean }).initialized).toBe(true),
+    );
+
+    const pending = sync.localChanged({
+      meta: {},
+      nodes: [{ id: "node", type: "text", x: 0, y: 0, width: 100, height: 100, text: "old" }],
+      edges: [],
+    });
+    sync.rename("Renamed.canvas");
+    await pending;
+
+    const document = (sync as unknown as { document: Y.Doc }).document;
+    expect(document.getMap("nodes").size).toBe(0);
+    sync.destroy();
   });
 });

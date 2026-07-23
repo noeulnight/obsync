@@ -126,15 +126,24 @@ export class CanvasSync {
   async localChanged(data?: CanvasData, syncExistingText = this.bindings.size === 0) {
     if (this.connection.readOnly) return;
     if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
-    await this.enqueueFileWork(() => this.applyLocal(data, syncExistingText));
+    const path = this.path;
+    const pathVersion = this.pathVersion;
+    await this.enqueueFileWork(() => this.applyLocal(data, syncExistingText, path, pathVersion));
   }
 
-  private async applyLocal(data?: CanvasData, syncExistingText = this.bindings.size === 0) {
+  private async applyLocal(
+    data?: CanvasData,
+    syncExistingText = this.bindings.size === 0,
+    path = this.path,
+    pathVersion = this.pathVersion,
+  ) {
+    if (pathVersion !== this.pathVersion || path !== this.path) return;
     if (!data) {
-      const file = this.app.vault.getAbstractFileByPath(this.path);
+      const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) return;
       data = parseCanvas(await this.app.vault.read(file));
     }
+    if (pathVersion !== this.pathVersion || path !== this.path) return;
     this.document.transact(() => {
       syncMap(this.meta, data.meta);
       syncNodes(this.document, this.nodes, data.nodes, syncExistingText);

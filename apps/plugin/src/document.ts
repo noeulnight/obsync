@@ -93,13 +93,18 @@ export class DocumentSync {
     if (this.readOnly) return;
     if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
     if (!allowOpenEditor && (this.openEditors > 0 || this.isOpen())) return;
-    await this.enqueueFileWork(() => this.applyLocal());
+    const path = this.path;
+    const pathVersion = this.pathVersion;
+    await this.enqueueFileWork(() => this.applyLocal(path, pathVersion));
   }
 
-  private async applyLocal() {
-    const file = this.app.vault.getAbstractFileByPath(this.path);
+  private async applyLocal(path = this.path, pathVersion = this.pathVersion) {
+    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
-    replaceText(this.text, await this.app.vault.read(file));
+    const content = await this.app.vault.read(file);
+    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    replaceText(this.text, content);
   }
 
   editorChanged(content: string) {
