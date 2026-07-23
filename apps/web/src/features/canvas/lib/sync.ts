@@ -176,6 +176,10 @@ export class WebCanvas {
     return this.provider.hasUnsyncedChanges;
   }
 
+  whenLoaded() {
+    return this.persistence.whenSynced;
+  }
+
   snapshot() {
     return Y.encodeStateAsUpdate(this.document);
   }

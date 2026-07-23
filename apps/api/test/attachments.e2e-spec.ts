@@ -210,7 +210,7 @@ describe('Attachments (e2e)', () => {
     ).resolves.toBeNull();
   });
 
-  it('accepts generic files and rejects unsafe paths and mismatched metadata', async () => {
+  it('accepts generic files and rejects unsafe paths and mismatched content', async () => {
     const body = Buffer.from('x');
     const sha256 = createHash('sha256').update(body).digest('hex');
     await request(app.getHttpServer())
@@ -241,7 +241,7 @@ describe('Attachments (e2e)', () => {
     await fetch(upload.uploadUrl, {
       method: 'PUT',
       headers: upload.uploadHeaders,
-      body,
+      body: Buffer.from('yy'),
     });
     await request(app.getHttpServer())
       .post(`/api/vaults/${vaultId}/attachments/${upload.id}/complete`)

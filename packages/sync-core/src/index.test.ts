@@ -207,6 +207,23 @@ describe("sync core", () => {
         version: 1,
       },
     });
+    expect(
+      rebaseOperation(
+        create,
+        [{ id: "server-file", kind: "markdown", path: "new.md", deleted: false, version: 1 }],
+        ["New.md"],
+        "create-retry",
+      ),
+    ).toEqual({
+      type: "merge",
+      file: {
+        id: "server-file",
+        kind: "markdown",
+        path: "new.md",
+        deleted: false,
+        version: 1,
+      },
+    });
     expect(rebaseOperation(create, [], ["New.md"], "create-retry")).toEqual({
       type: "replace",
       operation: {

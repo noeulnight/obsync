@@ -6,6 +6,7 @@ import {
   pathKey,
   projectEntries,
   type FileOperation,
+  type RemoteFile,
 } from "@obsync/sync-core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
@@ -42,6 +43,7 @@ export class WebVault {
     private readonly setStatus: (status: string) => void,
     private readonly setOnline: (online: boolean) => void,
     private readonly readOnly = false,
+    private readonly onMerged = (_fromFileId: string, _toFileId: string) => {},
   ) {
     this.cachePersistence = new IndexeddbPersistence(
       `obsync:${vaultId}:manifest-cache:v1${readOnly ? ":readonly" : ""}`,
@@ -53,6 +55,7 @@ export class WebVault {
       readOnly,
       (fileId) => this.serverManifest.get(fileId)?.version ?? 0,
       () => this.entries().map((entry) => entry.path),
+      (operation, file) => this.mergeCreate(operation, file),
       setStatus,
       () => this.notify(),
     );
@@ -294,6 +297,43 @@ export class WebVault {
 
   private notify() {
     for (const listener of this.listeners) listener();
+  }
+
+  private async mergeCreate(operation: FileOperation, file: RemoteFile) {
+    if (operation.kind === "folder") return;
+    if (operation.kind !== "markdown" && operation.kind !== "canvas") {
+      throw new Error("Merge target is unavailable.");
+    }
+    const target = this.serverManifest.get(file.id) ?? {
+      id: file.id,
+      kind: operation.kind,
+      path: file.path,
+      deleted: false,
+      version: file.version,
+    };
+    if (target.kind !== operation.kind) throw new Error("Merge target is unavailable.");
+    if (operation.kind === "markdown") {
+      const source = this.openDocument(
+        { id: operation.fileId, kind: "markdown", path: operation.path!, deleted: false },
+        this.api,
+        this.userName,
+      );
+      const destination = this.openDocument(target, this.api, this.userName);
+      await Promise.all([source.whenLoaded(), destination.whenLoaded()]);
+      Y.applyUpdate(destination.document, Y.encodeStateAsUpdate(source.document));
+      source.destroy();
+    } else if (operation.kind === "canvas") {
+      const source = this.openCanvas(
+        { id: operation.fileId, kind: "canvas", path: operation.path!, deleted: false },
+        this.api,
+        this.userName,
+      );
+      const destination = this.openCanvas(target, this.api, this.userName);
+      await Promise.all([source.whenLoaded(), destination.whenLoaded()]);
+      destination.applySnapshot(source.snapshot());
+      source.destroy();
+    }
+    this.onMerged(operation.fileId, file.id);
   }
 
   private preserveDeletedChanges(entry: FileEntry) {

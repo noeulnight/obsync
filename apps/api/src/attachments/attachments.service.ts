@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type Attachment } from '@prisma/client';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { VaultAccessService } from '../vaults/vault-access.service';
@@ -113,7 +113,6 @@ export class AttachmentsService {
         Bucket: this.storage.bucket,
         Key: attachment.objectKey,
         ContentType: attachment.mimeType,
-        Metadata: { sha256: attachment.sha256 },
       }),
       {
         expiresIn: uploadExpirySeconds,
@@ -139,6 +138,7 @@ export class AttachmentsService {
     if (attachment.status === 'READY') return this.response(attachment);
 
     let head;
+    let sha256;
     try {
       head = await this.storage.client.send(
         new HeadObjectCommand({
@@ -146,21 +146,37 @@ export class AttachmentsService {
           Key: attachment.objectKey,
         }),
       );
+      sha256 = await this.objectSha256(attachment.objectKey);
     } catch {
       throw new BadRequestException('Uploaded object is unavailable');
     }
     if (
       BigInt(head.ContentLength ?? -1) !== attachment.size ||
       head.ContentType !== attachment.mimeType ||
-      head.Metadata?.sha256?.toLowerCase() !== attachment.sha256
+      sha256 !== attachment.sha256
     ) {
-      throw new BadRequestException('Uploaded object metadata does not match');
+      throw new BadRequestException('Uploaded object does not match');
     }
     const ready = await this.prisma.attachment.update({
       where: { id: attachment.id },
       data: { status: 'READY', etag: head.ETag?.replaceAll('"', '') },
     });
     return this.response(ready);
+  }
+
+  private async objectSha256(objectKey: string) {
+    const object = await this.storage.client.send(
+      new GetObjectCommand({
+        Bucket: this.storage.bucket,
+        Key: objectKey,
+      }),
+    );
+    if (!object.Body) throw new Error('Uploaded object has no body');
+    const hash = createHash('sha256');
+    for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
+      hash.update(chunk);
+    }
+    return hash.digest('hex');
   }
 
   async download(

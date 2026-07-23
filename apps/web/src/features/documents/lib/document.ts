@@ -65,6 +65,10 @@ export class WebDocument {
     return this.provider.hasUnsyncedChanges;
   }
 
+  whenLoaded() {
+    return this.persistence.whenSynced;
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;

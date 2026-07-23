@@ -155,6 +155,30 @@ describe("Editor", () => {
     expect(editor.state.selection.main.anchor).toBe(2);
   });
 
+  it("flushes queued remote changes when compositionend precedes CodeMirror state", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "local");
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      view.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    editor.contentDOM.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+    Object.defineProperty(editor, "composing", { configurable: true, value: true });
+    connected.document.transact(() => connected.text.insert(5, " remote"), "remote");
+
+    editor.contentDOM.dispatchEvent(new Event("compositionend", { bubbles: true }));
+
+    await waitFor(() => expect(editor.state.doc.toString()).toBe("local remote"));
+  });
+
   it("publishes a completed IME composition as one Yjs change", async () => {
     const { connected } = session();
     const view = render(

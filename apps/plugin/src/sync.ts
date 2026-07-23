@@ -2,7 +2,7 @@ import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/pro
 import type { Extension } from "@codemirror/state";
 import { TFile, TFolder, type App, type TAbstractFile } from "obsidian";
 import * as Y from "yjs";
-import { isWithin } from "@obsync/sync-core";
+import { isWithin, type FileOperation, type RemoteFile } from "@obsync/sync-core";
 import { sha256, uploadAttachment } from "./attachment-sync";
 import { InitialVaultSync } from "./initial-sync";
 import { FileOperationOutbox } from "./outbox";
@@ -61,6 +61,7 @@ export class VaultSync {
       this.manifest,
       () => this.app.vault.getAllLoadedFiles().map((file) => file.path),
       (from, to) => this.moveQueuedFile(from, to),
+      (operation, file) => this.mergeCreate(operation, file),
       setStatus,
       (error) => this.report(error),
     );
@@ -393,6 +394,55 @@ export class VaultSync {
     const entry = this.files.findPath(from);
     await this.writer.moveLocalConflict(from, to);
     if (entry) this.sessions.rename(entry, to);
+  }
+
+  private async mergeCreate(operation: FileOperation, file: RemoteFile) {
+    if (operation.kind === "folder") return;
+    if (operation.kind !== "markdown" && operation.kind !== "canvas") {
+      throw new Error("Merge target is unavailable.");
+    }
+    this.sessions.delete({
+      id: operation.fileId,
+      kind: operation.kind,
+      path: operation.path!,
+      deleted: false,
+      updatedAt: operation.createdAt,
+      version: 0,
+    });
+    const existing = this.manifest.get(file.id);
+    if (operation.kind === "markdown") {
+      if (existing && existing.kind !== "markdown") throw new Error("Merge target is unavailable.");
+      await this.sessions
+        .document(
+          existing ?? {
+            id: file.id,
+            kind: "markdown",
+            path: file.path,
+            deleted: false,
+            updatedAt: Date.now(),
+            version: file.version,
+          },
+          "merge",
+        )
+        .localChanged();
+      this.refreshEditors();
+      return;
+    }
+    if (existing && existing.kind !== "canvas") throw new Error("Merge target is unavailable.");
+    await this.sessions
+      .canvas(
+        existing ?? {
+          id: file.id,
+          kind: "canvas",
+          path: file.path,
+          deleted: false,
+          updatedAt: Date.now(),
+          version: file.version,
+        },
+        "merge",
+      )
+      .localChanged();
+    this.refreshEditors();
   }
 
   private isApplying(path: string) {

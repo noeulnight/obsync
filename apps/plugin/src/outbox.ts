@@ -28,6 +28,7 @@ export class FileOperationOutbox {
     private readonly manifest: Y.Map<FileEntry>,
     private readonly localPaths: () => string[],
     private readonly moveLocalConflict: (from: string, to: string) => Promise<void>,
+    private readonly mergeCreate: (operation: FileOperation, file: RemoteFile) => Promise<void>,
     private readonly setStatus: (status: string) => void,
     private readonly report: (error: unknown) => void,
   ) {
@@ -122,8 +123,13 @@ export class FileOperationOutbox {
       return;
     }
     if (result.type === "merge") {
+      await this.mergeCreate(operation, result.file);
       this.operations.delete(index, 1);
-      this.setStatus("Merged with existing folder");
+      this.setStatus(
+        operation.kind === "folder"
+          ? "Merged with existing folder"
+          : "Merged with existing document",
+      );
       return;
     }
     if (result.type === "discard") {

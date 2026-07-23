@@ -25,8 +25,8 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
 +    this._compositionDocument = null
 +    this._compositionText = null
 +    this._compositionStateVector = null
-+    this._flushRemote = () => {
-+      if (!this._pendingRemote || view.composing || this._compositionDocument != null) return
++    this._flushRemote = (force = false) => {
++      if (!this._pendingRemote || (!force && (view.composing || this._compositionDocument != null))) return
 +      this._pendingRemote = false
 +      const current = view.state.doc.toString()
 +      const next = this._ytext.toString()
@@ -66,10 +66,10 @@ index d63317489f29c979e3849eff836250ca5318ef08..e7297134264b857d6717cf2f79af2c50
 +      }
 +      document?.destroy()
 +    }
-+    this._finishComposition = () => queueMicrotask(() => {
++    this._finishComposition = () => setTimeout(() => {
 +      this._flushComposition()
-+      this._flushRemote()
-+    })
++      this._flushRemote(true)
++    }, 0)
      this._ytext = this.conf.ytext
      this._ytext.observe(this._observer)
 +    view.contentDOM.addEventListener('compositionstart', this._compositionStart)

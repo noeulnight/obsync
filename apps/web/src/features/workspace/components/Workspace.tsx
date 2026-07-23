@@ -64,6 +64,7 @@ export function Workspace({
   const [active, setActive] = useState(() =>
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
+  const activeRef = useRef(active);
   const [online, setOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Connecting");
   const [notice, setNotice] = useState("");
@@ -97,6 +98,11 @@ export function Workspace({
       setConnectionStatus,
       setOnline,
       vault.role === "VIEWER",
+      (fromFileId, toFileId) => {
+        if (activeRef.current !== fromFileId) return;
+        setActive(toFileId);
+        void navigateRoute(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
+      },
     );
     const unsubscribe = next.subscribe(() => {
       setEntries(next.entries());
@@ -109,7 +115,11 @@ export function Workspace({
       next.destroy();
       setSync(undefined);
     };
-  }, [api, userName, vault.id, vault.role]);
+  }, [api, navigateRoute, userName, vault.id, vault.role]);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   useEffect(() => {
     const shortcuts = (event: KeyboardEvent) => {

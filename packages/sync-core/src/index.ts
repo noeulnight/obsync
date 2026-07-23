@@ -192,7 +192,10 @@ export function rebaseOperation(
         file.kind === operation.kind &&
         pathKey(file.path) === pathKey(operation.path!),
     );
-    if (samePath && operation.kind === "folder") {
+    if (
+      samePath &&
+      (operation.kind === "folder" || operation.kind === "markdown" || operation.kind === "canvas")
+    ) {
       return { type: "merge", file: samePath };
     }
     const path = conflictPath(operation.path!, operation.fileId, occupiedPaths);

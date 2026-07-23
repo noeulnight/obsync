@@ -41,6 +41,46 @@ function outbox(operation: FileOperation, serverVersion = 2) {
 }
 
 describe("browser file outbox", () => {
+  it("merges a colliding document create into the existing file", async () => {
+    const operation: FileOperation = {
+      operationId: "operation",
+      fileId: "local-file",
+      type: "create",
+      kind: "markdown",
+      path: "Note.md",
+      createdAt: 1,
+    };
+    const document = new Y.Doc();
+    const operations = document.getArray<FileOperation>("operations");
+    operations.push([operation]);
+    const mergeCreate = vi.fn().mockResolvedValue(undefined);
+    const target = Object.create(BrowserFileOutbox.prototype) as BrowserFileOutbox;
+    Object.assign(target, {
+      api: {
+        listFiles: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "server-file", kind: "markdown", path: "note.md", deleted: false, version: 1 },
+          ]),
+      },
+      vaultId: "vault",
+      document,
+      operations,
+      localPaths: () => ["Note.md"],
+      mergeCreate,
+      setStatus: vi.fn(),
+    });
+
+    await (target as unknown as OutboxInternals).recoverConflict(0, operation);
+
+    expect(mergeCreate).toHaveBeenCalledWith(
+      operation,
+      expect.objectContaining({ id: "server-file" }),
+    );
+    expect(operations).toHaveLength(0);
+    document.destroy();
+  });
+
   it("rebases a stale rename onto the current server path", async () => {
     const operation: FileOperation = {
       operationId: "operation",
