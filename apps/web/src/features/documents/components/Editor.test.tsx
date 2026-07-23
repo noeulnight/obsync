@@ -42,8 +42,53 @@ describe("Editor", () => {
     const { connected } = session();
     connected.text.insert(
       0,
-      "---\nstatus: draft\ntags: [sync]\n---\n# Note\n```ts\nconst value = 1\n```\n\nEnd",
+      "---\nstatus: draft\ntags:\n  - sync\n  - yjs\ncreated: 2026-07-23\n---\n# Note\n```ts\nconst value = 1\n```\n\nEnd",
     );
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: 10 } });
+
+    await waitFor(() => expect(screen.getByLabelText("Properties")).toBeTruthy());
+    expect(rendered.container.querySelectorAll(".cm-live-property-chip")).toHaveLength(2);
+    const date = screen
+      .getAllByLabelText("Property value")
+      .find((input) => (input as HTMLInputElement).value.includes("2026")) as HTMLInputElement;
+    expect(date.value).toBe(
+      new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(2026, 6, 23)),
+    );
+    fireEvent.focus(date);
+    expect(date.type).toBe("date");
+    expect(date.value).toBe("2026-07-23");
+    fireEvent.blur(date);
+    fireEvent.click(screen.getByLabelText("Toggle properties"));
+    expect(screen.getByLabelText("Properties").classList.contains("is-collapsed")).toBe(true);
+    expect(rendered.container.querySelector(".cm-live-code-language")?.textContent).toBe("ts");
+    expect(rendered.container.querySelector(".cm-live-code-line")?.textContent).toContain(
+      "const value = 1",
+    );
+
+    const value = screen.getAllByLabelText("Property value")[0];
+    fireEvent.change(value, { target: { value: "published" } });
+    fireEvent.blur(value);
+    expect(connected.text.toJSON()).toContain("status: published");
+  });
+
+  it("renders unordered list markers as bullets", () => {
+    const { connected } = session();
+    connected.text.insert(0, "- first\n- second");
     const rendered = render(
       <Editor
         session={connected}
@@ -57,16 +102,8 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
-    await waitFor(() => expect(screen.getByLabelText("Properties")).toBeTruthy());
-    expect(rendered.container.querySelector(".cm-live-code-language")?.textContent).toBe("ts");
-    expect(rendered.container.querySelector(".cm-live-code-line")?.textContent).toContain(
-      "const value = 1",
-    );
-
-    const value = screen.getAllByLabelText("Property value")[0];
-    fireEvent.change(value, { target: { value: "published" } });
-    fireEvent.blur(value);
-    expect(connected.text.toJSON()).toContain("status: published");
+    expect(rendered.container.querySelectorAll(".cm-live-bullet")).toHaveLength(2);
+    expect(rendered.container.querySelector(".cm-live-bullet")?.textContent).toBe("•");
   });
 
   it("keeps the presence binding when callback props change", () => {

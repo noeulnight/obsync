@@ -7,7 +7,7 @@ import {
   ViewPlugin,
 } from "@codemirror/view";
 import { codeBlocks, decorateCodeLine } from "./live-preview-code";
-import { type AssetResolver, editing } from "./live-preview-decoration";
+import type { AssetResolver } from "./live-preview-decoration";
 import { decorateLine } from "./live-preview-inline";
 import { frontmatter, propertyDecorations } from "./live-preview-properties";
 
@@ -63,8 +63,6 @@ function decorations(view: EditorView, resolveAsset: AssetResolver, assetRevisio
         const block = blocks.find((item) => line.number >= item.start && line.number <= item.end);
         if (block) decorateCodeLine(line.from, line.to, line.number, cursor, block, ranges);
         else decorateLine(view, line.from, line.text, cursor, ranges, resolveAsset, assetRevision);
-      } else if (editing(cursor, properties.from, properties.to)) {
-        ranges.push(Decoration.line({ class: "cm-live-property-source" }).range(line.from));
       }
       if (line.to >= view.state.doc.length) break;
       line = view.state.doc.line(line.number + 1);

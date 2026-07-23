@@ -12,6 +12,16 @@ export function decorateLine(
   resolveAsset: AssetResolver,
   assetRevision: number,
 ) {
+  const bullet = /^(\s*)[-+*]\s+(?!\[[ xX]\])/.exec(text);
+  if (bullet) {
+    const from = lineFrom + bullet[1].length;
+    const to = lineFrom + bullet[0].length;
+    ranges.push(Decoration.line({ class: "cm-live-list-item" }).range(lineFrom));
+    if (!editing(cursor, from, to)) {
+      ranges.push(Decoration.replace({ widget: new BulletWidget() }).range(from, to));
+    }
+  }
+
   const heading = /^(#{1,6})\s/.exec(text);
   if (heading) {
     ranges.push(Decoration.line({ class: `cm-live-heading-${heading[1].length}` }).range(lineFrom));
@@ -94,6 +104,15 @@ export function decorateLine(
       ranges.push(Decoration.mark({ class: className }).range(start + delimiter, end - delimiter));
       ranges.push(hidden.range(end - delimiter, end));
     }
+  }
+}
+
+class BulletWidget extends WidgetType {
+  toDOM() {
+    const bullet = document.createElement("span");
+    bullet.className = "cm-live-bullet";
+    bullet.textContent = "•";
+    return bullet;
   }
 }
 
