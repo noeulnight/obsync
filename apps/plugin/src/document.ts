@@ -153,6 +153,7 @@ export class DocumentSync {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const local = await this.app.vault.read(file);
+    if (local === "" && (this.persistedText !== "" || this.text.length > 0)) return;
     if (local !== this.persistedText) replaceText(this.text, local);
   }
 }

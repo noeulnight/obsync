@@ -126,6 +126,34 @@ describe("startup synchronization", () => {
     expect(sync.text.toJSON()).toBe("after from web");
   });
 
+  it("does not replace cached or server Markdown with an empty startup file", async () => {
+    const file = new TFile();
+    const vault = {
+      getAbstractFileByPath: () => file,
+      read: vi.fn().mockResolvedValue(""),
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new DocumentSync(
+      { vault, workspace: { getLeavesOfType: () => [] } } as unknown as App,
+      "id",
+      "Note.md",
+      "merge",
+      connection,
+      {} as never,
+      vi.fn(),
+      new Set(),
+      vi.fn(),
+    );
+    sync.text.insert(0, "cached");
+
+    mocks.persistenceCallbacks[0]?.();
+    replaceText(sync.text, "server content");
+    mocks.providers[0]?.options.onSynced?.({ state: true });
+
+    await vi.waitFor(() => expect(vault.modify).toHaveBeenCalledWith(file, "server content"));
+    expect(sync.text.toJSON()).toBe("server content");
+  });
+
   it("does not reapply the local file after opening its merge session", async () => {
     const localChanged = vi.fn();
     const sync = Object.assign(Object.create(VaultSync.prototype), {
