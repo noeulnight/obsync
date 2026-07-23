@@ -2,6 +2,7 @@ import {
   appendMarkdown,
   markdownDocumentMap,
   markdownFrontmatter,
+  markdownTarget,
   markdownTags,
   patchMarkdown,
 } from '../utils/markdown-document';
@@ -24,14 +25,18 @@ describe('Markdown document operations', () => {
   it('maps and queries document metadata', () => {
     expect(markdownDocumentMap(markdown)).toEqual({
       headings: [
-        { level: 1, text: 'Work', path: 'Work' },
-        { level: 2, text: 'Today', path: 'Work::Today' },
-        { level: 1, text: 'Later', path: 'Later' },
+        expect.objectContaining({ level: 1, text: 'Work', path: 'Work' }),
+        expect.objectContaining({
+          level: 2,
+          text: 'Today',
+          path: 'Work::Today',
+        }),
+        expect.objectContaining({ level: 1, text: 'Later', path: 'Later' }),
       ],
-      blocks: [{ id: 'task-1' }],
+      blocks: [expect.objectContaining({ id: 'task-1' })],
       frontmatter: [
-        { key: 'status', value: 'draft' },
-        { key: 'tags', value: '[project, korean]' },
+        expect.objectContaining({ key: 'status', value: 'draft' }),
+        expect.objectContaining({ key: 'tags', value: '[project, korean]' }),
       ],
     });
     expect(markdownTags(markdown)).toEqual(['project', 'korean']);
@@ -46,7 +51,13 @@ describe('Markdown document operations', () => {
       'replace',
       'Changed\n',
     );
-    expect(heading).toContain('## Today\nChanged\n# Later');
+    expect(heading).toContain('## Today\nChanged\n\n# Later');
+    expect(
+      patchMarkdown(markdown, 'heading', 'Work::Today', 'append', 'Added'),
+    ).toContain('Original ^task-1\nAdded\n\n# Later');
+    expect(
+      markdownTarget(markdown, 'heading', 'Work::Today').hash,
+    ).toHaveLength(64);
 
     const block = patchMarkdown(
       markdown,

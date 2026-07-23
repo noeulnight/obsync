@@ -189,6 +189,7 @@ describe('MCP OAuth (e2e)', () => {
       'vault_append',
       'vault_patch',
       'vault_get_document_map',
+      'vault_context',
       'tag_list',
       'search_query',
       'search_simple',
@@ -207,14 +208,28 @@ describe('MCP OAuth (e2e)', () => {
       path: 'MCP Test.md',
       content: '---\nstatus: draft\ntags: [mcp]\n---\n# Work\nOriginal ^task\n',
     });
-    await callTool('vault_patch', {
-      vaultId,
-      path: 'MCP Test.md',
-      targetType: 'frontmatter',
-      target: 'status',
-      operation: 'replace',
-      content: 'done',
-    });
+    const initialMap = toolValue<{
+      frontmatter: Array<{ key: string; hash: string }>;
+    }>(
+      await callTool('vault_get_document_map', {
+        vaultId,
+        path: 'MCP Test.md',
+      }),
+    );
+    const patch = toolValue<{ changed: boolean; result: string }>(
+      await callTool('vault_patch', {
+        vaultId,
+        path: 'MCP Test.md',
+        targetType: 'frontmatter',
+        target: 'status',
+        operation: 'replace',
+        content: 'done',
+        expectedTargetHash: initialMap.frontmatter.find(
+          ({ key }) => key === 'status',
+        )?.hash,
+      }),
+    );
+    expect(patch).toMatchObject({ changed: true, result: 'done' });
     await callTool('vault_append', {
       vaultId,
       path: 'MCP Test.md',
@@ -227,7 +242,7 @@ describe('MCP OAuth (e2e)', () => {
           path: 'MCP Test.md',
         }),
       ).frontmatter,
-    ).toContainEqual({ key: 'status', value: 'done' });
+    ).toContainEqual(expect.objectContaining({ key: 'status', value: 'done' }));
     expect(toolValue(await callTool('tag_list', { vaultId }))).toEqual(
       expect.arrayContaining([expect.objectContaining({ tag: 'mcp' })]),
     );

@@ -23,6 +23,7 @@ import {
   appendMarkdown,
   markdownDocumentMap,
   markdownFrontmatter,
+  markdownTarget,
   markdownTags,
   patchMarkdown,
   type MarkdownPatchOperation,
@@ -221,17 +222,40 @@ export class VaultFilesService {
     target: string,
     operation: MarkdownPatchOperation,
     content: string,
+    expectedTargetHash?: string,
   ) {
     await this.access.requireWrite(userId, vaultId);
     const file = await this.liveFile(vaultId, rawPath, 'MARKDOWN');
-    await this.collaboration.updateDocument(
+    let changed = false;
+    let previousTargetHash = '';
+    const updated = await this.collaboration.updateDocument(
       vaultId,
       file.id,
       userId,
-      (current) =>
-        patchMarkdown(current, targetType, target, operation, content),
+      (current) => {
+        previousTargetHash = markdownTarget(current, targetType, target).hash;
+        if (expectedTargetHash && expectedTargetHash !== previousTargetHash) {
+          throw new ConflictException('Patch target changed');
+        }
+        const next = patchMarkdown(
+          current,
+          targetType,
+          target,
+          operation,
+          content,
+        );
+        changed = current !== next;
+        return next;
+      },
     );
-    return file;
+    const result = markdownTarget(updated, targetType, target);
+    return {
+      ...file,
+      changed,
+      previousTargetHash,
+      targetHash: result.hash,
+      result: result.content,
+    };
   }
 
   async documentMap(userId: string, vaultId: string, rawPath: string) {

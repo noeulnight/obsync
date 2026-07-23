@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 
 export type MarkdownPatchTarget = 'heading' | 'block' | 'frontmatter';
 export type MarkdownPatchOperation = 'append' | 'prepend' | 'replace';
@@ -23,21 +24,36 @@ export function patchMarkdown(
   return patchFrontmatter(content, target, operation, value);
 }
 
+export function markdownTarget(
+  content: string,
+  targetType: MarkdownPatchTarget,
+  target: string,
+) {
+  const range = targetRange(content, targetType, target);
+  const value = content.slice(range.from, range.to);
+  return { content: value, hash: targetHash(value) };
+}
+
 export function markdownDocumentMap(content: string) {
-  const headings = headingEntries(content).map(({ level, text, path }) => ({
-    level,
-    text,
-    path,
-  }));
-  const blocks = [...content.matchAll(/^.*?\s+\^([A-Za-z0-9-]+)\s*$/gm)].map(
-    (match) => ({ id: match[1] }),
+  const headings = headingEntries(content).map(
+    ({ level, text, path, bodyFrom, bodyTo }) => ({
+      level,
+      text,
+      path,
+      hash: targetHash(content.slice(bodyFrom, bodyTo)),
+    }),
   );
+  const blocks = blockEntries(content).map(({ id, from, to }) => ({
+    id,
+    hash: targetHash(content.slice(from, to)),
+  }));
   return {
     headings,
     blocks,
     frontmatter: frontmatterEntries(content).map(({ key, value }) => ({
       key,
       value,
+      hash: targetHash(value),
     })),
   };
 }
@@ -73,7 +89,36 @@ function patchRange(
       : operation === 'prepend'
         ? appendMarkdown(value, current)
         : appendMarkdown(current, value);
-  return `${content.slice(0, range.from)}${replacement}${content.slice(range.to)}`;
+  const suffix = content.slice(range.to);
+  const separator =
+    suffix.startsWith('#') && replacement.trim()
+      ? '\n\n'
+      : !suffix && content.endsWith('\n')
+        ? '\n'
+        : '';
+  return `${content.slice(0, range.from)}${replacement.trimEnd()}${separator}${suffix}`;
+}
+
+function targetRange(
+  content: string,
+  targetType: MarkdownPatchTarget,
+  target: string,
+) {
+  if (targetType === 'heading') return headingRange(content, target);
+  if (targetType === 'block') {
+    const entry = blockEntries(content).find(
+      ({ id }) => id === target.replace(/^\^/, ''),
+    );
+    if (!entry) throw new NotFoundException('Block not found');
+    return { from: entry.from, to: entry.to };
+  }
+  const entry = frontmatterEntries(content).find(({ key }) => key === target);
+  if (!entry) return { from: 0, to: 0 };
+  return { from: entry.valueFrom, to: entry.valueTo };
+}
+
+function targetHash(value: string) {
+  return createHash('sha256').update(value).digest('hex');
 }
 
 function headingRange(content: string, target: string) {
@@ -124,6 +169,16 @@ function patchBlock(
         ? `${value}${match[1]}`
         : `${match[1]}${value}`;
   return `${content.slice(0, match.index)}${replacement} ^${match[2]}${content.slice(match.index + match[0].length)}`;
+}
+
+function blockEntries(content: string) {
+  return [...content.matchAll(/^(.*?)\s+\^([A-Za-z0-9-]+)\s*$/gm)].map(
+    (match) => ({
+      id: match[2],
+      from: match.index,
+      to: match.index + match[1].length,
+    }),
+  );
 }
 
 function patchFrontmatter(

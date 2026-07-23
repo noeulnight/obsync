@@ -344,7 +344,7 @@ export class McpService {
         'vault_patch',
         {
           description:
-            'Append, prepend, or replace one Markdown heading, block, or frontmatter property.',
+            'Append, prepend, or replace one Markdown heading, block, or frontmatter property. Optionally reject stale target content using a hash from vault_get_document_map.',
           inputSchema: {
             vaultId: z.string().uuid(),
             path: z.string().min(1),
@@ -352,9 +352,18 @@ export class McpService {
             target: z.string().min(1),
             operation: z.enum(['append', 'prepend', 'replace']),
             content: z.string(),
+            expectedTargetHash: z.string().length(64).optional(),
           },
         },
-        ({ vaultId, path, targetType, target, operation, content }) =>
+        ({
+          vaultId,
+          path,
+          targetType,
+          target,
+          operation,
+          content,
+          expectedTargetHash,
+        }) =>
           this.result(() =>
             this.files.patchMarkdown(
               userId,
@@ -364,6 +373,7 @@ export class McpService {
               target,
               operation,
               content,
+              expectedTargetHash,
             ),
           ),
       );
