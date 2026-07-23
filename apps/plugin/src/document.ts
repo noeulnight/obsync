@@ -85,8 +85,12 @@ export class DocumentSync {
 
   async localChanged(allowOpenEditor = true) {
     if (this.readOnly) return;
-    if (this.destroyed || !this.persistenceSynced || this.applying.has(this.path)) return;
+    if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
     if (!allowOpenEditor && (this.openEditors > 0 || this.isOpen())) return;
+    await this.applyLocal();
+  }
+
+  private async applyLocal() {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     replaceText(this.text, await this.app.vault.read(file));
@@ -142,7 +146,7 @@ export class DocumentSync {
   private async initialize() {
     if (this.destroyed || this.initialized || !this.persistenceSynced) return;
     if (this.seedMode !== "local" && !this.providerSynced) return;
-    if (this.seedMode === "local") await this.localChanged();
+    if (this.seedMode === "local") await this.applyLocal();
     else if (this.seedMode === "merge") await this.mergeLocalChanges();
     this.initialized = true;
     this.onReady();

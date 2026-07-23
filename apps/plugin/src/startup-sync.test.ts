@@ -98,6 +98,62 @@ describe("startup synchronization", () => {
     expect(mocks.providers[0]?.attach).toHaveBeenCalledOnce();
   });
 
+  it("ignores Markdown Vault events until the server document is ready", async () => {
+    const file = new TFile();
+    const vault = {
+      getAbstractFileByPath: () => file,
+      read: vi.fn().mockResolvedValue("stale local"),
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new DocumentSync(
+      { vault, workspace: { getLeavesOfType: () => [] } } as unknown as App,
+      "id",
+      "Note.md",
+      "merge",
+      connection,
+      {} as never,
+      vi.fn(),
+      new Set(),
+      vi.fn(),
+    );
+
+    mocks.persistenceCallbacks[0]?.();
+    await sync.localChanged();
+
+    expect(vault.read).not.toHaveBeenCalled();
+    expect(sync.text.toJSON()).toBe("");
+  });
+
+  it("ignores Canvas Vault events until the server document is ready", async () => {
+    const file = new TFile();
+    const vault = {
+      getAbstractFileByPath: () => file,
+      read: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          nodes: [{ id: "node", type: "text", x: 0, y: 0, width: 100, height: 100, text: "stale" }],
+          edges: [],
+        }),
+      ),
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new CanvasSync(
+      { vault, workspace: { getLeavesOfType: () => [] } } as unknown as App,
+      "id",
+      "Board.canvas",
+      "merge",
+      connection,
+      {} as never,
+      new Set(),
+      vi.fn(),
+      vi.fn(),
+    );
+
+    mocks.persistenceCallbacks[0]?.();
+    await sync.localChanged();
+
+    expect(vault.read).not.toHaveBeenCalled();
+  });
+
   it("keeps newer server Markdown when the stopped client did not edit locally", async () => {
     const file = new TFile();
     const vault = {
