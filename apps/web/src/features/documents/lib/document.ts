@@ -32,7 +32,9 @@ export class WebDocument {
       websocketProvider: socket,
       token: () => api.token(),
     });
-    this.provider.attach();
+    this.persistence.once("synced", () => {
+      if (!this.destroyed) this.provider.attach();
+    });
     this.provider.awareness?.setLocalStateField("user", {
       name: userName,
       color: presenceColor(this.document.clientID),

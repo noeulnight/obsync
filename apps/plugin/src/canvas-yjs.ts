@@ -11,9 +11,12 @@ export function syncNodes(
   target: Y.Map<Y.Map<unknown>>,
   items: CanvasItem[],
   syncExistingText = true,
+  removeMissing = true,
 ) {
   const wanted = new Map(items.map((item) => [item.id, item]));
-  for (const id of target.keys()) if (!wanted.has(id)) target.delete(id);
+  if (removeMissing) {
+    for (const id of target.keys()) if (!wanted.has(id)) target.delete(id);
+  }
   for (const [id, item] of wanted) {
     let shared = target.get(id);
     const created = !shared;

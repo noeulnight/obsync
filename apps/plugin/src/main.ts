@@ -373,8 +373,14 @@ export default class ObsyncPlugin extends Plugin {
   private disconnect() {
     this.sync?.destroy();
     this.sync = undefined;
-    this.refreshViews();
     this.boundEditors = new WeakMap();
+    for (const view of this.editorViews) {
+      const compartment = this.bindings.get(view);
+      if (compartment) {
+        view.dispatch({ effects: compartment.reconfigure([]) });
+      }
+    }
+    this.refreshViews();
   }
 
   private refreshViews() {

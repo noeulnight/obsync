@@ -190,6 +190,23 @@ describe("sync core", () => {
       path: "New.md",
       createdAt: 9,
     };
+    expect(
+      rebaseOperation(
+        { ...create, kind: "folder", path: "New" },
+        [{ id: "server-folder", kind: "folder", path: "new", deleted: false, version: 1 }],
+        ["New"],
+        "create-retry",
+      ),
+    ).toEqual({
+      type: "merge",
+      file: {
+        id: "server-folder",
+        kind: "folder",
+        path: "new",
+        deleted: false,
+        version: 1,
+      },
+    });
     expect(rebaseOperation(create, [], ["New.md"], "create-retry")).toEqual({
       type: "replace",
       operation: {

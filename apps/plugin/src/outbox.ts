@@ -70,7 +70,7 @@ export class FileOperationOutbox {
   }
 
   private async flush() {
-    if (this.flushing || !this.synced || this.connection.readOnly) return;
+    if (this.destroyed || this.flushing || !this.synced || this.connection.readOnly) return;
     this.flushing = true;
     try {
       while (true) {
@@ -83,9 +83,11 @@ export class FileOperationOutbox {
             this.connection.vaultId,
             operationRequest(operation),
           );
+          if (this.destroyed) return;
           this.retryDelay = 1_000;
           this.confirm(index, operation, result.files);
         } catch (error) {
+          if (this.destroyed) return;
           if (error instanceof ApiRequestError && error.status === 409) {
             try {
               await this.recoverConflict(index, operation);
@@ -117,6 +119,11 @@ export class FileOperationOutbox {
     );
     if (result.type === "confirm") {
       this.confirm(index, operation, [result.file]);
+      return;
+    }
+    if (result.type === "merge") {
+      this.operations.delete(index, 1);
+      this.setStatus("Merged with existing folder");
       return;
     }
     if (result.type === "discard") {

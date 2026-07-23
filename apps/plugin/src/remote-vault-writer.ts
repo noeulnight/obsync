@@ -133,9 +133,7 @@ export class RemoteVaultWriter {
       const parents = parent
         .split("/")
         .map((_, index, parts) => parts.slice(0, index + 1).join("/"));
-      await this.remote.queue(parent, () =>
-        this.remote.whileApplying(parents, () => createFolder(this.app, parent)),
-      );
+      await this.remote.whileApplying(parents, () => createFolder(this.app, parent));
     }
   }
 

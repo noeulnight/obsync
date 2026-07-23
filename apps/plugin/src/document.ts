@@ -16,8 +16,10 @@ export class DocumentSync {
   private persistenceSynced = false;
   private providerSynced = false;
   private persistedText = "";
+  private projectedText?: string;
   private openEditors = 0;
   private readonly readOnly: boolean;
+  private fileChain: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly app: App,
@@ -45,7 +47,9 @@ export class DocumentSync {
         this.providerSynced = true;
         void this.initialize();
       },
-      onAuthenticationFailed: () => setStatus("Authentication failed"),
+      onAuthenticationFailed: () => {
+        if (!this.destroyed) setStatus("Authentication failed");
+      },
     });
     this.provider.awareness?.setLocalStateField("user", {
       name: connection.userName,
@@ -76,7 +80,7 @@ export class DocumentSync {
   closeEditor() {
     this.openEditors = Math.max(0, this.openEditors - 1);
     if (this.openEditors === 0) this.clearCursor();
-    setTimeout(() => void this.writeFile(), 250);
+    setTimeout(() => void this.enqueueFileWrite(), 250);
   }
 
   rename(path: string) {
@@ -84,12 +88,25 @@ export class DocumentSync {
   }
 
   async localChanged(allowOpenEditor = true) {
+    await this.enqueueFileTask(() => this.applyLocalFile(allowOpenEditor));
+  }
+
+  private async applyLocalFile(allowOpenEditor: boolean) {
     if (this.readOnly) return;
     if (this.destroyed || !this.persistenceSynced || this.applying.has(this.path)) return;
     if (!allowOpenEditor && (this.openEditors > 0 || this.isOpen())) return;
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
-    replaceText(this.text, await this.app.vault.read(file));
+    const content = await this.app.vault.read(file);
+    if (content === this.projectedText) return;
+    const current = this.text.toJSON();
+    if (this.projectedText !== undefined && current !== this.projectedText) {
+      this.projectedText = current;
+      await this.writeFile();
+      return;
+    }
+    replaceText(this.text, content);
+    this.projectedText = content;
   }
 
   editorChanged(content: string) {
@@ -115,8 +132,18 @@ export class DocumentSync {
     this.writePending = true;
     queueMicrotask(() => {
       this.writePending = false;
-      void this.writeFile();
+      void this.enqueueFileWrite();
     });
+  }
+
+  private enqueueFileWrite() {
+    return this.enqueueFileTask(() => this.writeFile());
+  }
+
+  private enqueueFileTask(work: () => Promise<void>) {
+    const next = this.fileChain.catch(() => undefined).then(work);
+    this.fileChain = next;
+    return next;
   }
 
   private async writeFile() {
@@ -124,10 +151,14 @@ export class DocumentSync {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const next = this.text.toJSON();
-    if ((await this.app.vault.read(file)) === next) return;
+    if ((await this.app.vault.read(file)) === next) {
+      this.projectedText = next;
+      return;
+    }
     this.applying.add(this.path);
     try {
       await this.app.vault.modify(file, next);
+      this.projectedText = next;
     } finally {
       this.applying.delete(this.path);
     }
@@ -141,18 +172,29 @@ export class DocumentSync {
 
   private async initialize() {
     if (this.destroyed || this.initialized || !this.persistenceSynced) return;
-    if (this.seedMode !== "local" && !this.providerSynced) return;
+    if (this.seedMode === "merge" && !this.providerSynced) return;
     if (this.seedMode === "local") await this.localChanged();
     else if (this.seedMode === "merge") await this.mergeLocalChanges();
     this.initialized = true;
     this.onReady();
-    await this.writeFile();
+    await this.enqueueFileWrite();
   }
 
   private async mergeLocalChanges() {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const local = await this.app.vault.read(file);
-    if (local !== this.persistedText) replaceText(this.text, local);
+    const server = this.text.toJSON();
+    if (local === server || local === this.persistedText) {
+      this.projectedText = server;
+      return;
+    }
+    if (server === this.persistedText) {
+      replaceText(this.text, local);
+      this.projectedText = local;
+      return;
+    }
+
+    this.projectedText = server;
   }
 }

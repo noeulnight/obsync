@@ -33,6 +33,7 @@ export class WebVault {
   private manifestLoaded = false;
   private manifestSynced = false;
   private readonly preservingDeletes = new Set<string>();
+  private destroyed = false;
 
   constructor(
     private readonly vaultId: string,
@@ -61,6 +62,7 @@ export class WebVault {
       maxDelay: 5_000,
       maxAttempts: 0,
       onStatus: ({ status }) => {
+        if (this.destroyed) return;
         if (status !== "connected") this.setOnline(false);
         if (status === "disconnected") {
           this.manifestSynced = false;
@@ -89,6 +91,7 @@ export class WebVault {
       this.notify();
     });
     this.cachePersistence.once("synced", () => {
+      if (this.destroyed) return;
       this.manifestLoaded = true;
       this.notify();
     });
@@ -98,7 +101,7 @@ export class WebVault {
       websocketProvider: this.socket,
       token: () => api.token(),
       onSynced: ({ state }) => {
-        if (!state) return;
+        if (!state || this.destroyed) return;
         this.manifestSynced = true;
         this.manifestLoaded = true;
         this.cachedManifestDocument.transact(() => {
@@ -111,6 +114,7 @@ export class WebVault {
         this.outbox.setConnected(true);
       },
       onAuthenticationFailed: () => {
+        if (this.destroyed) return;
         this.setOnline(false);
         setStatus("Authentication failed");
       },
@@ -274,6 +278,8 @@ export class WebVault {
   }
 
   destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
     for (const document of this.documents.values()) document.destroy();
     this.documents.clear();
     for (const canvas of this.canvases.values()) canvas.destroy();

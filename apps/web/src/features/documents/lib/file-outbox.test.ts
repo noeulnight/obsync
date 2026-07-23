@@ -109,4 +109,40 @@ describe("browser file outbox", () => {
     expect(applyFileOperation).not.toHaveBeenCalled();
     document.destroy();
   });
+
+  it("does not retry an in-flight request after the Vault is destroyed", async () => {
+    let reject!: (error: Error) => void;
+    const request = new Promise<never>((_resolve, rejectRequest) => {
+      reject = rejectRequest;
+    });
+    const document = new Y.Doc();
+    const operations = document.getArray<FileOperation>("operations");
+    operations.push([
+      {
+        operationId: "operation",
+        fileId: "file",
+        type: "delete",
+        fromPath: "Note.md",
+        createdAt: 1,
+      },
+    ]);
+    const target = Object.create(BrowserFileOutbox.prototype) as BrowserFileOutbox;
+    Object.assign(target, {
+      document,
+      operations,
+      api: { applyFileOperation: () => request },
+      vaultId: "vault",
+      readOnly: false,
+      connected: true,
+      flushing: false,
+      persistence: { destroy: vi.fn() },
+    });
+
+    const flushing = (target as unknown as OutboxInternals).flush();
+    target.destroy();
+    reject(new Error("disconnected"));
+    await flushing;
+
+    expect((target as unknown as { retryTimer?: unknown }).retryTimer).toBeUndefined();
+  });
 });

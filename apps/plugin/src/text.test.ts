@@ -91,6 +91,19 @@ describe("canvas text synchronization", () => {
     syncNodes(document, nodes, [{ ...note, text: "ㅎㅏㄴㄱㅡㄹ" }], false);
     expect(text.toJSON()).toBe("한글");
   });
+
+  it("does not delete Canvas nodes from a partial open-view snapshot", () => {
+    const document = new Y.Doc();
+    const nodes = document.getMap<Y.Map<unknown>>("nodes");
+    syncNodes(document, nodes, [
+      { id: "one", type: "text", text: "one" },
+      { id: "two", type: "text", text: "two" },
+    ]);
+
+    syncNodes(document, nodes, [{ id: "one", type: "text", text: "one" }], false, false);
+
+    expect([...nodes.keys()]).toEqual(["one", "two"]);
+  });
 });
 
 describe("canvas controller", () => {

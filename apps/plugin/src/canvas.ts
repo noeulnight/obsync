@@ -32,6 +32,8 @@ export class CanvasSync {
   private applyingView = false;
   private readonly bindings = new Map<CanvasController, () => void>();
   private readonly pendingText = new Map<string, string>();
+  private projectedCanvas?: CanvasData;
+  private fileChain: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly app: App,
@@ -63,7 +65,9 @@ export class CanvasSync {
         this.providerSynced = true;
         void this.initialize();
       },
-      onAuthenticationFailed: () => setStatus("Authentication failed"),
+      onAuthenticationFailed: () => {
+        if (!this.destroyed) setStatus("Authentication failed");
+      },
     });
     this.provider.awareness?.setLocalStateField("user", {
       name: connection.userName,
@@ -106,7 +110,15 @@ export class CanvasSync {
     return this.provider.hasUnsyncedChanges;
   }
 
-  async localChanged(data?: CanvasData, syncExistingText = this.bindings.size === 0) {
+  async localChanged(
+    data?: CanvasData,
+    syncExistingText = this.bindings.size === 0,
+    removeMissing = true,
+  ) {
+    await this.enqueueFileTask(() => this.applyLocalCanvas(data, syncExistingText, removeMissing));
+  }
+
+  private async applyLocalCanvas(data?: CanvasData, syncExistingText = true, removeMissing = true) {
     if (this.connection.readOnly) return;
     if (this.destroyed || !this.persistenceSynced || this.applying.has(this.path)) return;
     if (!data) {
@@ -114,13 +126,21 @@ export class CanvasSync {
       if (!(file instanceof TFile)) return;
       data = parseCanvas(await this.app.vault.read(file));
     }
+    if (this.projectedCanvas && sameCanvas(data, this.projectedCanvas)) return;
+    const current = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
+    if (this.projectedCanvas && !sameCanvas(current, this.projectedCanvas)) {
+      this.projectedCanvas = current;
+      await this.writeFile();
+      return;
+    }
     this.document.transact(() => {
       syncMap(this.meta, data.meta);
-      syncNodes(this.document, this.nodes, data.nodes, syncExistingText);
-      syncZOrder(this.zOrder, data.nodes);
-      syncItems(this.edges, data.edges);
+      syncNodes(this.document, this.nodes, data.nodes, syncExistingText, removeMissing);
+      syncZOrder(this.zOrder, data.nodes, removeMissing);
+      syncItems(this.edges, data.edges, removeMissing);
       this.applyPendingText();
     }, localOrigin);
+    this.projectedCanvas = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
   }
 
   async fileChanged() {
@@ -157,7 +177,7 @@ export class CanvasSync {
 
   private async initialize() {
     if (this.destroyed || this.initialized || !this.persistenceSynced) return;
-    if (this.seedMode !== "local" && !this.providerSynced) return;
+    if (this.seedMode === "merge" && !this.providerSynced) return;
     if (this.seedMode === "local") await this.localChanged();
     else if (this.seedMode === "merge") await this.mergeLocalChanges();
     this.document.transact(() => {
@@ -167,16 +187,27 @@ export class CanvasSync {
     this.initialized = true;
     this.onReady();
     this.renderViews();
-    await this.writeFile();
+    await this.enqueueFileWrite();
   }
 
   private async mergeLocalChanges() {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const local = parseCanvas(await this.app.vault.read(file));
-    if (!this.persistedCanvas || !sameCanvas(local, this.persistedCanvas)) {
-      await this.localChanged(local);
+    const server = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
+    if (
+      sameCanvas(local, server) ||
+      (this.persistedCanvas && sameCanvas(local, this.persistedCanvas))
+    ) {
+      this.projectedCanvas = server;
+      return;
     }
+    if (this.persistedCanvas && sameCanvas(server, this.persistedCanvas)) {
+      await this.localChanged(local);
+      return;
+    }
+
+    this.projectedCanvas = server;
   }
 
   bindOpenViews() {
@@ -190,7 +221,7 @@ export class CanvasSync {
       if (!this.bindings.has(controller)) {
         const stopChanges = observeCanvas(controller, (data) => {
           if (!this.connection.readOnly && !this.applyingView) {
-            void this.localChanged(parseCanvas(JSON.stringify(data)), false);
+            void this.localChanged(parseCanvas(JSON.stringify(data)), false, false);
           }
         });
         const stopPresence = this.provider.awareness
@@ -213,8 +244,18 @@ export class CanvasSync {
     if (this.writeTimer !== undefined) window.clearTimeout(this.writeTimer);
     this.writeTimer = window.setTimeout(() => {
       this.writeTimer = undefined;
-      void this.writeFile();
+      void this.enqueueFileWrite();
     }, 1_000);
+  }
+
+  private enqueueFileWrite() {
+    return this.enqueueFileTask(() => this.writeFile());
+  }
+
+  private enqueueFileTask(work: () => Promise<void>) {
+    const next = this.fileChain.catch(() => undefined).then(work);
+    this.fileChain = next;
+    return next;
   }
 
   private scheduleRender() {
@@ -244,10 +285,14 @@ export class CanvasSync {
     if (!(file instanceof TFile)) return;
     const data = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
     const current = await this.app.vault.read(file);
-    if (sameCanvas(parseCanvas(current), data)) return;
+    if (sameCanvas(parseCanvas(current), data)) {
+      this.projectedCanvas = data;
+      return;
+    }
     this.applying.add(this.path);
     try {
       await this.app.vault.modify(file, `${JSON.stringify(toJson(data), null, "\t")}\n`);
+      this.projectedCanvas = data;
     } finally {
       this.applying.delete(this.path);
     }
@@ -282,9 +327,11 @@ export class CanvasSync {
   }
 }
 
-function syncItems(target: Y.Map<Y.Map<unknown>>, items: CanvasItem[]) {
+function syncItems(target: Y.Map<Y.Map<unknown>>, items: CanvasItem[], removeMissing = true) {
   const wanted = new Map(items.map((item) => [item.id, item]));
-  for (const id of target.keys()) if (!wanted.has(id)) target.delete(id);
+  if (removeMissing) {
+    for (const id of target.keys()) if (!wanted.has(id)) target.delete(id);
+  }
   for (const [id, item] of wanted) {
     let shared = target.get(id);
     if (!shared) {
@@ -295,9 +342,11 @@ function syncItems(target: Y.Map<Y.Map<unknown>>, items: CanvasItem[]) {
   }
 }
 
-function syncZOrder(order: Y.Map<number>, nodes: CanvasItem[]) {
+function syncZOrder(order: Y.Map<number>, nodes: CanvasItem[], removeMissing = true) {
   const ids = new Set(nodes.map((node) => node.id));
-  for (const id of order.keys()) if (!ids.has(id)) order.delete(id);
+  if (removeMissing) {
+    for (const id of order.keys()) if (!ids.has(id)) order.delete(id);
+  }
   nodes.forEach((node, index) => {
     if (order.get(node.id) !== index) order.set(node.id, index);
   });

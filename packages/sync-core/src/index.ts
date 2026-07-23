@@ -37,6 +37,7 @@ export type FileOperation = FileOperationRequest & {
 
 export type RemoteFile = {
   id: string;
+  kind?: FileKind;
   path: string;
   deleted: boolean;
   version: number;
@@ -168,6 +169,7 @@ export function cleanupConfirmedOperations(
 
 export type FileOperationRebase =
   | { type: "confirm"; file: RemoteFile }
+  | { type: "merge"; file: RemoteFile }
   | { type: "discard" }
   | {
       type: "replace";
@@ -184,6 +186,15 @@ export function rebaseOperation(
   const current = files.find((file) => file.id === operation.fileId && !file.deleted);
   if (operation.type === "create") {
     if (current) return { type: "confirm", file: current };
+    const samePath = files.find(
+      (file) =>
+        !file.deleted &&
+        file.kind === operation.kind &&
+        pathKey(file.path) === pathKey(operation.path!),
+    );
+    if (samePath && operation.kind === "folder") {
+      return { type: "merge", file: samePath };
+    }
     const path = conflictPath(operation.path!, operation.fileId, occupiedPaths);
     return {
       type: "replace",

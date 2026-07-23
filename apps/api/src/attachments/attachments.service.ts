@@ -106,7 +106,6 @@ export class AttachmentsService {
     }
     const uploadHeaders = {
       'content-type': attachment.mimeType,
-      'x-amz-meta-sha256': attachment.sha256,
     };
     const uploadUrl = await getSignedUrl(
       this.storage.publicClient,
@@ -116,7 +115,10 @@ export class AttachmentsService {
         ContentType: attachment.mimeType,
         Metadata: { sha256: attachment.sha256 },
       }),
-      { expiresIn: uploadExpirySeconds },
+      {
+        expiresIn: uploadExpirySeconds,
+        signableHeaders: new Set(['content-type']),
+      },
     );
     return {
       attachment: this.response(attachment),

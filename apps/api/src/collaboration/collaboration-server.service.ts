@@ -43,6 +43,7 @@ export class CollaborationServerService
   private readonly websocketServer = new WebSocketServer({ noServer: true });
   private readonly pendingStores = new Set<Promise<void>>();
   private readonly storeChains = new Map<string, Promise<void>>();
+  private readonly removedRooms = new Set<string>();
   private server?: Server;
 
   constructor(
@@ -211,10 +212,36 @@ export class CollaborationServerService
   }
 
   async removeFiles(vaultId: string, fileIds: string[]): Promise<void> {
-    const connection = await this.collaboration(vaultId).openDirectConnection(
-      'manifest',
-      { vaultId, userId: 'server', role: 'OWNER' },
+    const hocuspocus = this.collaboration(vaultId);
+    const rooms = fileIds.flatMap((fileId) => [
+      {
+        name: `doc:${fileId}`,
+        stored: `vault:${vaultId}:doc:${fileId}`,
+      },
+      {
+        name: `canvas:${fileId}`,
+        stored: `vault:${vaultId}:canvas:${fileId}`,
+      },
+    ]);
+    for (const room of rooms) {
+      this.removedRooms.add(room.stored);
+      hocuspocus.closeConnections(room.name);
+    }
+    await Promise.allSettled(
+      rooms.flatMap((room) => {
+        const pending = this.storeChains.get(room.stored);
+        return pending ? [pending] : [];
+      }),
     );
+    await this.prisma.yDocument.deleteMany({
+      where: { roomName: { in: rooms.map((room) => room.stored) } },
+    });
+
+    const connection = await hocuspocus.openDirectConnection('manifest', {
+      vaultId,
+      userId: 'server',
+      role: 'OWNER',
+    });
     await connection.transact((document) => {
       const manifest = document.getMap<ManifestEntry>('files');
       for (const fileId of fileIds) manifest.delete(fileId);
@@ -235,11 +262,7 @@ export class CollaborationServerService
     const roomName = `doc:${fileId}`;
     const connection = await this.collaboration(vaultId).openDirectConnection(
       roomName,
-      {
-        vaultId,
-        userId: 'server',
-        role: 'OWNER',
-      },
+      { vaultId, userId: 'server', role: 'OWNER' },
     );
     try {
       let content = '';
@@ -270,11 +293,7 @@ export class CollaborationServerService
     const roomName = `doc:${fileId}`;
     const connection = await this.collaboration(vaultId).openDirectConnection(
       roomName,
-      {
-        vaultId,
-        userId,
-        role: 'OWNER',
-      },
+      { vaultId, userId, role: 'OWNER' },
     );
     try {
       let currentState = Y.encodeStateAsUpdate(new Y.Doc());
@@ -303,7 +322,11 @@ export class CollaborationServerService
   async readCanvas(vaultId: string, fileId: string) {
     const connection = await this.collaboration(vaultId).openDirectConnection(
       `canvas:${fileId}`,
-      { vaultId, userId: 'server', role: 'OWNER' },
+      {
+        vaultId,
+        userId: 'server',
+        role: 'OWNER',
+      },
     );
     try {
       let data: CanvasData = { meta: {}, nodes: [], edges: [] };
@@ -324,7 +347,11 @@ export class CollaborationServerService
   ) {
     const connection = await this.collaboration(vaultId).openDirectConnection(
       `canvas:${fileId}`,
-      { vaultId, userId, role: 'OWNER' },
+      {
+        vaultId,
+        userId,
+        role: 'OWNER',
+      },
     );
     try {
       await connection.transact((document) => {
@@ -380,10 +407,31 @@ export class CollaborationServerService
     userId: string,
     clientsCount: number,
   ): Promise<void> {
+    if (this.removedRooms.has(roomName)) return;
     const room = parseStoredCollaborationRoom(roomName);
     if (!room) throw new Error('Invalid collaboration room');
 
     const storedState = Uint8Array.from(state);
+    const previous =
+      room.kind === 'document'
+        ? await this.prisma.yDocument.findUnique({
+            where: { roomName },
+            select: { state: true },
+          })
+        : undefined;
+    if (
+      room.kind === 'document' &&
+      previous?.state &&
+      shouldCheckpointBefore(previous.state, storedState)
+    ) {
+      await this.createVersion(
+        room.vaultId,
+        room.documentId,
+        previous.state,
+        userId,
+        true,
+      );
+    }
     await this.prisma.yDocument.upsert({
       where: { roomName },
       create: { roomName, vaultId: room.vaultId, state: storedState },
@@ -495,6 +543,14 @@ function documentText(state: Uint8Array) {
   const document = new Y.Doc();
   Y.applyUpdate(document, state);
   return document.getText('content').toJSON();
+}
+
+export function shouldCheckpointBefore(previous: Uint8Array, next: Uint8Array) {
+  const before = documentText(previous).length;
+  const after = documentText(next).length;
+  return (
+    before > 0 && (after === 0 || (before - after >= 100 && after * 2 < before))
+  );
 }
 
 function canvasData(document: Y.Doc): CanvasData {

@@ -22,6 +22,7 @@ export class BrowserFileOutbox {
   private flushing = false;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private retryDelay = 1_000;
+  private destroyed = false;
 
   constructor(
     private readonly vaultId: string,
@@ -61,13 +62,14 @@ export class BrowserFileOutbox {
   }
 
   destroy() {
+    this.destroyed = true;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     void this.persistence.destroy();
     this.document.destroy();
   }
 
   private async flush() {
-    if (this.flushing || !this.connected || this.readOnly) return;
+    if (this.destroyed || this.flushing || !this.connected || this.readOnly) return;
     this.flushing = true;
     try {
       while (true) {
@@ -80,9 +82,11 @@ export class BrowserFileOutbox {
             this.vaultId,
             operationRequest(operation),
           );
+          if (this.destroyed) return;
           this.retryDelay = 1_000;
           this.confirm(index, operation, result.files);
         } catch (error) {
+          if (this.destroyed) return;
           if (axios.isAxiosError(error) && error.response?.status === 409) {
             try {
               await this.recoverConflict(index, operation);
@@ -108,6 +112,11 @@ export class BrowserFileOutbox {
     const result = rebaseOperation(operation, files, this.occupiedPaths(files), randomUuid());
     if (result.type === "confirm") {
       this.confirm(index, operation, [result.file]);
+      return;
+    }
+    if (result.type === "merge") {
+      this.operations.delete(index, 1);
+      this.setStatus("Merged with existing folder");
       return;
     }
     if (result.type === "discard") {
@@ -138,7 +147,7 @@ export class BrowserFileOutbox {
   }
 
   private scheduleRetry() {
-    if (this.retryTimer || this.readOnly) return;
+    if (this.destroyed || this.retryTimer || this.readOnly) return;
     const delay = this.retryDelay;
     this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
     this.setStatus("Waiting to reconnect");
