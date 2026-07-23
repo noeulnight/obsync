@@ -246,6 +246,92 @@ describe("startup synchronization", () => {
     expect(sync.text.toJSON()).toBe("after from web");
   });
 
+  it("treats an existing stale Markdown file as a server replica on reconnect", async () => {
+    const file = new TFile();
+    const vault = {
+      getAbstractFileByPath: () => file,
+      read: vi.fn().mockResolvedValue("stale disk copy"),
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new DocumentSync(
+      { vault, workspace: { getLeavesOfType: () => [] } } as unknown as App,
+      "id",
+      "Note.md",
+      "server",
+      connection,
+      {} as never,
+      vi.fn(),
+      new Set(),
+      vi.fn(),
+    );
+    sync.text.insert(0, "cached before");
+
+    mocks.persistenceCallbacks[0]?.();
+    replaceText(sync.text, "newest server");
+    mocks.providers[0]?.options.onSynced?.({ state: true });
+
+    await vi.waitFor(() => expect(vault.modify).toHaveBeenCalledWith(file, "newest server"));
+    expect(sync.text.toJSON()).toBe("newest server");
+  });
+
+  it("treats an existing stale Canvas file as a server replica on reconnect", async () => {
+    const file = new TFile();
+    const vault = {
+      getAbstractFileByPath: () => file,
+      read: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          nodes: [
+            {
+              id: "node",
+              type: "text",
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 100,
+              text: "stale disk copy",
+            },
+          ],
+          edges: [],
+        }),
+      ),
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new CanvasSync(
+      { vault, workspace: { getLeavesOfType: () => [] } } as unknown as App,
+      "id",
+      "Board.canvas",
+      "server",
+      connection,
+      {} as never,
+      new Set(),
+      vi.fn(),
+      vi.fn(),
+    );
+    const document = (sync as unknown as { document: Y.Doc }).document;
+    const node = new Y.Map<unknown>();
+    for (const [key, value] of Object.entries({
+      id: "node",
+      type: "text",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    })) {
+      node.set(key, value);
+    }
+    document.getMap("nodes").set("node", node);
+    document.getText("canvas-node:node:text").insert(0, "newest server");
+
+    mocks.persistenceCallbacks[0]?.();
+    mocks.providers[0]?.options.onSynced?.({ state: true });
+
+    await vi.waitFor(() => expect(vault.modify).toHaveBeenCalled());
+    const saved = JSON.parse(vault.modify.mock.calls.at(-1)?.[1] as string) as {
+      nodes: Array<{ text?: string }>;
+    };
+    expect(saved.nodes[0]?.text).toBe("newest server");
+  });
+
   it("does not replace cached or server Markdown with an empty startup file", async () => {
     const file = new TFile();
     const vault = {

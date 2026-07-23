@@ -81,9 +81,8 @@ export class RemoteVaultWriter {
             createTextFile(this.app, entry.path, entry.kind === "markdown" ? "" : "{}\n"),
           );
         }
-        const seedMode = Boolean(local) && !this.connection.readOnly ? "merge" : "server";
-        if (entry.kind === "markdown") this.sessions.document(entry, seedMode);
-        else this.sessions.canvas(entry, seedMode);
+        if (entry.kind === "markdown") this.sessions.document(entry, "server");
+        else this.sessions.canvas(entry, "server");
         return;
       }
 

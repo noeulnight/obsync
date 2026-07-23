@@ -83,7 +83,7 @@ export class VaultSessions {
     };
   }
 
-  document(entry: MarkdownEntry, seedMode: SeedMode = "merge") {
+  document(entry: MarkdownEntry, seedMode: SeedMode = "server") {
     let document = this.documents.get(entry.id);
     if (!document) {
       document = new DocumentSync(
@@ -102,7 +102,7 @@ export class VaultSessions {
     return document;
   }
 
-  canvas(entry: CanvasEntry, seedMode: SeedMode = "merge") {
+  canvas(entry: CanvasEntry, seedMode: SeedMode = "server") {
     let canvas = this.canvases.get(entry.id);
     if (!canvas) {
       canvas = new CanvasSync(

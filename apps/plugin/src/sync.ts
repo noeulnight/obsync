@@ -192,11 +192,11 @@ export class VaultSync {
     if (!(file instanceof TFile)) return;
     if (file.extension === "md") {
       const entry = this.files.ensureMarkdown(file.path);
-      await this.sessions.document(entry).localChanged();
+      await this.sessions.document(entry, "local").localChanged();
       return;
     }
     if (file.extension === "canvas") {
-      await this.sessions.canvas(this.files.ensureCanvas(file.path)).localChanged();
+      await this.sessions.canvas(this.files.ensureCanvas(file.path), "local").localChanged();
       return;
     }
     await this.remote.queue(file.path, () => this.upload(file));
@@ -208,11 +208,11 @@ export class VaultSync {
     if (!this.manifestLoaded && !this.files.findPath(file.path)) return;
     if (file.extension === "md") {
       const entry = this.files.ensureMarkdown(file.path);
-      await this.sessions.document(entry).localChanged(false);
+      await this.sessions.document(entry, "local").localChanged(false);
       return;
     }
     if (file.extension === "canvas") {
-      await this.sessions.canvas(this.files.ensureCanvas(file.path)).fileChanged();
+      await this.sessions.canvas(this.files.ensureCanvas(file.path), "local").fileChanged();
       return;
     }
     await this.remote.queue(file.path, () => this.upload(file));
