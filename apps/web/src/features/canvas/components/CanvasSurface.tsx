@@ -299,7 +299,7 @@ export function CanvasSurface({
         data-testid="canvas-surface"
         tabIndex={0}
         aria-label="Canvas"
-        className="absolute inset-0 touch-none overflow-hidden border bg-background outline-none cursor-grab active:cursor-grabbing"
+        className="absolute inset-0 touch-none overflow-hidden bg-background outline-none cursor-grab active:cursor-grabbing"
         style={
           showGrid
             ? {

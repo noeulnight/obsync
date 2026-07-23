@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { ApiClient } from "@/lib/api/client";
-import { forceLayout, VaultGraphView } from "./VaultGraphView";
+import { forceLayout, graphViewport, localGraph, VaultGraphView } from "./VaultGraphView";
 
 afterEach(cleanup);
 
@@ -29,6 +29,41 @@ describe("VaultGraphView", () => {
         }),
       ).size,
     ).toBe(3);
+  });
+
+  it("keeps only the viewed document and its direct connections", () => {
+    const graph = localGraph(
+      {
+        nodes: ["one", "two", "three", "four"].map((id) => ({
+          id,
+          path: `${id}.md`,
+          exists: true,
+        })),
+        edges: [
+          { source: "one", target: "two" },
+          { source: "two", target: "three" },
+          { source: "three", target: "four" },
+        ],
+      },
+      "two",
+    );
+
+    expect(graph.nodes.map((node) => node.id)).toEqual(["one", "two", "three"]);
+    expect(graph.edges).toEqual([
+      { source: "one", target: "two" },
+      { source: "two", target: "three" },
+    ]);
+  });
+
+  it("fits a local graph around its simulated nodes", () => {
+    const viewport = graphViewport([
+      { x: 460, y: 320 },
+      { x: 540, y: 380 },
+    ]);
+
+    expect(viewport.k).toBeGreaterThan(1);
+    expect(viewport.x).toBeCloseTo(-750);
+    expect(viewport.y).toBeCloseTo(-525);
   });
 
   it("renders force links and opens a document node", async () => {

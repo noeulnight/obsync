@@ -65,6 +65,8 @@ export function Workspace({
     routeVaultId === vault.id ? (routeFileId ?? "") : "",
   );
   const activeRef = useRef(active);
+  const navigateRef = useRef(navigateRoute);
+  navigateRef.current = navigateRoute;
   const [online, setOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Connecting");
   const [notice, setNotice] = useState("");
@@ -101,7 +103,7 @@ export function Workspace({
       (fromFileId, toFileId) => {
         if (activeRef.current !== fromFileId) return;
         setActive(toFileId);
-        void navigateRoute(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
+        void navigateRef.current(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
       },
     );
     const unsubscribe = next.subscribe(() => {
@@ -115,7 +117,7 @@ export function Workspace({
       next.destroy();
       setSync(undefined);
     };
-  }, [api, navigateRoute, userName, vault.id, vault.role]);
+  }, [api, userName, vault.id, vault.role]);
 
   useEffect(() => {
     activeRef.current = active;
@@ -400,7 +402,6 @@ export function Workspace({
           vaultId={vault.id}
           vaultName={vault.name}
           entries={entries}
-          active={active}
           activeEntry={activeEntry}
           notice={notice}
           documentSession={documentSession}

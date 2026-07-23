@@ -1,14 +1,7 @@
 import { Link2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { ApiClient } from "@/lib/api/client";
 import { useBacklinks } from "../queries/use-vault-search";
 
@@ -34,12 +27,11 @@ export function BacklinksSheet({
           {results.length}
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent className="w-full gap-0 p-0 sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Backlinks</SheetTitle>
-          <SheetDescription>Documents that link to this note.</SheetDescription>
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
           {backlinks.isPending ? (
             <Message>Loading backlinks…</Message>
           ) : !results.length ? (

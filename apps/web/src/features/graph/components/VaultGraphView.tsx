@@ -1,5 +1,4 @@
 import {
-  forceCenter,
   forceCollide,
   forceLink,
   forceManyBody,
@@ -79,14 +78,16 @@ export function VaultGraphView({
   );
 }
 
-function ForceGraph({
+export function ForceGraph({
   data,
   vaultId,
   open,
+  initialFit = false,
 }: {
   data: VaultGraph;
   vaultId: string;
   open: (node: VaultGraph["nodes"][number]) => void;
+  initialFit?: boolean;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const simulation = useRef<Simulation<ForceNode, ForceLink> | undefined>(undefined);
@@ -96,14 +97,32 @@ function ForceGraph({
   const dragStart = useRef<{ id: string; x: number; y: number } | undefined>(undefined);
   const panning = useRef<Point | undefined>(undefined);
   const [viewport, setViewport] = useState(defaultViewport);
+  const [surfaceScale, setSurfaceScale] = useState(1);
   const [hovered, setHovered] = useState<string>();
   const related = useMemo(() => neighbors(data), [data]);
+
+  useEffect(() => {
+    const element = svg.current;
+    if (!element) return;
+    const measure = () => {
+      const bounds = element.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      setSurfaceScale(Math.min(bounds.width / width, bounds.height / height));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const screenUnit = 1 / (viewport.k * surfaceScale);
 
   useEffect(() => {
     const graph = createSimulation(data);
     simulation.current = graph.simulation;
 
-    graph.simulation.on("tick", () => {
+    const render = () => {
       for (const node of graph.nodes) {
         const group = nodes.current.get(node.id);
         if (!group) continue;
@@ -119,7 +138,13 @@ function ForceGraph({
         line.setAttribute("x2", String(target.x));
         line.setAttribute("y2", String(target.y));
       }
-    });
+    };
+    graph.simulation.on("tick", render);
+    if (initialFit) {
+      graph.simulation.stop().tick(120);
+      render();
+      setViewport(graphViewport(graph.nodes));
+    }
 
     return () => {
       graph.simulation.stop();
@@ -213,7 +238,7 @@ function ForceGraph({
         onPointerCancel={() => release()}
       >
         <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.k})`}>
-          <g fill="none" strokeWidth={1 / viewport.k}>
+          <g fill="none" strokeWidth={screenUnit}>
             {data.edges.map((edge, index) => {
               const active =
                 hovered !== undefined && (edge.source === hovered || edge.target === hovered);
@@ -229,7 +254,7 @@ function ForceGraph({
               );
             })}
           </g>
-          <g strokeWidth={1.5 / viewport.k}>
+          <g strokeWidth={1.5 * screenUnit}>
             {data.nodes.map((node) => {
               const selected = hovered === node.id;
               const connected = hovered !== undefined && related.get(hovered)?.has(node.id);
@@ -271,7 +296,7 @@ function ForceGraph({
                     }}
                   >
                     <circle
-                      r={(selected ? 8 : 6) / viewport.k}
+                      r={(selected ? 8 : 6) * screenUnit}
                       className={
                         selected
                           ? "fill-violet-500 stroke-violet-300"
@@ -283,7 +308,7 @@ function ForceGraph({
                       }
                     />
                     <text
-                      y={20 / viewport.k}
+                      y={20 * screenUnit}
                       textAnchor="middle"
                       className={
                         selected
@@ -292,7 +317,7 @@ function ForceGraph({
                             ? "fill-muted-foreground"
                             : "fill-muted-foreground/60"
                       }
-                      fontSize={11 / viewport.k}
+                      fontSize={11 * screenUnit}
                       stroke="none"
                     >
                       {name(node.path)}
@@ -314,6 +339,36 @@ export function forceLayout(data: VaultGraph) {
   return new Map(graph.nodes.map(({ id, x = width / 2, y = height / 2 }) => [id, { x, y }]));
 }
 
+export function localGraph(data: VaultGraph, fileId: string): VaultGraph {
+  const related = new Set([fileId]);
+  for (const edge of data.edges) {
+    if (edge.source === fileId) related.add(edge.target);
+    if (edge.target === fileId) related.add(edge.source);
+  }
+  return {
+    nodes: data.nodes.filter((node) => related.has(node.id)),
+    edges: data.edges.filter((edge) => related.has(edge.source) && related.has(edge.target)),
+  };
+}
+
+export function graphViewport(nodes: Array<{ x?: number; y?: number }>): Viewport {
+  if (!nodes.length) return defaultViewport;
+  const xs = nodes.map((node) => node.x ?? width / 2);
+  const ys = nodes.map((node) => node.y ?? height / 2);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const graphWidth = Math.max(240, maxX - minX);
+  const graphHeight = Math.max(160, maxY - minY);
+  const k = Math.min(2.5, Math.max(0.4, Math.min(840 / graphWidth, 540 / graphHeight)));
+  return {
+    k,
+    x: width / 2 - ((minX + maxX) / 2) * k,
+    y: height / 2 - ((minY + maxY) / 2) * k,
+  };
+}
+
 function createSimulation(data: VaultGraph) {
   const nodes: ForceNode[] = data.nodes.map(({ id }) => ({ id }));
   const links: ForceLink[] = data.edges.map(({ source, target }) => ({ source, target }));
@@ -322,13 +377,13 @@ function createSimulation(data: VaultGraph) {
       "link",
       forceLink<ForceNode, ForceLink>(links)
         .id((node) => node.id)
-        .distance(100),
+        .distance(66)
+        .strength(0.85),
     )
-    .force("charge", forceManyBody().strength(-60).distanceMax(300))
-    .force("center", forceCenter(width / 2, height / 2))
-    .force("x", forceX(width / 2).strength(0.05))
-    .force("y", forceY(height / 2).strength(0.05))
-    .force("collision", forceCollide(24));
+    .force("charge", forceManyBody().strength(-95))
+    .force("x", forceX(width / 2).strength(0.12))
+    .force("y", forceY(height / 2).strength(0.12))
+    .force("collision", forceCollide(14).strength(0.95));
   return { nodes, links, simulation };
 }
 

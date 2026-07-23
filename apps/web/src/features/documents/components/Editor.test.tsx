@@ -144,7 +144,7 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     vi.spyOn(editor, "posAtCoords").mockReturnValue(6);
 
-    fireEvent.mouseDown(rendered.container.querySelectorAll(".cm-line")[0], {
+    fireEvent.click(rendered.container.querySelectorAll(".cm-line")[0], {
       button: 0,
       detail: 1,
       clientX: 10,
@@ -563,6 +563,33 @@ describe("Editor", () => {
     if (!link) throw new Error("Wiki link was not rendered");
     fireEvent.mouseDown(link, { button: 0 });
 
+    expect(onNavigate).toHaveBeenCalledWith("Notes/Beta");
+  });
+
+  it("renders a wiki-link alias while retaining its target", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "[[Notes/Beta|Readable title]]\nEnd");
+    const onNavigate = vi.fn();
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={onNavigate}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    const link = await waitFor(() =>
+      rendered.container.querySelector<HTMLElement>(".cm-live-link"),
+    );
+    if (!link) throw new Error("Wiki alias was not rendered");
+    expect(link.textContent).toBe("Readable title");
+    expect(link.dataset.href).toBe("Notes/Beta");
+    fireEvent.mouseDown(link, { button: 0 });
     expect(onNavigate).toHaveBeenCalledWith("Notes/Beta");
   });
 });

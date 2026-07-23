@@ -15,8 +15,8 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
+  SheetResizeHandle,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
@@ -62,38 +62,13 @@ export function VersionHistorySheet({
       </SheetTrigger>
       <SheetContent
         className="w-full max-w-[calc(100vw-24px)] gap-0 overflow-hidden sm:max-w-none"
-        style={{ width }}
+        style={{ width, maxWidth: "calc(100vw - 24px)" }}
       >
-        <button
-          type="button"
-          aria-label="Resize version history"
-          className="group absolute inset-y-0 left-0 z-20 w-3 -translate-x-1/2 cursor-ew-resize touch-none"
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            event.preventDefault();
-          }}
-          onPointerMove={(event) => {
-            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-            setWidth(
-              Math.min(window.innerWidth - 24, Math.max(360, window.innerWidth - event.clientX)),
-            );
-          }}
-          onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") {
-              setWidth((current) => Math.min(window.innerWidth - 24, current + 32));
-            } else if (event.key === "ArrowRight") {
-              setWidth((current) => Math.max(360, current - 32));
-            }
-          }}
-        >
-          <span className="absolute inset-y-0 left-1/2 w-px bg-border transition-colors group-hover:bg-primary group-focus-visible:bg-primary" />
-        </button>
-        <SheetHeader className="shrink-0">
+        <SheetResizeHandle label="Resize version history" width={width} onWidthChange={setWidth} />
+        <SheetHeader>
           <SheetTitle>Version history</SheetTitle>
-          <SheetDescription>Review and restore earlier versions of this document.</SheetDescription>
         </SheetHeader>
-        <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr] overflow-hidden border-t">
+        <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr] overflow-hidden">
           <div className="overflow-y-auto border-r p-2">
             {versions.isPending ? (
               <Message>Loading history…</Message>

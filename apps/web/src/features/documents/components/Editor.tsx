@@ -4,7 +4,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { yCollab } from "y-codemirror.next";
 import { livePreview, refreshLivePreview } from "../lib/live-preview";
 import { markdownLinkOptions, type FileEntry } from "../lib/files";
@@ -42,7 +42,7 @@ export function Editor({
   pasteImages.current = onPasteImages;
   vaultFiles.current = files;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!parent.current) return;
     const view = new EditorView({
       parent: parent.current,
@@ -107,7 +107,7 @@ export function Editor({
 }
 
 const correctPointerLine = EditorView.domEventHandlers({
-  mousedown(event, view) {
+  click(event, view) {
     if (
       event.button !== 0 ||
       event.detail !== 1 ||
@@ -155,7 +155,6 @@ const correctPointerLine = EditorView.domEventHandlers({
           ? documentLine.from
           : documentLine.to;
 
-    event.preventDefault();
     view.dispatch({ selection: { anchor: position }, scrollIntoView: true });
     view.focus();
     return true;
@@ -203,8 +202,8 @@ const compactEditorTheme = EditorView.theme(
     ".cm-content": {
       minHeight: "100%",
       padding: "12px",
-      fontSize: "14px",
-      lineHeight: "1.55",
+      fontSize: "16px",
+      lineHeight: "1.5",
       caretColor: "var(--foreground)",
     },
   },

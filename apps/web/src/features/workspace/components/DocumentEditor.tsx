@@ -8,6 +8,7 @@ import { VersionHistorySheet } from "@/features/history/components/VersionHistor
 import type { ApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/error";
 import { ShareButton } from "@/features/sharing/components/ShareButton";
+import { LocalGraphSheet } from "@/features/graph/components/LocalGraphSheet";
 import { FileHeader } from "./FileHeader";
 
 export function DocumentEditor({
@@ -78,6 +79,12 @@ export function DocumentEditor({
           <>
             {canShare && <ShareButton vaultId={vaultId} fileId={entry.id} />}
             <BacklinksSheet
+              api={api}
+              vaultId={vaultId}
+              fileId={entry.id}
+              openDocument={onOpenDocument}
+            />
+            <LocalGraphSheet
               api={api}
               vaultId={vaultId}
               fileId={entry.id}

@@ -91,12 +91,16 @@ export function decorateLine(
       );
       continue;
     }
+    const separator = match[2].indexOf("|");
+    const href = separator < 0 ? match[2] : match[2].slice(0, separator);
+    const labelFrom = separator < 0 ? contentStart : contentStart + separator + 1;
     ranges.push(hidden.range(start, contentStart));
+    if (separator >= 0) ranges.push(hidden.range(contentStart, labelFrom));
     ranges.push(
       Decoration.mark({
         class: match[1] ? "cm-live-embed" : "cm-live-link",
-        attributes: { "data-href": match[2] },
-      }).range(contentStart, end - 2),
+        attributes: { "data-href": href },
+      }).range(labelFrom, end - 2),
     );
     ranges.push(hidden.range(end - 2, end));
   }

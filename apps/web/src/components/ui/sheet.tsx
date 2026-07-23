@@ -77,9 +77,48 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn("flex flex-col gap-0.5 p-4", className)}
+      className={cn("flex shrink-0 flex-col gap-0.5 border-b px-5 py-3", className)}
       {...props}
     />
+  );
+}
+
+function SheetResizeHandle({
+  label,
+  width,
+  onWidthChange,
+  minWidth = 360,
+  maxWidth,
+}: {
+  label: string;
+  width: number;
+  onWidthChange: (width: number) => void;
+  minWidth?: number;
+  maxWidth?: number;
+}) {
+  const clamp = (value: number) =>
+    Math.min(maxWidth ?? Infinity, window.innerWidth - 24, Math.max(minWidth, value));
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="group absolute inset-y-0 left-0 z-20 w-4 cursor-ew-resize touch-none"
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }}
+      onPointerMove={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        onWidthChange(clamp(window.innerWidth - event.clientX));
+      }}
+      onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") onWidthChange(clamp(width + 32));
+        else if (event.key === "ArrowRight") onWidthChange(clamp(width - 32));
+      }}
+    >
+      <span className="absolute top-1/2 left-1/2 h-16 w-px -translate-y-1/2 bg-border transition-colors group-hover:bg-primary group-focus-visible:bg-primary" />
+    </button>
   );
 }
 
@@ -122,6 +161,7 @@ export {
   SheetClose,
   SheetContent,
   SheetHeader,
+  SheetResizeHandle,
   SheetFooter,
   SheetTitle,
   SheetDescription,

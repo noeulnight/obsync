@@ -23,7 +23,6 @@ export function WorkspaceContent({
   vaultId,
   vaultName,
   entries,
-  active,
   activeEntry,
   notice,
   documentSession,
@@ -55,7 +54,6 @@ export function WorkspaceContent({
   vaultId: string;
   vaultName: string;
   entries: FileEntry[];
-  active: string;
   activeEntry?: FileEntry;
   notice: string;
   documentSession?: WebDocument;
@@ -114,7 +112,6 @@ export function WorkspaceContent({
         ) : documentSession && activeEntry ? (
           <Suspense fallback={<EditorLoading />}>
             <DocumentEditor
-              key={active}
               entry={activeEntry}
               vaultName={vaultName}
               session={documentSession}
@@ -139,7 +136,6 @@ export function WorkspaceContent({
         ) : canvasSession && activeEntry ? (
           <Suspense fallback={<EditorLoading />}>
             <CanvasEditor
-              key={active}
               session={canvasSession}
               fileId={activeEntry.id}
               vaultId={vaultId}
