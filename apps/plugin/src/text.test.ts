@@ -4,7 +4,7 @@ import { replaceText } from "@obsync/sync-core";
 import { type CanvasItemController, observeCanvas, renderCanvas } from "./canvas-controller";
 import { parseCanvas } from "./canvas-data";
 import { readCanvasPresence } from "./canvas-presence";
-import { changesCanvasStructure, syncNodes } from "./canvas-yjs";
+import { syncNodes } from "./canvas-yjs";
 import { mimeType } from "./mime";
 import { fileId, isWithin, moveWithin, parentPath, pathKey } from "./path";
 import { editorBindingKey } from "./sync-types";
@@ -49,35 +49,6 @@ describe("parseCanvas", () => {
 });
 
 describe("canvas text synchronization", () => {
-  it("does not rerender the canvas for direct node text updates", () => {
-    const document = new Y.Doc();
-    const nodes = document.getMap<Y.Map<unknown>>("nodes");
-    const text = document.getText("canvas-node:node:text");
-    let structural = true;
-    document.on("afterTransaction", (transaction) => {
-      structural = changesCanvasStructure(transaction, [nodes]);
-    });
-
-    text.insert(0, "remote text");
-
-    expect(structural).toBe(false);
-  });
-
-  it("rerenders the canvas for nested node metadata updates", () => {
-    const document = new Y.Doc();
-    const nodes = document.getMap<Y.Map<unknown>>("nodes");
-    const node = new Y.Map<unknown>();
-    nodes.set("node", node);
-    let structural = false;
-    document.on("afterTransaction", (transaction) => {
-      structural = changesCanvasStructure(transaction, [nodes]);
-    });
-
-    node.set("x", 100);
-
-    expect(structural).toBe(true);
-  });
-
   it("seeds new notes but leaves existing text to the CodeMirror binding", () => {
     const document = new Y.Doc();
     const nodes = document.getMap<Y.Map<unknown>>("nodes");
@@ -161,15 +132,10 @@ describe("canvas controller", () => {
     expect(renders).toBe(1);
   });
 
-  it("leaves a focused text node to its CodeMirror binding", () => {
-    const activeElement = {};
-    const nodeEl = {
-      ownerDocument: { activeElement, hasFocus: () => true },
-      contains: (element: unknown) => element === activeElement,
-    } as unknown as HTMLElement;
+  it("leaves an editing text node to its CodeMirror binding", () => {
     const setData = vi.fn();
     const controller = {
-      nodes: new Map([["node", { nodeEl, setData }]]),
+      nodes: new Map([["node", { isEditing: true, setData }]]),
       edges: new Map(),
       getData: () => ({ nodes: [], edges: [] }),
       importData: () => undefined,
@@ -181,15 +147,15 @@ describe("canvas controller", () => {
     expect(setData).not.toHaveBeenCalled();
   });
 
-  it("updates a text node when the Obsidian window is not focused", () => {
+  it("updates a selected text node before CodeMirror exists", () => {
     const activeElement = {};
     const nodeEl = {
-      ownerDocument: { activeElement, hasFocus: () => false },
+      ownerDocument: { activeElement, hasFocus: () => true },
       contains: (element: unknown) => element === activeElement,
     } as unknown as HTMLElement;
     const setData = vi.fn();
     const controller = {
-      nodes: new Map([["node", { nodeEl, setData }]]),
+      nodes: new Map([["node", { isEditing: false, nodeEl, setData }]]),
       edges: new Map(),
       getData: () => ({ nodes: [], edges: [] }),
       importData: () => undefined,

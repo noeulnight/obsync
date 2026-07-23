@@ -2,10 +2,6 @@ import * as Y from "yjs";
 import { canvasNodeTextName, replaceText } from "@obsync/sync-core";
 import type { CanvasItem } from "./canvas-data";
 
-export function changesCanvasStructure(transaction: Y.Transaction, roots: readonly Y.Map<any>[]) {
-  return roots.some((root) => transaction.changedParentTypes.has(root as never));
-}
-
 export function syncNodes(
   document: Y.Doc,
   target: Y.Map<Y.Map<unknown>>,

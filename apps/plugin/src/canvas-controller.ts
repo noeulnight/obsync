@@ -18,6 +18,7 @@ export type CanvasController = {
 export type CanvasItemController = {
   id?: string;
   nodeEl?: HTMLElement;
+  isEditing?: boolean;
   x?: number;
   y?: number;
   width?: number;
@@ -51,11 +52,7 @@ export function renderCanvas(controller: CanvasController, data: CanvasData) {
   if (canPatch(controller.nodes, data.nodes) && canPatch(controller.edges, data.edges)) {
     for (const item of data.nodes) {
       const node = controller.nodes?.get(item.id);
-      if (
-        node?.nodeEl?.ownerDocument.hasFocus() &&
-        node.nodeEl.contains(node.nodeEl.ownerDocument.activeElement)
-      )
-        continue;
+      if (node?.isEditing) continue;
       node?.setData(item);
     }
     for (const item of data.edges) controller.edges?.get(item.id)?.setData(item);

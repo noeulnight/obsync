@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { TFile, type App } from "obsidian";
 import { replaceText } from "@obsync/sync-core";
+import * as Y from "yjs";
 
 const mocks = vi.hoisted(() => ({
   providers: [] as Array<{
@@ -60,6 +61,7 @@ describe("startup synchronization", () => {
   beforeEach(() => {
     mocks.providers.length = 0;
     mocks.persistenceCallbacks.length = 0;
+    vi.stubGlobal("window", globalThis);
   });
 
   it("does not connect Markdown before its local cache is loaded", () => {
@@ -152,6 +154,67 @@ describe("startup synchronization", () => {
     await sync.localChanged();
 
     expect(vault.read).not.toHaveBeenCalled();
+  });
+
+  it("renders remote Canvas node text without opening its editor", async () => {
+    const file = new TFile();
+    const setData = vi.fn();
+    const controller = {
+      nodes: new Map([["node", { setData }]]),
+      edges: new Map(),
+      getData: () => ({ nodes: [], edges: [] }),
+      importData: vi.fn(),
+      requestSave: vi.fn(),
+    };
+    const vault = {
+      getAbstractFileByPath: () => file,
+      read: vi.fn().mockResolvedValue('{"nodes":[],"edges":[]}'),
+      modify: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = new CanvasSync(
+      {
+        vault,
+        workspace: {
+          getLeavesOfType: () => [{ view: { file: { path: "Board.canvas" }, canvas: controller } }],
+        },
+      } as unknown as App,
+      "id",
+      "Board.canvas",
+      "server",
+      connection,
+      {} as never,
+      new Set(),
+      vi.fn(),
+      vi.fn(),
+    );
+    const document = (sync as unknown as { document: Y.Doc }).document;
+    const peer = new Y.Doc();
+    const node = new Y.Map<unknown>();
+    for (const [key, value] of Object.entries({
+      id: "node",
+      type: "text",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    })) {
+      node.set(key, value);
+    }
+    peer.getMap("nodes").set("node", node);
+    peer.getText("canvas-node:node:text").insert(0, "before");
+    Y.applyUpdate(document, Y.encodeStateAsUpdate(peer));
+    mocks.persistenceCallbacks[0]?.();
+    mocks.providers[0]?.options.onSynced?.({ state: true });
+    await vi.waitFor(() => expect(setData).toHaveBeenCalled());
+    setData.mockClear();
+
+    replaceText(peer.getText("canvas-node:node:text"), "after from web");
+    Y.applyUpdate(document, Y.encodeStateAsUpdate(peer, Y.encodeStateVector(document)));
+
+    await vi.waitFor(() =>
+      expect(setData).toHaveBeenCalledWith(expect.objectContaining({ text: "after from web" })),
+    );
+    sync.destroy();
   });
 
   it("keeps newer server Markdown when the stopped client did not edit locally", async () => {

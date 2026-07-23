@@ -8,7 +8,7 @@ import { canvasNodeTextName, presenceColor, replaceText } from "@obsync/sync-cor
 import { type CanvasController, observeCanvas, renderCanvas } from "./canvas-controller";
 import { parseCanvas, type CanvasData, type CanvasItem } from "./canvas-data";
 import { bindCanvasPresence } from "./canvas-presence";
-import { changesCanvasStructure, syncMap, syncNodes } from "./canvas-yjs";
+import { syncMap, syncNodes } from "./canvas-yjs";
 
 type SeedMode = "local" | "server" | "merge";
 
@@ -85,12 +85,7 @@ export class CanvasSync {
     this.document.on("update", (_update, origin, _document, transaction) => {
       if (origin !== localOrigin) {
         this.scheduleWrite();
-        if (
-          !transaction.local &&
-          changesCanvasStructure(transaction, [this.nodes, this.zOrder, this.edges, this.meta])
-        ) {
-          this.scheduleRender();
-        }
+        if (!transaction.local) this.scheduleRender();
       }
     });
   }
