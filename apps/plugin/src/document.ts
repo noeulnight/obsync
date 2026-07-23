@@ -2,7 +2,9 @@ import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/pro
 import { IndexeddbPersistence } from "y-indexeddb";
 import { MarkdownView, TFile, type App } from "obsidian";
 import * as Y from "yjs";
-import { presenceColor, replaceText } from "@obsync/sync-core";
+import { conflictPath, presenceColor, replaceText } from "@obsync/sync-core";
+import type { ApplyingPaths } from "./remote-file-applier";
+import { startupMerge } from "./startup-merge";
 import type { SeedMode, SyncConnection } from "./sync-types";
 
 export class DocumentSync {
@@ -18,6 +20,8 @@ export class DocumentSync {
   private persistedText = "";
   private openEditors = 0;
   private readonly readOnly: boolean;
+  private fileWork: Promise<unknown> = Promise.resolve();
+  private pathVersion = 0;
 
   constructor(
     private readonly app: App,
@@ -27,7 +31,7 @@ export class DocumentSync {
     connection: SyncConnection,
     socket: HocuspocusProviderWebsocket,
     setStatus: (status: string) => void,
-    private readonly applying: Set<string>,
+    private readonly applying: ApplyingPaths,
     private readonly onReady: () => void,
   ) {
     this.readOnly = connection.readOnly;
@@ -81,13 +85,15 @@ export class DocumentSync {
 
   rename(path: string) {
     this.path = path;
+    this.pathVersion += 1;
+    if (this.initialized) void this.writeFile();
   }
 
   async localChanged(allowOpenEditor = true) {
     if (this.readOnly) return;
     if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
     if (!allowOpenEditor && (this.openEditors > 0 || this.isOpen())) return;
-    await this.applyLocal();
+    await this.enqueueFileWork(() => this.applyLocal());
   }
 
   private async applyLocal() {
@@ -124,16 +130,23 @@ export class DocumentSync {
   }
 
   private async writeFile() {
+    await this.enqueueFileWork(() => this.writeFileNow());
+  }
+
+  private async writeFileNow() {
     if (this.destroyed || !this.initialized || this.openEditors > 0 || this.isOpen()) return;
-    const file = this.app.vault.getAbstractFileByPath(this.path);
+    const path = this.path;
+    const pathVersion = this.pathVersion;
+    const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
     const next = this.text.toJSON();
     if ((await this.app.vault.read(file)) === next) return;
-    this.applying.add(this.path);
+    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    this.applying.add(path);
     try {
       await this.app.vault.modify(file, next);
     } finally {
-      this.applying.delete(this.path);
+      this.applying.delete(path);
     }
   }
 
@@ -157,7 +170,24 @@ export class DocumentSync {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const local = await this.app.vault.read(file);
-    if (local === "" && (this.persistedText !== "" || this.text.length > 0)) return;
-    if (local !== this.persistedText) replaceText(this.text, local);
+    const server = this.text.toJSON();
+    const decision = startupMerge(this.persistedText, local, server);
+    if (decision === "local") replaceText(this.text, local);
+    if (decision === "conflict") await this.preserveLocalConflict(local);
+  }
+
+  private async preserveLocalConflict(content: string) {
+    const path = conflictPath(
+      this.path,
+      this.document.guid,
+      this.app.vault.getAllLoadedFiles().map((file) => file.path),
+    );
+    await this.app.vault.create(path, content);
+  }
+
+  private enqueueFileWork<T>(work: () => Promise<T>) {
+    const next = this.fileWork.catch(() => undefined).then(work);
+    this.fileWork = next;
+    return next;
   }
 }

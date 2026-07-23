@@ -181,6 +181,19 @@ describe("sync core", () => {
       conflict: { from: "Taken.md", to: "Taken (conflict file).md" },
     });
     expect(rebaseOperation(operation, [], [], "new-operation")).toEqual({ type: "discard" });
+    expect(
+      rebaseOperation(
+        {
+          ...operation,
+          type: "delete",
+          path: undefined,
+          fromPath: "Old.md",
+        },
+        files,
+        files.map((file) => file.path),
+        "new-operation",
+      ),
+    ).toEqual({ type: "discard" });
 
     const create: FileOperation = {
       operationId: "create",

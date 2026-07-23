@@ -1,9 +1,40 @@
 import type { FileEntry } from "./sync-types";
 
 export type RemoteChange = { entry: FileEntry; previous?: FileEntry };
+export type ApplyingPaths = {
+  add(path: string): void;
+  delete(path: string): void;
+  has(path: string): boolean;
+} & Iterable<string>;
+
+class ApplyingPathCounts implements ApplyingPaths {
+  private readonly counts = new Map<string, number>();
+
+  add(path: string) {
+    this.counts.set(path, (this.counts.get(path) ?? 0) + 1);
+  }
+
+  delete(path: string) {
+    const count = this.counts.get(path) ?? 0;
+    if (count <= 1) this.counts.delete(path);
+    else this.counts.set(path, count - 1);
+  }
+
+  has(path: string) {
+    return this.counts.has(path);
+  }
+
+  get size() {
+    return this.counts.size;
+  }
+
+  [Symbol.iterator]() {
+    return this.counts.keys();
+  }
+}
 
 export class RemoteFileApplier {
-  readonly applying = new Set<string>();
+  readonly applying = new ApplyingPathCounts();
   private readonly queues = new Map<string, Promise<void>>();
   private chain: Promise<unknown> = Promise.resolve();
   private readonly attempts = new Map<string, number>();

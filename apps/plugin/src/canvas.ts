@@ -4,7 +4,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { yCollab } from "y-codemirror.next";
 import { TFile, type App } from "obsidian";
 import * as Y from "yjs";
-import { canvasNodeTextName, presenceColor, replaceText } from "@obsync/sync-core";
+import { canvasNodeTextName, conflictPath, presenceColor, replaceText } from "@obsync/sync-core";
 import {
   type CanvasController,
   observeCanvas,
@@ -13,6 +13,8 @@ import {
 } from "./canvas-controller";
 import { parseCanvas, type CanvasData, type CanvasItem } from "./canvas-data";
 import { bindCanvasPresence } from "./canvas-presence";
+import type { ApplyingPaths } from "./remote-file-applier";
+import { startupMerge } from "./startup-merge";
 import { syncMap, syncNodes } from "./canvas-yjs";
 
 type SeedMode = "local" | "server" | "merge";
@@ -39,6 +41,8 @@ export class CanvasSync {
   private applyingView = false;
   private readonly bindings = new Map<CanvasController, () => void>();
   private readonly pendingText = new Map<string, string>();
+  private fileWork: Promise<unknown> = Promise.resolve();
+  private pathVersion = 0;
 
   constructor(
     private readonly app: App,
@@ -52,7 +56,7 @@ export class CanvasSync {
       readOnly: boolean;
     },
     socket: HocuspocusProviderWebsocket,
-    private readonly applying: Set<string>,
+    private readonly applying: ApplyingPaths,
     setStatus: (status: string) => void,
     private readonly onReady: () => void,
   ) {
@@ -110,7 +114,9 @@ export class CanvasSync {
     for (const unbind of this.bindings.values()) unbind();
     this.bindings.clear();
     this.path = path;
+    this.pathVersion += 1;
     this.bindOpenViews();
+    if (this.initialized) void this.writeFile();
   }
 
   get hasUnsyncedChanges() {
@@ -120,7 +126,7 @@ export class CanvasSync {
   async localChanged(data?: CanvasData, syncExistingText = this.bindings.size === 0) {
     if (this.connection.readOnly) return;
     if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
-    await this.applyLocal(data, syncExistingText);
+    await this.enqueueFileWork(() => this.applyLocal(data, syncExistingText));
   }
 
   private async applyLocal(data?: CanvasData, syncExistingText = this.bindings.size === 0) {
@@ -189,9 +195,13 @@ export class CanvasSync {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const local = parseCanvas(await this.app.vault.read(file));
-    if (!this.persistedCanvas || !sameCanvas(local, this.persistedCanvas)) {
-      await this.applyLocal(local);
-    }
+    const baseline = canvasMergeValue(this.persistedCanvas ?? emptyCanvas());
+    const server = canvasMergeValue(
+      snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges),
+    );
+    const decision = startupMerge(baseline, canvasMergeValue(local), server);
+    if (decision === "local") await this.applyLocal(local);
+    if (decision === "conflict") await this.preserveLocalConflict(local);
   }
 
   bindOpenViews() {
@@ -284,17 +294,24 @@ export class CanvasSync {
   }
 
   private async writeFile() {
+    await this.enqueueFileWork(() => this.writeFileNow());
+  }
+
+  private async writeFileNow() {
     if (this.destroyed || !this.initialized || this.bindings.size > 0 || this.isOpen()) return;
-    const file = this.app.vault.getAbstractFileByPath(this.path);
+    const path = this.path;
+    const pathVersion = this.pathVersion;
+    const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
     const data = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
     const current = await this.app.vault.read(file);
     if (sameCanvas(parseCanvas(current), data)) return;
-    this.applying.add(this.path);
+    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    this.applying.add(path);
     try {
       await this.app.vault.modify(file, `${JSON.stringify(toJson(data), null, "\t")}\n`);
     } finally {
-      this.applying.delete(this.path);
+      this.applying.delete(path);
     }
   }
 
@@ -324,6 +341,21 @@ export class CanvasSync {
       replaceText(text, content);
       this.pendingText.delete(nodeId);
     }
+  }
+
+  private async preserveLocalConflict(data: CanvasData) {
+    const path = conflictPath(
+      this.path,
+      this.document.guid,
+      this.app.vault.getAllLoadedFiles().map((file) => file.path),
+    );
+    await this.app.vault.create(path, `${JSON.stringify(toJson(data), null, "\t")}\n`);
+  }
+
+  private enqueueFileWork<T>(work: () => Promise<T>) {
+    const next = this.fileWork.catch(() => undefined).then(work);
+    this.fileWork = next;
+    return next;
   }
 }
 
@@ -395,4 +427,14 @@ function toJson(data: CanvasData) {
 
 function sameCanvas(left: CanvasData, right: CanvasData) {
   return JSON.stringify(toJson(left)) === JSON.stringify(toJson(right));
+}
+
+function emptyCanvas(): CanvasData {
+  return { meta: {}, nodes: [], edges: [] };
+}
+
+function canvasMergeValue(data: CanvasData) {
+  return data.nodes.length || data.edges.length || Object.keys(data.meta).length
+    ? JSON.stringify(toJson(data))
+    : "";
 }

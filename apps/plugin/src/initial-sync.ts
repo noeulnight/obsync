@@ -41,7 +41,7 @@ export class InitialVaultSync {
       if (!this.options.isApplying(folder.path)) this.options.ensureFolder(folder.path);
     }
 
-    const seedMode = initialMode === "local" ? "local" : "merge";
+    const seedMode = connection.readOnly ? "server" : initialMode === "local" ? "local" : "merge";
     for (const file of app.vault.getFiles()) {
       if (!this.options.isApplying(file.path)) await this.options.syncFile(file, seedMode);
     }

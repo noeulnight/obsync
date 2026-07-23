@@ -70,7 +70,7 @@ describe("canvas text synchronization", () => {
 });
 
 describe("canvas controller", () => {
-  it("publishes saves immediately and renders remote data", () => {
+  it("publishes one stable snapshot per Canvas operation turn", async () => {
     let data: unknown = { nodes: [], edges: [] };
     let saves = 0;
     let moves = 0;
@@ -92,9 +92,11 @@ describe("canvas controller", () => {
 
     controller.requestSave();
     expect(saves).toBe(1);
+    await Promise.resolve();
     expect(changes).toEqual([data]);
     controller.markMoved();
     expect(moves).toBe(1);
+    await Promise.resolve();
     expect(changes).toEqual([data, data]);
 
     const remote = { nodes: [{ id: "remote" }], edges: [] };
@@ -105,6 +107,7 @@ describe("canvas controller", () => {
     unbind();
     controller.requestSave();
     controller.markMoved();
+    await Promise.resolve();
     expect(changes).toHaveLength(2);
   });
 

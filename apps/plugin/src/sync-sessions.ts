@@ -5,6 +5,7 @@ import { yCollab } from "y-codemirror.next";
 import type { App } from "obsidian";
 import { CanvasSync } from "./canvas";
 import { DocumentSync } from "./document";
+import type { ApplyingPaths } from "./remote-file-applier";
 import type { CanvasEntry, FileEntry, MarkdownEntry, SeedMode, SyncConnection } from "./sync-types";
 import { editorBindingKey } from "./sync-types";
 
@@ -16,7 +17,7 @@ export class VaultSessions {
     private readonly app: App,
     private readonly connection: SyncConnection,
     private readonly socket: HocuspocusProviderWebsocket,
-    private readonly applying: Set<string>,
+    private readonly applying: ApplyingPaths,
     private readonly setStatus: (status: string) => void,
     private readonly onReady: () => void,
   ) {}

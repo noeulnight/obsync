@@ -17,6 +17,7 @@ import {
   ObsyncSettingTab,
   type PluginSettings,
 } from "./settings";
+import { replaceEditorBinding } from "./editor-binding";
 import { VaultSync } from "./sync";
 import type { InitialSyncMode } from "./sync-types";
 
@@ -449,7 +450,7 @@ export default class ObsyncPlugin extends Plugin {
       this.editorDetached(view, token),
     );
     token.key = binding.key;
-    this.applyEditorBinding(view, current, binding, token);
+    this.applyEditorBinding(view, binding, token);
   }
 
   private bindCanvasTextEditor(info: CanvasTextInfo, editor: CodeMirrorEditor) {
@@ -467,7 +468,7 @@ export default class ObsyncPlugin extends Plugin {
       () => this.editorDetached(view, token),
     );
     token.key = binding.key;
-    this.applyEditorBinding(view, current, binding, token);
+    this.applyEditorBinding(view, binding, token);
   }
 
   private editorDetached(view: EditorView, token: EditorBindingToken) {
@@ -478,12 +479,7 @@ export default class ObsyncPlugin extends Plugin {
     }, 300);
   }
 
-  private applyEditorBinding(
-    view: EditorView,
-    current: string,
-    binding: EditorBinding,
-    token: EditorBindingToken,
-  ) {
+  private applyEditorBinding(view: EditorView, binding: EditorBinding, token: EditorBindingToken) {
     const compartment = this.bindings.get(view);
     if (
       !compartment ||
@@ -494,18 +490,13 @@ export default class ObsyncPlugin extends Plugin {
       return;
     this.boundEditors.set(view, token);
     try {
-      view.dispatch({
-        effects: compartment.reconfigure([
-          binding.extension,
-          EditorView.editable.of(
-            this.vaults.find((vault) => vault.id === this.settings.vaultId)?.role !== "VIEWER",
-          ),
-        ]),
-        changes:
-          binding.text !== current
-            ? { from: 0, to: current.length, insert: binding.text }
-            : undefined,
-      });
+      replaceEditorBinding(
+        view,
+        compartment,
+        binding.extension,
+        binding.text,
+        this.vaults.find((vault) => vault.id === this.settings.vaultId)?.role !== "VIEWER",
+      );
     } catch (error) {
       this.boundEditors.delete(view);
       throw error;

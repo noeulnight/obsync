@@ -29,8 +29,11 @@ export type CanvasItemController = {
 };
 
 export function observeCanvas(controller: CanvasController, changed: (data: unknown) => void) {
+  let pending = false;
+  let stopped = false;
   const restorers = [wrap("requestSave"), wrap("markDirty"), wrap("markMoved")];
   return () => {
+    stopped = true;
     for (const restore of restorers) restore?.();
   };
 
@@ -39,7 +42,12 @@ export function observeCanvas(controller: CanvasController, changed: (data: unkn
     if (!original) return;
     const wrapped = (...args: unknown[]) => {
       original.apply(controller, args);
-      changed(controller.getData());
+      if (pending) return;
+      pending = true;
+      queueMicrotask(() => {
+        pending = false;
+        if (!stopped) changed(controller.getData());
+      });
     };
     controller[key] = wrapped;
     return () => {

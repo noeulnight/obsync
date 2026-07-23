@@ -206,6 +206,7 @@ export function rebaseOperation(
     };
   }
   if (!current) return { type: "discard" };
+  if (operation.type === "delete") return { type: "discard" };
 
   let path = operation.path;
   let conflict: { from: string; to: string } | undefined;
@@ -227,10 +228,7 @@ export function rebaseOperation(
       ...operation,
       operationId: nextOperationId,
       baseVersion: current.version,
-      fromPath:
-        operation.type === "rename" || operation.type === "delete"
-          ? current.path
-          : operation.fromPath,
+      fromPath: operation.type === "rename" ? current.path : operation.fromPath,
       path,
     },
     conflict,

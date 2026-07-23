@@ -62,6 +62,13 @@ describe("remote file applier", () => {
       }),
     ).rejects.toThrow("write failed");
     expect(applier.applying.size).toBe(0);
+
+    await applier.whileApplying(["note.md"], () =>
+      applier.whileApplying(["note.md"], async () => {
+        expect(applier.applying.has("note.md")).toBe(true);
+      }),
+    );
+    expect(applier.applying.size).toBe(0);
     applier.destroy();
   });
 });
