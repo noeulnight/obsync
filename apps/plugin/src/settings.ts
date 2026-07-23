@@ -276,6 +276,31 @@ export class ObsyncSettingTab extends PluginSettingTab {
           ),
       );
     new Setting(containerEl)
+      .setName("Rebuild local Vault")
+      .setDesc(
+        this.plugin.canRebuildLocalFromServer()
+          ? "Delete local content and download a clean copy from the server. `.obsidian` settings are preserved."
+          : "Connect to the server before rebuilding local data.",
+      )
+      .addButton((button) =>
+        button
+          .setButtonText("Rebuild from server")
+          .setWarning()
+          .setDisabled(!this.plugin.canRebuildLocalFromServer())
+          .onClick(async () => {
+            button.setDisabled(true).setButtonText("Rebuilding…");
+            try {
+              if (await this.plugin.rebuildLocalFromServer()) {
+                new Notice("Local Vault rebuild started.");
+              }
+              await this.render();
+            } catch (error) {
+              this.notice(error);
+              button.setDisabled(false).setButtonText("Rebuild from server");
+            }
+          }),
+      );
+    new Setting(containerEl)
       .addButton((button) =>
         button
           .setButtonText("Save and reconnect")

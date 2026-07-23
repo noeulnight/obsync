@@ -257,7 +257,7 @@ export default class ObsyncPlugin extends Plugin {
     return true;
   }
 
-  async connect() {
+  async connect(initialModeOverride?: InitialSyncMode) {
     this.disconnect();
     if (!this.api.hasSession()) {
       this.setStatus("Sign in required");
@@ -276,8 +276,8 @@ export default class ObsyncPlugin extends Plugin {
     const selected = this.vaults.find((vault) => vault.id === vaultId);
     const role = selected?.role || this.settings.vaultRole;
     const readOnly = role === "VIEWER";
-    let initialMode: InitialSyncMode | undefined;
-    if (this.settings.initializedVaultId !== vaultId) {
+    let initialMode = initialModeOverride;
+    if (!initialMode && this.settings.initializedVaultId !== vaultId) {
       const source = this.vaults.find(
         (vault) => vault.id === this.settings.initializedVaultId,
       )?.name;
@@ -314,6 +314,32 @@ export default class ObsyncPlugin extends Plugin {
     this.setStatus("Connecting");
     this.refreshViews();
     return true;
+  }
+
+  canRebuildLocalFromServer() {
+    return Boolean(this.settings.vaultId && this.sync?.isOnline);
+  }
+
+  async rebuildLocalFromServer() {
+    const vaultName = this.settings.vaultName || "the selected Vault";
+    if (!this.canRebuildLocalFromServer()) {
+      throw new Error("Connect to the server before rebuilding this local Vault.");
+    }
+    if (
+      !(await new ConfirmationModal(
+        this.app,
+        "Rebuild local Vault from server?",
+        `All local files and folders except \`.obsidian\` will be permanently deleted and downloaded again from ${vaultName}. Unsynchronized local changes will be discarded. No backup will be created.`,
+        "Delete and rebuild",
+      ).confirm())
+    ) {
+      return false;
+    }
+    if (!this.canRebuildLocalFromServer()) {
+      throw new Error("The server connection was lost. Reconnect and try again.");
+    }
+    this.setStatus("Rebuilding local Vault");
+    return this.connect("server");
   }
 
   private async chooseInitialSync(readOnly: boolean, source?: string, target?: string) {

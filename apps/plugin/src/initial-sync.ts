@@ -23,6 +23,7 @@ export class InitialVaultSync {
     const { app, connection, remote } = this.options;
     const initialMode = effectiveInitialMode(mode, connection.readOnly);
     if (initialMode === "server") {
+      await this.options.outbox.discardAll();
       await this.clearContentCache();
       await this.clearLocalVault();
     }

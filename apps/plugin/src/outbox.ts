@@ -18,6 +18,7 @@ export class FileOperationOutbox {
   private readonly document = new Y.Doc();
   private readonly operations = this.document.getArray<FileOperation>("operations");
   private readonly persistence: IndexeddbPersistence;
+  private readonly loaded: Promise<void>;
   private synced = false;
   private flushing = false;
   private retryTimer?: ReturnType<typeof setTimeout>;
@@ -36,7 +37,12 @@ export class FileOperationOutbox {
       `obsync:${connection.vaultId}:file-operations:v2${connection.readOnly ? ":readonly" : ""}`,
       this.document,
     );
-    this.persistence.once("synced", () => void this.flush());
+    this.loaded = new Promise((resolve) => {
+      this.persistence.once("synced", () => {
+        resolve();
+        void this.flush();
+      });
+    });
   }
 
   destroy() {
@@ -53,6 +59,11 @@ export class FileOperationOutbox {
 
   entries() {
     return projectEntries(this.manifest, this.operations.toArray()) as FileEntry[];
+  }
+
+  async discardAll() {
+    await this.loaded;
+    if (this.operations.length) this.operations.delete(0, this.operations.length);
   }
 
   enqueue(operation: Omit<FileOperation, "createdAt">) {

@@ -3,7 +3,9 @@ import * as Y from "yjs";
 
 vi.mock("y-indexeddb", () => ({
   IndexeddbPersistence: class {
-    once() {}
+    once(_event: string, callback: () => void) {
+      callback();
+    }
     destroy() {}
   },
 }));
@@ -13,6 +15,29 @@ import { FileOperationOutbox } from "./outbox";
 import type { FileOperation } from "./sync-types";
 
 describe("file operation outbox", () => {
+  it("discards pending local operations before a server rebuild", async () => {
+    const manifestDocument = new Y.Doc();
+    const outbox = new FileOperationOutbox(
+      { vaultId: "vault", readOnly: false } as never,
+      manifestDocument.getMap("files"),
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+    );
+    outbox.enqueue({
+      operationId: "create",
+      fileId: "local",
+      type: "create",
+      kind: "markdown",
+      path: "Note.md",
+    });
+
+    expect(outbox.entries()).toHaveLength(1);
+    await outbox.discardAll();
+    expect(outbox.entries()).toEqual([]);
+  });
+
   it("preserves a same-path create as a conflict copy", async () => {
     const operation: FileOperation = {
       operationId: "create",

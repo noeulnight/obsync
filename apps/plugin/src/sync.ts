@@ -115,7 +115,7 @@ export class VaultSync {
     this.manifestProvider = this.provider("manifest", this.manifestDocument, () => {
       this.manifestLoaded = true;
       this.manifestSynced = true;
-      this.outbox.setSynced(true);
+      if (this.initialMode !== "server") this.outbox.setSynced(true);
       this.startReconcile();
     });
   }
@@ -129,6 +129,10 @@ export class VaultSync {
     this.outbox.destroy();
     this.socket.destroy();
     this.manifestDocument.destroy();
+  }
+
+  get isOnline() {
+    return this.socket.status === "connected" && this.manifestSynced;
   }
 
   extension(
@@ -342,6 +346,7 @@ export class VaultSync {
     if (!this.initialMode || this.destroyed) return;
     await this.onInitialSyncComplete();
     this.initialMode = undefined;
+    this.outbox.setSynced(true);
   }
 
   private startReconcile() {
