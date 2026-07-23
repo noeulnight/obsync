@@ -30,7 +30,6 @@ export class InitialSyncModal extends Modal {
   constructor(
     app: App,
     private readonly readOnly: boolean,
-    private readonly sourceVault?: string,
     private readonly targetVault?: string,
   ) {
     super(app);
@@ -45,12 +44,10 @@ export class InitialSyncModal extends Modal {
 
   onOpen() {
     this.contentEl.createEl("h2", {
-      text: this.sourceVault ? "Switch Vault" : "Set up Vault synchronization",
+      text: "Set up Vault synchronization",
     });
     this.contentEl.createEl("p", {
-      text: this.sourceVault
-        ? `${this.sourceVault} → ${this.targetVault ?? "selected Vault"}. Choose how to handle the files currently stored in this local Obsidian Vault.`
-        : `Choose how to handle existing local files and ${this.targetVault ?? "the server Vault"}.`,
+      text: `Choose how to handle existing local files and ${this.targetVault ?? "the server Vault"}.`,
     });
 
     if (!this.readOnly) {

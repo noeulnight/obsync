@@ -277,13 +277,9 @@ export default class ObsyncPlugin extends Plugin {
     const role = selected?.role || this.settings.vaultRole;
     const readOnly = role === "VIEWER";
     let initialMode: InitialSyncMode | undefined;
-    if (this.settings.initializedVaultId !== vaultId) {
-      const source = this.vaults.find(
-        (vault) => vault.id === this.settings.initializedVaultId,
-      )?.name;
+    if (!this.settings.initializedVaultId) {
       initialMode = await this.chooseInitialSync(
         readOnly,
-        source ?? (this.settings.initializedVaultId ? "Current local Vault" : undefined),
         selected?.name || this.settings.vaultName,
       );
       if (!initialMode) {
@@ -305,7 +301,7 @@ export default class ObsyncPlugin extends Plugin {
       (status) => this.setStatus(status),
       () => this.refreshViews(),
       async () => {
-        if (this.settings.initializedVaultId !== vaultId) {
+        if (!this.settings.initializedVaultId) {
           this.settings.initializedVaultId = vaultId;
           await this.saveData(this.settings);
         }
@@ -316,8 +312,8 @@ export default class ObsyncPlugin extends Plugin {
     return true;
   }
 
-  private async chooseInitialSync(readOnly: boolean, source?: string, target?: string) {
-    const mode = await new InitialSyncModal(this.app, readOnly, source, target).choose();
+  private async chooseInitialSync(readOnly: boolean, target?: string) {
+    const mode = await new InitialSyncModal(this.app, readOnly, target).choose();
     if (mode === "local") {
       return (await new ConfirmationModal(
         this.app,

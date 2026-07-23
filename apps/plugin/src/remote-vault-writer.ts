@@ -1,5 +1,5 @@
 import { TFile, TFolder, type App } from "obsidian";
-import { conflictPath } from "@obsync/sync-core";
+import { conflictPath, pathKey } from "@obsync/sync-core";
 import { downloadAttachment, sha256 } from "./attachment-sync";
 import type { FileOperationOutbox } from "./outbox";
 import { parentPath } from "./path";
@@ -38,6 +38,18 @@ export class RemoteVaultWriter {
 
       let local = this.app.vault.getAbstractFileByPath(entry.path);
       if (entry.deleted) {
+        const replacement = this.outbox
+          .entries()
+          .some(
+            (candidate) =>
+              candidate.id !== entry.id &&
+              !candidate.deleted &&
+              pathKey(candidate.path) === pathKey(entry.path),
+          );
+        if (replacement) {
+          this.sessions.delete(entry);
+          return;
+        }
         const pendingAttachment =
           entry.kind === "attachment" && this.outbox.hasPendingAttachment(entry.id);
         if (
@@ -75,15 +87,15 @@ export class RemoteVaultWriter {
       }
 
       if (entry.kind === "markdown" || entry.kind === "canvas") {
-        if (!local) {
+        const stored = await this.app.vault.adapter.stat(entry.path);
+        if (!stored) {
           await this.ensureParent(entry.path);
           await this.remote.whileApplying([entry.path], () =>
             createTextFile(this.app, entry.path, entry.kind === "markdown" ? "" : "{}\n"),
           );
         }
-        const seedMode = Boolean(local) && !this.connection.readOnly ? "merge" : "server";
-        if (entry.kind === "markdown") this.sessions.document(entry, seedMode);
-        else this.sessions.canvas(entry, seedMode);
+        if (entry.kind === "markdown") this.sessions.document(entry, "server");
+        else this.sessions.canvas(entry, "server");
         return;
       }
 
