@@ -106,6 +106,54 @@ describe("Editor", () => {
     expect(rendered.container.querySelector(".cm-live-bullet")?.textContent).toBe("•");
   });
 
+  it("renders Markdown tables and horizontal rules", () => {
+    const { connected } = session();
+    connected.text.insert(0, "| Name | Value |\n| --- | --- |\n| One | Two |\n\n---\n");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    expect(rendered.container.querySelectorAll(".cm-live-table-row")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-live-table-cell")).toHaveLength(4);
+    expect(rendered.container.querySelector(".cm-live-table-separator")).toBeTruthy();
+    expect(rendered.container.querySelector(".cm-live-horizontal-rule")).toBeTruthy();
+  });
+
+  it("keeps pointer placement on the clicked DOM line when measured coordinates drift", () => {
+    const { connected } = session();
+    connected.text.insert(0, "Hellw\nworld");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    vi.spyOn(editor, "posAtCoords").mockReturnValue(6);
+
+    fireEvent.mouseDown(rendered.container.querySelectorAll(".cm-line")[0], {
+      button: 0,
+      detail: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+
+    expect(editor.state.selection.main.head).toBe(5);
+  });
+
   it("keeps the presence binding when callback props change", () => {
     const { connected, destroy } = session();
     const view = render(

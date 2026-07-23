@@ -12,6 +12,51 @@ export function decorateLine(
   resolveAsset: AssetResolver,
   assetRevision: number,
 ) {
+  const lineTo = lineFrom + text.length;
+  if (/^\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(text)) {
+    if (!editing(cursor, lineFrom, lineTo)) {
+      ranges.push(
+        Decoration.replace({ widget: new HorizontalRuleWidget() }).range(lineFrom, lineTo),
+      );
+    }
+    return;
+  }
+
+  const cells = tableCells(text);
+  if (cells && isTableLine(view, lineFrom)) {
+    if (tableSeparator(text)) {
+      if (!editing(cursor, lineFrom, lineTo)) {
+        ranges.push(Decoration.line({ class: "cm-live-table-separator" }).range(lineFrom));
+        ranges.push(hidden.range(lineFrom, lineTo));
+      }
+      return;
+    }
+    if (!editing(cursor, lineFrom, lineTo)) {
+      ranges.push(
+        Decoration.line({
+          class: "cm-live-table-row",
+          attributes: { style: `--table-columns:${cells.length}` },
+        }).range(lineFrom),
+      );
+      let hiddenFrom = 0;
+      for (const cell of cells) {
+        if (cell.from > hiddenFrom) {
+          ranges.push(hidden.range(lineFrom + hiddenFrom, lineFrom + cell.from));
+        }
+        if (cell.to > cell.from) {
+          ranges.push(
+            Decoration.mark({ class: "cm-live-table-cell" }).range(
+              lineFrom + cell.from,
+              lineFrom + cell.to,
+            ),
+          );
+        }
+        hiddenFrom = cell.to;
+      }
+      if (hiddenFrom < text.length) ranges.push(hidden.range(lineFrom + hiddenFrom, lineTo));
+    }
+  }
+
   const bullet = /^(\s*)[-+*]\s+(?!\[[ xX]\])/.exec(text);
   if (bullet) {
     const from = lineFrom + bullet[1].length;
@@ -107,12 +152,60 @@ export function decorateLine(
   }
 }
 
+function tableCells(text: string) {
+  if (!text.includes("|")) return;
+  const boundaries = [...text.matchAll(/\|/g)].map((match) => match.index);
+  const startsWithPipe = /^\s*\|/.test(text);
+  const endsWithPipe = /\|\s*$/.test(text);
+  const edges = [startsWithPipe ? boundaries.shift()! : 0, ...boundaries, text.length];
+  if (endsWithPipe) edges.pop();
+  if (edges.length < 3) return;
+  return edges.slice(0, -1).map((boundaryFrom, index) => {
+    const sourceFrom = boundaryFrom + (boundaryFrom === 0 && !startsWithPipe ? 0 : 1);
+    const sourceTo = edges[index + 1];
+    const content = text.slice(sourceFrom, sourceTo);
+    const leading = content.length - content.trimStart().length;
+    const trailing = content.length - content.trimEnd().length;
+    return {
+      from: sourceFrom + leading,
+      to: sourceTo - trailing,
+    };
+  });
+}
+
+function tableSeparator(text: string) {
+  return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+(?:\s*:?-{3,}:?\s*\|?)\s*$/.test(text);
+}
+
+function isTableLine(view: EditorView, from: number) {
+  const current = view.state.doc.lineAt(from);
+  for (let number = current.number; number >= 1; number -= 1) {
+    const line = view.state.doc.line(number);
+    if (!line.text.trim()) break;
+    if (tableSeparator(line.text)) return true;
+  }
+  for (let number = current.number + 1; number <= view.state.doc.lines; number += 1) {
+    const line = view.state.doc.line(number);
+    if (!line.text.trim()) break;
+    if (tableSeparator(line.text)) return true;
+  }
+  return false;
+}
+
 class BulletWidget extends WidgetType {
   toDOM() {
     const bullet = document.createElement("span");
     bullet.className = "cm-live-bullet";
     bullet.textContent = "•";
     return bullet;
+  }
+}
+
+class HorizontalRuleWidget extends WidgetType {
+  toDOM() {
+    const rule = document.createElement("span");
+    rule.className = "cm-live-horizontal-rule";
+    return rule;
   }
 }
 

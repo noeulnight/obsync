@@ -58,6 +58,7 @@ export function Editor({
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
           EditorView.lineWrapping,
           EditorView.editable.of(!readOnly),
+          correctPointerLine,
           baseEditorTheme,
           compact ? compactEditorTheme : editorTheme,
           livePreviewTheme,
@@ -104,6 +105,62 @@ export function Editor({
 
   return <div ref={parent} className={compact ? "h-full" : undefined} />;
 }
+
+const correctPointerLine = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    if (
+      event.button !== 0 ||
+      event.detail !== 1 ||
+      event.shiftKey ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey
+    ) {
+      return false;
+    }
+    const target =
+      event.target instanceof Element
+        ? event.target
+        : event.target instanceof Node
+          ? event.target.parentElement
+          : null;
+    if (!target || target.closest("[data-href], button, input, img")) return false;
+    const line = target.closest<HTMLElement>(".cm-line");
+    if (!line) return false;
+
+    const lineStart = view.posAtDOM(line, 0);
+    const documentLine = view.state.doc.lineAt(lineStart);
+    const measured = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (measured === null || view.state.doc.lineAt(measured).number === documentLine.number) {
+      return false;
+    }
+
+    const bounds = line.getBoundingClientRect();
+    const ownerDocument = view.dom.ownerDocument;
+    const caret = ownerDocument.caretPositionFromPoint?.(
+      event.clientX,
+      bounds.top + bounds.height / 2,
+    );
+    const range = (
+      ownerDocument as Document & {
+        caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      }
+    ).caretRangeFromPoint?.(event.clientX, bounds.top + bounds.height / 2);
+    const offsetNode = caret?.offsetNode ?? range?.startContainer;
+    const offset = caret?.offset ?? range?.startOffset;
+    const position =
+      offsetNode && offset !== undefined && line.contains(offsetNode)
+        ? view.posAtDOM(offsetNode, offset)
+        : event.clientX <= bounds.left
+          ? documentLine.from
+          : documentLine.to;
+
+    event.preventDefault();
+    view.dispatch({ selection: { anchor: position }, scrollIntoView: true });
+    view.focus();
+    return true;
+  },
+});
 
 function wikiLinkCompletion(files: () => FileEntry[]): CompletionSource {
   return (context) => {
@@ -227,6 +284,35 @@ const livePreviewTheme = EditorView.theme({
     width: "1.25em",
     color: "var(--foreground)",
     textAlign: "center",
+  },
+  ".cm-live-horizontal-rule": {
+    display: "block",
+    width: "100%",
+    margin: "0.75rem 0",
+    borderTop: "1px solid var(--border)",
+  },
+  ".cm-live-table-row": {
+    display: "grid",
+    gridTemplateColumns: "repeat(var(--table-columns), minmax(0, 1fr))",
+    borderRight: "1px solid var(--border)",
+    borderBottom: "1px solid var(--border)",
+    borderLeft: "1px solid var(--border)",
+  },
+  ".cm-live-table-row:has(+ .cm-live-table-separator)": {
+    borderTop: "1px solid var(--border)",
+    backgroundColor: "var(--muted)",
+    fontWeight: "600",
+  },
+  ".cm-live-table-cell": {
+    minWidth: "0",
+    padding: "0.35rem 0.5rem",
+    borderRight: "1px solid var(--border)",
+  },
+  ".cm-live-table-cell:last-child": { borderRight: "0" },
+  ".cm-live-table-separator": {
+    height: "0",
+    overflow: "hidden",
+    lineHeight: "0",
   },
   ".cm-live-code-line, .cm-live-code-fence": {
     backgroundColor: "color-mix(in oklab, var(--muted) 58%, transparent)",
