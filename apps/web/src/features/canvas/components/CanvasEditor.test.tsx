@@ -387,11 +387,11 @@ describe("CanvasEditor", () => {
     fireEvent.keyDown(customColor, { key: "Escape" });
 
     fireEvent.click(screen.getByRole("button", { name: "Center selected node" }));
-    await waitFor(() =>
-      expect(screen.getByTestId("canvas-viewport").style.transform).toContain(
-        "translate(20px, 40px) scale(2)",
-      ),
-    );
+    await waitFor(() => {
+      const viewport = screen.getByTestId("canvas-viewport");
+      expect(viewport.style.zoom).toBe("2");
+      expect(viewport.style.transform).toContain("translate(10px, 20px)");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Reset zoom" }));
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));

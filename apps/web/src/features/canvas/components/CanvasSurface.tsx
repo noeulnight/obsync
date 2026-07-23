@@ -330,7 +330,10 @@ export function CanvasSurface({
         <div
           data-testid="canvas-viewport"
           className="absolute top-0 left-0 size-px origin-top-left"
-          style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${zoom})` }}
+          style={{
+            zoom,
+            transform: `translate(${viewport.x / zoom}px, ${viewport.y / zoom}px)`,
+          }}
         >
           <svg className="absolute top-0 left-0 size-px overflow-visible">
             <defs>
