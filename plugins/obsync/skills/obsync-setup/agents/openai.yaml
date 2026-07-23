@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set up Obsync"
+  short_description: "Connect Codex to an Obsync server"
+  default_prompt: "Use $obsync-setup to connect Codex to my Obsync server and verify access."

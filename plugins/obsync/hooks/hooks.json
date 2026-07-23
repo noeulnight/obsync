@@ -1,0 +1,19 @@
+{
+  "description": "Activate the Obsync durable-knowledge workflow when a Codex session starts.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/session-start.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\session-start.py\"",
+            "timeout": 5,
+            "statusMessage": "Preparing Obsync knowledge workflow"
+          }
+        ]
+      }
+    ]
+  }
+}

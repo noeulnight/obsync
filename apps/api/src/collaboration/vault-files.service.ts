@@ -79,6 +79,70 @@ export class VaultFilesService {
       }));
   }
 
+  async context(
+    userId: string,
+    vaultId: string,
+    question: string,
+    maxDocuments = 5,
+    maxCharacters = 4_000,
+  ) {
+    await this.access.requireRead(userId, vaultId);
+    const terms = [
+      ...new Set(
+        (question.toLowerCase().match(/[\p{L}\p{N}_-]+/gu) ?? []).filter(
+          (term: string) => term.length > 1,
+        ),
+      ),
+    ].slice(0, 12);
+    const documents = (await this.markdownDocuments(vaultId))
+      .map((document) => {
+        const path = document.path.toLowerCase();
+        const content = document.content.toLowerCase();
+        const score = terms.reduce(
+          (total, term) =>
+            total + (path.includes(term) ? 4 : 0) + occurrences(content, term),
+          0,
+        );
+        const term = terms.find((candidate) => content.includes(candidate));
+        return {
+          ...document,
+          score,
+          excerpt: term
+            ? excerpt(document.content, content.indexOf(term), term.length)
+            : '',
+        };
+      })
+      .filter((document) => document.score > 0)
+      .sort(
+        (left, right) =>
+          right.score - left.score || left.path.localeCompare(right.path),
+      )
+      .slice(0, maxDocuments);
+    const graph = await this.links.graph(vaultId);
+    const selected = new Set(documents.map((document) => document.id));
+    const relatedIds = new Set(
+      graph.edges.flatMap((edge) => {
+        if (selected.has(edge.source)) return [edge.target];
+        if (selected.has(edge.target)) return [edge.source];
+        return [];
+      }),
+    );
+    return {
+      question,
+      documents: documents.map(({ id, path, content, score, excerpt }) => ({
+        id,
+        path,
+        score,
+        excerpt,
+        content: content.slice(0, maxCharacters),
+        truncated: content.length > maxCharacters,
+      })),
+      related: graph.nodes
+        .filter((node) => relatedIds.has(node.id) && !selected.has(node.id))
+        .slice(0, 20),
+    };
+  }
+
   async readMarkdown(userId: string, vaultId: string, rawPath: string) {
     await this.access.requireRead(userId, vaultId);
     const path = vaultPath(rawPath);
@@ -887,6 +951,18 @@ function excerpt(content: string, index: number, length: number) {
   const start = Math.max(0, match - 45);
   const end = Math.min(compact.length, match + length + 75);
   return `${start ? '…' : ''}${compact.slice(start, end)}${end < compact.length ? '…' : ''}`;
+}
+
+function occurrences(value: string, term: string) {
+  let count = 0;
+  for (
+    let index = value.indexOf(term);
+    index >= 0;
+    index = value.indexOf(term, index + term.length)
+  ) {
+    count += 1;
+  }
+  return count;
 }
 
 function linkExcerpt(content: string, targetPath: string) {

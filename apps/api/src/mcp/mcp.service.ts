@@ -385,6 +385,30 @@ export class McpService {
       );
 
       server.registerTool(
+        'vault_context',
+        {
+          description:
+            'Load compact Markdown context and linked documents relevant to a question.',
+          inputSchema: {
+            vaultId: z.string().uuid(),
+            question: z.string().min(1),
+            maxDocuments: z.number().int().min(1).max(20).optional(),
+            maxCharacters: z.number().int().min(200).max(20_000).optional(),
+          },
+        },
+        ({ vaultId, question, maxDocuments, maxCharacters }) =>
+          this.result(() =>
+            this.files.context(
+              userId,
+              vaultId,
+              question,
+              maxDocuments,
+              maxCharacters,
+            ),
+          ),
+      );
+
+      server.registerTool(
         'tag_list',
         {
           description:

@@ -1,0 +1,36 @@
+{
+  "name": "obsync",
+  "version": "0.1.0+codex.20260723005439",
+  "description": "Connect Codex to Obsync Vaults and maintain durable project knowledge.",
+  "author": {
+    "name": "noeulnight",
+    "url": "https://github.com/noeulnight"
+  },
+  "homepage": "https://github.com/noeulnight/obsync",
+  "repository": "https://github.com/noeulnight/obsync",
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "knowledge",
+    "wiki",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Obsync",
+    "shortDescription": "Use your Obsync Vault as durable knowledge.",
+    "longDescription": "Read relevant Vault context while working and preserve durable decisions, discoveries, and runbooks as linked Markdown knowledge.",
+    "developerName": "noeulnight",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/noeulnight/obsync",
+    "defaultPrompt": [
+      "Use my Vault context for this task.",
+      "Save this decision to my Vault wiki.",
+      "Update the related Vault documentation."
+    ]
+  }
+}
