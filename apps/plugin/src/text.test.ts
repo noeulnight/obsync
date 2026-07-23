@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import * as Y from "yjs";
 import { replaceText } from "@obsync/sync-core";
-import { type CanvasItemController, observeCanvas, renderCanvas } from "./canvas-controller";
+import {
+  type CanvasItemController,
+  observeCanvas,
+  renderCanvas,
+  renderCanvasText,
+} from "./canvas-controller";
 import { parseCanvas } from "./canvas-data";
 import { readCanvasPresence } from "./canvas-presence";
 import { syncNodes } from "./canvas-yjs";
@@ -165,6 +170,39 @@ describe("canvas controller", () => {
     renderCanvas(controller, { nodes: [{ id: "node", text: "remote" }], edges: [] });
 
     expect(setData).toHaveBeenCalledOnce();
+  });
+
+  it("patches only changed inactive text nodes", () => {
+    const changed = { isEditing: false, setData: vi.fn() };
+    const unchanged = { isEditing: false, setData: vi.fn() };
+    const editing = { isEditing: true, setData: vi.fn() };
+    const controller = {
+      nodes: new Map([
+        ["changed", changed],
+        ["unchanged", unchanged],
+        ["editing", editing],
+      ]),
+      data: undefined as unknown,
+      edges: new Map(),
+      getData: () => ({ nodes: [], edges: [] }),
+      importData: () => undefined,
+      requestSave: () => undefined,
+    };
+    const data = {
+      nodes: [
+        { id: "changed", text: "remote" },
+        { id: "unchanged", text: "same" },
+        { id: "editing", text: "bound through CodeMirror" },
+      ],
+      edges: [],
+    };
+
+    renderCanvasText(controller, data, new Set(["changed", "editing"]));
+
+    expect(changed.setData).toHaveBeenCalledWith(data.nodes[0]);
+    expect(unchanged.setData).not.toHaveBeenCalled();
+    expect(editing.setData).not.toHaveBeenCalled();
+    expect(controller.data).toBe(data);
   });
 });
 

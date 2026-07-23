@@ -64,6 +64,19 @@ export function renderCanvas(controller: CanvasController, data: CanvasData) {
   controller.data = data;
 }
 
+export function renderCanvasText(
+  controller: CanvasController,
+  data: CanvasData,
+  nodeIds: Set<string>,
+) {
+  for (const item of data.nodes) {
+    if (!nodeIds.has(item.id)) continue;
+    const node = controller.nodes?.get(item.id);
+    if (!node?.isEditing) node?.setData(item);
+  }
+  controller.data = data;
+}
+
 function applyZOrder(controller: CanvasController, nodes: CanvasItem[]) {
   nodes.forEach((item, zIndex) => {
     const node = controller.nodes?.get(item.id);

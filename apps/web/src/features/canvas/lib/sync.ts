@@ -107,7 +107,7 @@ export class WebCanvas {
       name: userName,
       color: presenceColor(this.document.clientID),
     });
-    this.document.on("update", this.notify);
+    this.document.on("afterTransaction", this.notifyStructure);
     this.provider.awareness?.on("change", this.notifyPresence);
   }
 
@@ -307,7 +307,7 @@ export class WebCanvas {
     if (this.destroyed) return;
     this.destroyed = true;
     this.setPresence();
-    this.document.off("update", this.notify);
+    this.document.off("afterTransaction", this.notifyStructure);
     this.provider.awareness?.off("change", this.notifyPresence);
     this.provider.destroy();
     void this.persistence.destroy();
@@ -318,6 +318,13 @@ export class WebCanvas {
 
   private readonly notify = () => {
     for (const listener of this.listeners) listener();
+  };
+
+  private readonly notifyStructure = (transaction: Y.Transaction) => {
+    const changed = new Set<unknown>(transaction.changedParentTypes.keys());
+    if (changed.has(this.nodesMap) || changed.has(this.zOrder) || changed.has(this.edgesMap)) {
+      this.notify();
+    }
   };
 
   private readonly notifyPresence = () => {

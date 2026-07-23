@@ -214,6 +214,7 @@ describe("startup synchronization", () => {
     await vi.waitFor(() =>
       expect(setData).toHaveBeenCalledWith(expect.objectContaining({ text: "after from web" })),
     );
+    expect(vault.modify).not.toHaveBeenCalled();
     sync.destroy();
   });
 

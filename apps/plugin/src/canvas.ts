@@ -5,7 +5,12 @@ import { yCollab } from "y-codemirror.next";
 import { TFile, type App } from "obsidian";
 import * as Y from "yjs";
 import { canvasNodeTextName, presenceColor, replaceText } from "@obsync/sync-core";
-import { type CanvasController, observeCanvas, renderCanvas } from "./canvas-controller";
+import {
+  type CanvasController,
+  observeCanvas,
+  renderCanvas,
+  renderCanvasText,
+} from "./canvas-controller";
 import { parseCanvas, type CanvasData, type CanvasItem } from "./canvas-data";
 import { bindCanvasPresence } from "./canvas-presence";
 import { syncMap, syncNodes } from "./canvas-yjs";
@@ -29,6 +34,8 @@ export class CanvasSync {
   private persistedCanvas?: CanvasData;
   private writeTimer?: number;
   private renderPending = false;
+  private textRenderPending = false;
+  private readonly pendingTextRenders = new Set<string>();
   private applyingView = false;
   private readonly bindings = new Map<CanvasController, () => void>();
   private readonly pendingText = new Map<string, string>();
@@ -85,7 +92,16 @@ export class CanvasSync {
     this.document.on("update", (_update, origin, _document, transaction) => {
       if (origin !== localOrigin) {
         this.scheduleWrite();
-        if (!transaction.local) this.scheduleRender();
+        if (!transaction.local) {
+          const changed = new Set<unknown>(transaction.changedParentTypes.keys());
+          const structureChanged =
+            changed.has(this.meta) ||
+            changed.has(this.nodes) ||
+            changed.has(this.zOrder) ||
+            changed.has(this.edges);
+          if (structureChanged) this.scheduleRender();
+          else this.scheduleTextRender(changedTextNodeIds(this.document, changed));
+        }
       }
     });
   }
@@ -180,6 +196,7 @@ export class CanvasSync {
 
   bindOpenViews() {
     if (this.destroyed || !this.initialized) return;
+    const wasOpen = this.bindings.size > 0;
     const open = new Set<CanvasController>();
     for (const leaf of this.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as unknown as { file?: TFile; canvas?: CanvasController };
@@ -206,6 +223,9 @@ export class CanvasSync {
       unbind();
       this.bindings.delete(controller);
     }
+    if (wasOpen && this.bindings.size === 0) {
+      window.setTimeout(() => void this.writeFile(), 250);
+    }
   }
 
   private scheduleWrite() {
@@ -221,7 +241,21 @@ export class CanvasSync {
     this.renderPending = true;
     queueMicrotask(() => {
       this.renderPending = false;
+      this.pendingTextRenders.clear();
       this.renderViews();
+    });
+  }
+
+  private scheduleTextRender(nodeIds: string[]) {
+    for (const nodeId of nodeIds) this.pendingTextRenders.add(nodeId);
+    if (this.textRenderPending || this.pendingTextRenders.size === 0) return;
+    this.textRenderPending = true;
+    queueMicrotask(() => {
+      this.textRenderPending = false;
+      if (this.renderPending || this.pendingTextRenders.size === 0) return;
+      const nodeIds = new Set(this.pendingTextRenders);
+      this.pendingTextRenders.clear();
+      this.renderTextViews(nodeIds);
     });
   }
 
@@ -237,8 +271,20 @@ export class CanvasSync {
     }
   }
 
-  private async writeFile() {
+  private renderTextViews(nodeIds: Set<string>) {
     if (this.destroyed || !this.initialized) return;
+    this.bindOpenViews();
+    const data = toJson(snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges));
+    this.applyingView = true;
+    try {
+      for (const controller of this.bindings.keys()) renderCanvasText(controller, data, nodeIds);
+    } finally {
+      this.applyingView = false;
+    }
+  }
+
+  private async writeFile() {
+    if (this.destroyed || !this.initialized || this.bindings.size > 0 || this.isOpen()) return;
     const file = this.app.vault.getAbstractFileByPath(this.path);
     if (!(file instanceof TFile)) return;
     const data = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
@@ -279,6 +325,18 @@ export class CanvasSync {
       this.pendingText.delete(nodeId);
     }
   }
+}
+
+function changedTextNodeIds(document: Y.Doc, changed: Set<unknown>) {
+  const prefix = "canvas-node:";
+  const suffix = ":text";
+  const ids: string[] = [];
+  for (const [name, type] of document.share) {
+    if (name.startsWith(prefix) && name.endsWith(suffix) && changed.has(type)) {
+      ids.push(name.slice(prefix.length, -suffix.length));
+    }
+  }
+  return ids;
 }
 
 function syncItems(target: Y.Map<Y.Map<unknown>>, items: CanvasItem[]) {
