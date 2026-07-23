@@ -277,7 +277,31 @@ describe("replaceText", () => {
     expect(content[0]).toContain("한글");
     expect(content[0]).toContain("offline");
   });
+
+  it("keeps three peers converged across repeated reconnect orders", () => {
+    const peers = [new Y.Doc(), new Y.Doc(), new Y.Doc()];
+    const texts = peers.map((document) => document.getText("content"));
+    texts[0].insert(0, "문서\n");
+    synchronize(peers);
+
+    for (let round = 0; round < 20; round += 1) {
+      texts[round % 3].insert(texts[round % 3].length, `${round % 2 ? "한글" : "enter"}\n`);
+      synchronize(round % 2 ? [...peers].reverse() : peers);
+    }
+
+    expect(new Set(texts.map((text) => text.toJSON())).size).toBe(1);
+    expect(texts[0].toJSON()).not.toMatch(/[ㄱ-ㅎㅏ-ㅣ]/);
+  });
 });
+
+function synchronize(documents: Y.Doc[]) {
+  for (const target of documents) {
+    for (const source of documents) {
+      const update = Y.encodeStateAsUpdate(source, Y.encodeStateVector(target));
+      Y.applyUpdate(target, update);
+    }
+  }
+}
 
 describe("editorBindingKey", () => {
   it("changes when a path is reused by a different file", () => {

@@ -3,6 +3,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { MarkdownView, TFile, type App } from "obsidian";
 import * as Y from "yjs";
 import { conflictPath, presenceColor, replaceText } from "@obsync/sync-core";
+import { PathWork } from "./path-work";
 import type { ApplyingPaths } from "./remote-file-applier";
 import { startupMerge } from "./startup-merge";
 import type { SeedMode, SyncConnection } from "./sync-types";
@@ -20,8 +21,7 @@ export class DocumentSync {
   private persistedText = "";
   private openEditors = 0;
   private readonly readOnly: boolean;
-  private fileWork: Promise<unknown> = Promise.resolve();
-  private pathVersion = 0;
+  private readonly fileWork = new PathWork();
 
   constructor(
     private readonly app: App,
@@ -85,7 +85,7 @@ export class DocumentSync {
 
   rename(path: string) {
     this.path = path;
-    this.pathVersion += 1;
+    this.fileWork.move();
     if (this.initialized) void this.writeFile();
   }
 
@@ -93,17 +93,16 @@ export class DocumentSync {
     if (this.readOnly) return;
     if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
     if (!allowOpenEditor && (this.openEditors > 0 || this.isOpen())) return;
-    const path = this.path;
-    const pathVersion = this.pathVersion;
-    await this.enqueueFileWork(() => this.applyLocal(path, pathVersion));
+    const snapshot = this.fileWork.snapshot(this.path);
+    await this.fileWork.run(() => this.applyLocal(snapshot));
   }
 
-  private async applyLocal(path = this.path, pathVersion = this.pathVersion) {
-    if (pathVersion !== this.pathVersion || path !== this.path) return;
-    const file = this.app.vault.getAbstractFileByPath(path);
+  private async applyLocal(snapshot = this.fileWork.snapshot(this.path)) {
+    if (!this.fileWork.current(snapshot, this.path)) return;
+    const file = this.app.vault.getAbstractFileByPath(snapshot.path);
     if (!(file instanceof TFile)) return;
     const content = await this.app.vault.read(file);
-    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    if (!this.fileWork.current(snapshot, this.path)) return;
     replaceText(this.text, content);
   }
 
@@ -135,23 +134,22 @@ export class DocumentSync {
   }
 
   private async writeFile() {
-    await this.enqueueFileWork(() => this.writeFileNow());
+    await this.fileWork.run(() => this.writeFileNow());
   }
 
   private async writeFileNow() {
     if (this.destroyed || !this.initialized || this.openEditors > 0 || this.isOpen()) return;
-    const path = this.path;
-    const pathVersion = this.pathVersion;
-    const file = this.app.vault.getAbstractFileByPath(path);
+    const snapshot = this.fileWork.snapshot(this.path);
+    const file = this.app.vault.getAbstractFileByPath(snapshot.path);
     if (!(file instanceof TFile)) return;
     const next = this.text.toJSON();
     if ((await this.app.vault.read(file)) === next) return;
-    if (pathVersion !== this.pathVersion || path !== this.path) return;
-    this.applying.add(path);
+    if (!this.fileWork.current(snapshot, this.path)) return;
+    this.applying.add(snapshot.path);
     try {
       await this.app.vault.modify(file, next);
     } finally {
-      this.applying.delete(path);
+      this.applying.delete(snapshot.path);
     }
   }
 
@@ -188,11 +186,5 @@ export class DocumentSync {
       this.app.vault.getAllLoadedFiles().map((file) => file.path),
     );
     await this.app.vault.create(path, content);
-  }
-
-  private enqueueFileWork<T>(work: () => Promise<T>) {
-    const next = this.fileWork.catch(() => undefined).then(work);
-    this.fileWork = next;
-    return next;
   }
 }

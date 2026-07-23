@@ -13,6 +13,7 @@ import {
 } from "./canvas-controller";
 import { parseCanvas, type CanvasData, type CanvasItem } from "./canvas-data";
 import { bindCanvasPresence } from "./canvas-presence";
+import { PathWork } from "./path-work";
 import type { ApplyingPaths } from "./remote-file-applier";
 import { startupMerge } from "./startup-merge";
 import { syncMap, syncNodes } from "./canvas-yjs";
@@ -41,8 +42,7 @@ export class CanvasSync {
   private applyingView = false;
   private readonly bindings = new Map<CanvasController, () => void>();
   private readonly pendingText = new Map<string, string>();
-  private fileWork: Promise<unknown> = Promise.resolve();
-  private pathVersion = 0;
+  private readonly fileWork = new PathWork();
 
   constructor(
     private readonly app: App,
@@ -114,7 +114,7 @@ export class CanvasSync {
     for (const unbind of this.bindings.values()) unbind();
     this.bindings.clear();
     this.path = path;
-    this.pathVersion += 1;
+    this.fileWork.move();
     this.bindOpenViews();
     if (this.initialized) void this.writeFile();
   }
@@ -126,24 +126,22 @@ export class CanvasSync {
   async localChanged(data?: CanvasData, syncExistingText = this.bindings.size === 0) {
     if (this.connection.readOnly) return;
     if (this.destroyed || !this.initialized || this.applying.has(this.path)) return;
-    const path = this.path;
-    const pathVersion = this.pathVersion;
-    await this.enqueueFileWork(() => this.applyLocal(data, syncExistingText, path, pathVersion));
+    const snapshot = this.fileWork.snapshot(this.path);
+    await this.fileWork.run(() => this.applyLocal(data, syncExistingText, snapshot));
   }
 
   private async applyLocal(
     data?: CanvasData,
     syncExistingText = this.bindings.size === 0,
-    path = this.path,
-    pathVersion = this.pathVersion,
+    snapshot = this.fileWork.snapshot(this.path),
   ) {
-    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    if (!this.fileWork.current(snapshot, this.path)) return;
     if (!data) {
-      const file = this.app.vault.getAbstractFileByPath(path);
+      const file = this.app.vault.getAbstractFileByPath(snapshot.path);
       if (!(file instanceof TFile)) return;
       data = parseCanvas(await this.app.vault.read(file));
     }
-    if (pathVersion !== this.pathVersion || path !== this.path) return;
+    if (!this.fileWork.current(snapshot, this.path)) return;
     this.document.transact(() => {
       syncMap(this.meta, data.meta);
       syncNodes(this.document, this.nodes, data.nodes, syncExistingText);
@@ -303,24 +301,23 @@ export class CanvasSync {
   }
 
   private async writeFile() {
-    await this.enqueueFileWork(() => this.writeFileNow());
+    await this.fileWork.run(() => this.writeFileNow());
   }
 
   private async writeFileNow() {
     if (this.destroyed || !this.initialized || this.bindings.size > 0 || this.isOpen()) return;
-    const path = this.path;
-    const pathVersion = this.pathVersion;
-    const file = this.app.vault.getAbstractFileByPath(path);
+    const pathState = this.fileWork.snapshot(this.path);
+    const file = this.app.vault.getAbstractFileByPath(pathState.path);
     if (!(file instanceof TFile)) return;
     const data = snapshot(this.document, this.meta, this.nodes, this.zOrder, this.edges);
     const current = await this.app.vault.read(file);
     if (sameCanvas(parseCanvas(current), data)) return;
-    if (pathVersion !== this.pathVersion || path !== this.path) return;
-    this.applying.add(path);
+    if (!this.fileWork.current(pathState, this.path)) return;
+    this.applying.add(pathState.path);
     try {
       await this.app.vault.modify(file, `${JSON.stringify(toJson(data), null, "\t")}\n`);
     } finally {
-      this.applying.delete(path);
+      this.applying.delete(pathState.path);
     }
   }
 
@@ -359,12 +356,6 @@ export class CanvasSync {
       this.app.vault.getAllLoadedFiles().map((file) => file.path),
     );
     await this.app.vault.create(path, `${JSON.stringify(toJson(data), null, "\t")}\n`);
-  }
-
-  private enqueueFileWork<T>(work: () => Promise<T>) {
-    const next = this.fileWork.catch(() => undefined).then(work);
-    this.fileWork = next;
-    return next;
   }
 }
 
