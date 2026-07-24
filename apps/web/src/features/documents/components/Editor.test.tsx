@@ -108,7 +108,7 @@ describe("Editor", () => {
 
   it("renders Markdown tables and horizontal rules", () => {
     const { connected } = session();
-    connected.text.insert(0, "| Name | Value |\n| --- | --- |\n| One | Two |\n\n---\n");
+    connected.text.insert(0, "| Name | Value |\n| :--- | ---: |\n| One | Two |\n\n---\n");
     const rendered = render(
       <Editor
         session={connected}
@@ -138,6 +138,32 @@ describe("Editor", () => {
     for (const helper of helpers) {
       expect(getComputedStyle(helper).position).toBe("absolute");
     }
+    expect(
+      rendered.container.querySelectorAll<HTMLElement>(".cm-live-table-cell")[1]?.style.textAlign,
+    ).toBe("right");
+  });
+
+  it("uses Markdown syntax for inline formatting", () => {
+    const { connected } = session();
+    connected.text.insert(0, "*asterisk* _underscore_ **bold** __strong__ \\*literal* `*code*`");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    expect(rendered.container.querySelectorAll(".cm-live-em")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-live-strong")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-live-em")[0]?.textContent).toBe("asterisk");
+    expect(rendered.container.querySelectorAll(".cm-live-em")[1]?.textContent).toBe("underscore");
+    expect(rendered.container.querySelectorAll(".cm-live-em")[2]).toBeUndefined();
   });
 
   it("keeps pointer placement on the clicked DOM line when measured coordinates drift", () => {
@@ -738,5 +764,27 @@ describe("Editor", () => {
     expect(link.dataset.href).toBe("Notes/Beta");
     fireEvent.mouseDown(link, { button: 0 });
     expect(onNavigate).toHaveBeenCalledWith("Notes/Beta");
+  });
+
+  it("distinguishes internal and external live-preview links", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "[[Notes/Beta]] and [Website](https://example.com)\nEnd");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
+
+    await waitFor(() => {
+      expect(rendered.container.querySelector(".cm-live-internal-link")).toBeTruthy();
+      expect(rendered.container.querySelector(".cm-live-external-link")).toBeTruthy();
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { Range } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import { imagePath } from "./files";
 import { type AssetResolver, editing, hidden, hide } from "./live-preview-decoration";
@@ -32,6 +33,7 @@ export function decorateLine(
       return;
     }
     if (!editing(cursor, lineFrom, lineTo)) {
+      const alignments = tableAlignments(view, lineFrom);
       ranges.push(
         Decoration.line({
           class: "cm-live-table-row",
@@ -39,16 +41,19 @@ export function decorateLine(
         }).range(lineFrom),
       );
       let hiddenFrom = 0;
-      for (const cell of cells) {
+      for (const [index, cell] of cells.entries()) {
         if (cell.from > hiddenFrom) {
           ranges.push(hidden.range(lineFrom + hiddenFrom, lineFrom + cell.from));
         }
         if (cell.to > cell.from) {
           ranges.push(
-            Decoration.mark({ class: "cm-live-table-cell" }).range(
-              lineFrom + cell.from,
-              lineFrom + cell.to,
-            ),
+            Decoration.mark({
+              class: "cm-live-table-cell",
+              attributes:
+                alignments[index] === "left"
+                  ? undefined
+                  : { style: `text-align:${alignments[index]}` },
+            }).range(lineFrom + cell.from, lineFrom + cell.to),
           );
         }
         hiddenFrom = cell.to;
@@ -73,9 +78,7 @@ export function decorateLine(
     hide(lineFrom, lineFrom + heading[0].length, cursor, ranges);
   }
 
-  inline(text, /\*\*(.+?)\*\*/g, 2, "cm-live-strong");
-  inline(text, /~~(.+?)~~/g, 2, "cm-live-strike");
-  inline(text, /(?<!\*)\*([^*\n]+?)\*(?!\*)/g, 1, "cm-live-em");
+  decorateInlineFormatting(view, lineFrom, lineTo, cursor, ranges);
 
   for (const match of text.matchAll(/(!?)\[\[([^\]]+)\]\]/g)) {
     const start = lineFrom + (match.index ?? 0);
@@ -98,7 +101,7 @@ export function decorateLine(
     if (separator >= 0) ranges.push(hidden.range(contentStart, labelFrom));
     ranges.push(
       Decoration.mark({
-        class: match[1] ? "cm-live-embed" : "cm-live-link",
+        class: match[1] ? "cm-live-embed" : "cm-live-link cm-live-internal-link",
         attributes: { "data-href": href },
       }).range(labelFrom, end - 2),
     );
@@ -125,7 +128,7 @@ export function decorateLine(
     ranges.push(hidden.range(start, labelStart));
     ranges.push(
       Decoration.mark({
-        class: "cm-live-link",
+        class: `cm-live-link ${isExternalLink(match[2]) ? "cm-live-external-link" : "cm-live-internal-link"}`,
         attributes: { "data-href": match[2] },
       }).range(labelStart, labelEnd),
     );
@@ -143,17 +146,47 @@ export function decorateLine(
       ),
     );
   }
+}
 
-  function inline(source: string, pattern: RegExp, delimiter: number, className: string) {
-    for (const match of source.matchAll(pattern)) {
-      const start = lineFrom + (match.index ?? 0);
-      const end = start + match[0].length;
-      if (editing(cursor, start, end)) continue;
-      ranges.push(hidden.range(start, start + delimiter));
-      ranges.push(Decoration.mark({ class: className }).range(start + delimiter, end - delimiter));
-      ranges.push(hidden.range(end - delimiter, end));
-    }
-  }
+function isExternalLink(href: string) {
+  return /^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith("//");
+}
+
+function decorateInlineFormatting(
+  view: EditorView,
+  lineFrom: number,
+  lineTo: number,
+  cursor: number,
+  ranges: Range<Decoration>[],
+) {
+  const formats: Record<string, { className: string; markerLength: number }> = {
+    Emphasis: { className: "cm-live-em", markerLength: 1 },
+    StrongEmphasis: { className: "cm-live-strong", markerLength: 2 },
+    Strikethrough: { className: "cm-live-strike", markerLength: 2 },
+  };
+  syntaxTree(view.state).iterate({
+    from: lineFrom,
+    to: lineTo,
+    enter(node) {
+      const format = formats[node.name];
+      if (
+        !format ||
+        node.from < lineFrom ||
+        node.to > lineTo ||
+        editing(cursor, node.from, node.to)
+      ) {
+        return;
+      }
+      ranges.push(hidden.range(node.from, node.from + format.markerLength));
+      ranges.push(
+        Decoration.mark({ class: format.className }).range(
+          node.from + format.markerLength,
+          node.to - format.markerLength,
+        ),
+      );
+      ranges.push(hidden.range(node.to - format.markerLength, node.to));
+    },
+  });
 }
 
 function tableCells(text: string) {
@@ -181,18 +214,33 @@ function tableSeparator(text: string) {
   return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+(?:\s*:?-{3,}:?\s*\|?)\s*$/.test(text);
 }
 
+function tableAlignments(view: EditorView, from: number) {
+  const cursor = syntaxTree(view.state).cursorAt(from, 1);
+  while (cursor.name !== "Table" && cursor.parent()) {
+    // Walk to the enclosing GFM table.
+  }
+  if (cursor.name !== "Table") return [];
+
+  let line = view.state.doc.lineAt(cursor.from);
+  while (line.from <= cursor.to) {
+    if (tableSeparator(line.text)) {
+      return (tableCells(line.text) ?? []).map((cell) => {
+        const source = line.text.slice(cell.from, cell.to);
+        if (source.startsWith(":")) return source.endsWith(":") ? "center" : "left";
+        return source.endsWith(":") ? "right" : "left";
+      });
+    }
+    if (line.to >= view.state.doc.length) break;
+    line = view.state.doc.line(line.number + 1);
+  }
+  return [];
+}
+
 function isTableLine(view: EditorView, from: number) {
-  const current = view.state.doc.lineAt(from);
-  for (let number = current.number; number >= 1; number -= 1) {
-    const line = view.state.doc.line(number);
-    if (!line.text.trim()) break;
-    if (tableSeparator(line.text)) return true;
-  }
-  for (let number = current.number + 1; number <= view.state.doc.lines; number += 1) {
-    const line = view.state.doc.line(number);
-    if (!line.text.trim()) break;
-    if (tableSeparator(line.text)) return true;
-  }
+  const cursor = syntaxTree(view.state).cursorAt(from, 1);
+  do {
+    if (cursor.name === "Table") return true;
+  } while (cursor.parent());
   return false;
 }
 
@@ -209,6 +257,7 @@ class HorizontalRuleWidget extends WidgetType {
   toDOM() {
     const rule = document.createElement("span");
     rule.className = "cm-live-horizontal-rule";
+    rule.setAttribute("role", "separator");
     return rule;
   }
 }

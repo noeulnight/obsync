@@ -1,6 +1,6 @@
 import { autocompletion, type CompletionSource } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
@@ -51,7 +51,7 @@ export function Editor({
         extensions: [
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
-          markdown(),
+          markdown({ base: markdownLanguage }),
           autocompletion({
             override: [wikiLinkCompletion(() => vaultFiles.current)],
           }),
@@ -207,6 +207,7 @@ const editorTheme = EditorView.theme(
       padding: "0 0 45vh",
       fontSize: "16px",
       lineHeight: "1.5",
+      letterSpacing: "normal",
       caretColor: "var(--foreground)",
     },
   },
@@ -222,6 +223,7 @@ const compactEditorTheme = EditorView.theme(
       padding: "12px",
       fontSize: "16px",
       lineHeight: "1.5",
+      letterSpacing: "normal",
       caretColor: "var(--foreground)",
     },
   },
@@ -231,7 +233,7 @@ const compactEditorTheme = EditorView.theme(
 const baseEditorTheme = EditorView.theme({
   "&.cm-focused": { outline: "none" },
   ".cm-content": { cursor: "text" },
-  ".cm-scroller": { fontFamily: "inherit" },
+  ".cm-scroller": { fontFamily: "var(--font-text)" },
   ".cm-line": { padding: "0" },
   ".cm-selectionBackground, .cm-content ::selection": {
     backgroundColor: "color-mix(in oklab, var(--primary) 25%, transparent) !important",
@@ -248,25 +250,38 @@ const baseEditorTheme = EditorView.theme({
 
 const livePreviewTheme = EditorView.theme({
   ".cm-live-heading-1": {
-    fontSize: "2em",
-    lineHeight: "1.3",
+    fontSize: "1.618em",
+    lineHeight: "1.2",
     fontWeight: "700",
-    paddingTop: "0.7em !important",
+    paddingTop: "1rem !important",
   },
   ".cm-live-heading-2": {
-    fontSize: "1.6em",
-    lineHeight: "1.35",
+    fontSize: "1.462em",
+    lineHeight: "1.2",
     fontWeight: "600",
-    paddingTop: "0.6em !important",
+    paddingTop: "1rem !important",
   },
   ".cm-live-heading-3": {
-    fontSize: "1.3em",
+    fontSize: "1.318em",
+    lineHeight: "1.3",
     fontWeight: "600",
-    paddingTop: "0.45em !important",
+    paddingTop: "1rem !important",
   },
-  ".cm-live-heading-4, .cm-live-heading-5, .cm-live-heading-6": {
+  ".cm-live-heading-4": {
+    fontSize: "1.188em",
+    lineHeight: "1.4",
     fontWeight: "600",
-    paddingTop: "0.3em !important",
+    paddingTop: "1rem !important",
+  },
+  ".cm-live-heading-5": {
+    fontSize: "1.076em",
+    fontWeight: "600",
+    paddingTop: "1rem !important",
+  },
+  ".cm-live-heading-6": {
+    fontSize: "1em",
+    fontWeight: "600",
+    paddingTop: "1rem !important",
   },
   ".cm-live-heading-1, .cm-live-heading-2, .cm-live-heading-3, .cm-live-heading-4, .cm-live-heading-5, .cm-live-heading-6, .cm-live-heading-1 *, .cm-live-heading-2 *, .cm-live-heading-3 *, .cm-live-heading-4 *, .cm-live-heading-5 *, .cm-live-heading-6 *":
     {
@@ -277,11 +292,19 @@ const livePreviewTheme = EditorView.theme({
   ".cm-live-em": { fontStyle: "italic" },
   ".cm-live-strike": { textDecoration: "line-through", color: "var(--muted-foreground)" },
   ".cm-live-link, .cm-live-embed": {
-    color: "var(--sidebar-primary)",
-    textDecoration: "none",
     cursor: "pointer",
   },
-  ".cm-live-embed": { borderBottom: "1px dashed var(--sidebar-primary)" },
+  ".cm-live-internal-link, .cm-live-embed": {
+    color: "var(--link-color)",
+    textDecoration: "underline",
+  },
+  ".cm-live-external-link": {
+    color: "var(--link-external-color)",
+    textDecoration: "underline",
+  },
+  ".cm-live-internal-link:hover, .cm-live-embed:hover": { color: "var(--link-color-hover)" },
+  ".cm-live-external-link:hover": { color: "var(--link-external-color-hover)" },
+  ".cm-live-embed": { textDecorationStyle: "dashed" },
   ".cm-live-image": {
     display: "block",
     margin: "0.75rem 0",
@@ -304,10 +327,14 @@ const livePreviewTheme = EditorView.theme({
     textAlign: "center",
   },
   ".cm-live-horizontal-rule": {
-    display: "block",
+    display: "inline-block",
+    boxSizing: "border-box",
     width: "100%",
-    margin: "0.75rem 0",
-    borderTop: "1px solid var(--border)",
+    height: "0",
+    margin: "0",
+    border: "0",
+    borderTop: "2px solid var(--border)",
+    verticalAlign: "middle",
   },
   ".cm-live-table-row": {
     display: "grid",
