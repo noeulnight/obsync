@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useMatch, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -13,11 +13,13 @@ import {
   validVaultPath,
   type FileEntry,
 } from "@/features/documents/lib/files";
+import { WebVault } from "@/features/documents/lib/sync";
 import {
-  clearLocalVaultData,
-  type VaultDiagnostics,
-  WebVault,
-} from "@/features/documents/lib/sync";
+  loadProductivity,
+  recordRecent,
+  saveProductivity,
+  togglePinned,
+} from "@/features/workspace/lib/productivity";
 import type { Vault } from "@/features/vaults/types/vault";
 import { VaultSearchDialog, type SearchMode } from "@/features/search/components/VaultSearchDialog";
 import type { ApiClient } from "@/lib/api/client";
@@ -32,9 +34,9 @@ import {
   RenameFileDialog,
 } from "./FileDialogs";
 import { WorkspaceContent } from "./WorkspaceContent";
-import { WorkspaceSidebar } from "./WorkspaceSidebar";
-import { SyncDiagnosticsSheet } from "./SyncDiagnosticsSheet";
+import { WorkspaceSidebar, type WorkspaceSidebarView } from "./WorkspaceSidebar";
 import { AttachmentUploadStatus, type UploadProgress } from "./AttachmentUploadStatus";
+import { TemplateDialog } from "./TemplateDialog";
 
 export function Workspace({
   api,
@@ -77,71 +79,72 @@ export function Workspace({
   navigateRef.current = navigateRoute;
   const [online, setOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Connecting");
-  const [diagnostics, setDiagnostics] = useState<VaultDiagnostics>();
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>();
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
   const [deleteTarget, setDeleteTarget] = useState<FileEntry>();
   const [moveTarget, setMoveTarget] = useState<{ entry: FileEntry; parentPath: string }>();
   const [createKind, setCreateKind] = useState<CreateEntryKind>();
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [searchMode, setSearchMode] = useState<SearchMode>();
+  const [sidebarView, setSidebarView] = useState<WorkspaceSidebarView>("files");
+  const [productivity, setProductivity] = useState(() => loadProductivity(vault.id));
   const uploadInput = useRef<HTMLInputElement>(null);
   const uploadAttachment = useUploadAttachment(api, vault.id);
   const canWrite = vault.role !== "VIEWER" && online;
   const activeEntry = entries.find((entry) => entry.id === active);
+
+  const updateProductivity = useCallback(
+    (change: (current: typeof productivity) => typeof productivity) => {
+      setProductivity((current) => {
+        const next = change(current);
+        saveProductivity(vault.id, next);
+        return next;
+      });
+    },
+    [vault.id],
+  );
+
   const open = useCallback(
     (entry: FileEntry, replace = false) => {
       setNotice("");
+      updateProductivity((current) => recordRecent(current, entry.id));
       if (entry.kind === "markdown" || entry.kind === "attachment" || entry.kind === "canvas") {
         setActive(entry.id);
         void navigateRoute(`/vaults/${vault.id}/files/${entry.id}`, { replace });
       }
     },
-    [navigateRoute, vault.id],
+    [navigateRoute, updateProductivity, vault.id],
   );
+
+  useEffect(() => setProductivity(loadProductivity(vault.id)), [vault.id]);
 
   useEffect(() => {
     setEntries([]);
     setOnline(false);
     setConnectionStatus("Connecting");
-    let cancelled = false;
     let next: WebVault | undefined;
     let unsubscribe: (() => void) | undefined;
-    const rebuildKey = `obsync:${vault.id}:rebuild`;
-    void (async () => {
-      if (sessionStorage.getItem(rebuildKey)) {
-        sessionStorage.removeItem(rebuildKey);
-        try {
-          await clearLocalVaultData(vault.id);
-        } catch (reason) {
-          if (!cancelled) setNotice(`Local rebuild failed: ${errorMessage(reason)}`);
-        }
-      }
-      if (cancelled) return;
-      next = new WebVault(
-        vault.id,
-        api,
-        userName,
-        setConnectionStatus,
-        setOnline,
-        vault.role === "VIEWER",
-        (fromFileId, toFileId) => {
-          if (activeRef.current !== fromFileId) return;
-          setActive(toFileId);
-          void navigateRef.current(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
-        },
-      );
-      unsubscribe = next.subscribe(() => {
-        setEntries(next!.entries());
-        setDeletedEntries(next!.deletedEntries());
-        setDiagnostics(next!.diagnostics());
-      });
-      setSync(next);
-      setActive("");
-    })();
+    next = new WebVault(
+      vault.id,
+      api,
+      userName,
+      setConnectionStatus,
+      setOnline,
+      vault.role === "VIEWER",
+      (fromFileId, toFileId) => {
+        if (activeRef.current !== fromFileId) return;
+        setActive(toFileId);
+        void navigateRef.current(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
+      },
+    );
+    unsubscribe = next.subscribe(() => {
+      setEntries(next!.entries());
+      setDeletedEntries(next!.deletedEntries());
+    });
+    setSync(next);
+    setActive("");
     return () => {
-      cancelled = true;
       unsubscribe?.();
       next?.destroy();
       setSync(undefined);
@@ -164,7 +167,7 @@ export function Workspace({
         setSearchMode(activeEntry?.kind === "canvas" && canWrite ? "canvas" : "open");
       } else if (event.shiftKey && key === "f") {
         event.preventDefault();
-        setSearchMode("search");
+        setSidebarView("search");
       }
     };
     window.addEventListener("keydown", shortcuts);
@@ -258,6 +261,55 @@ export function Workspace({
       open(sync.create("markdown", path));
     } catch (reason) {
       setNotice(`Document creation failed: ${errorMessage(reason)}`);
+    }
+  }
+
+  function createDailyNote() {
+    if (!sync || !canWrite) return toast.error("Editing is unavailable while offline.");
+    const date = new Intl.DateTimeFormat("en-CA").format(new Date());
+    const path = `Daily/${date}.md`;
+    const existing = entries.find((entry) => entry.path === path);
+    if (existing) {
+      const document = sync.openDocument(existing, api, userName);
+      const legacyTitle = `# ${date}\n\n`;
+      if (document.text.toJSON() === legacyTitle) {
+        document.document.transact(() => document.text.delete(0, document.text.length));
+      }
+      return open(existing);
+    }
+    try {
+      const entry = sync.create("markdown", path);
+      open(entry);
+    } catch (reason) {
+      toast.error(`Daily note creation failed: ${errorMessage(reason)}`);
+    }
+  }
+
+  function createFromTemplate(template: FileEntry, path: string) {
+    if (!sync || !canWrite) return "Editing is unavailable while offline.";
+    const requested = newEntryPath("markdown", path);
+    if (!requested) return "Enter a name.";
+    try {
+      const entry = sync.create("markdown", requested);
+      const source = sync.openDocument(template, api, userName);
+      const target = sync.openDocument(entry, api, userName);
+      source.acquire();
+      target.acquire();
+      void source
+        .whenSynced()
+        .then(() => {
+          const content = source.text.toJSON();
+          if (!content || target.text.length) return;
+          target.document.transact(() => target.text.insert(0, content));
+        })
+        .catch((reason) => toast.error(`Template copy failed: ${errorMessage(reason)}`))
+        .finally(() => {
+          source.release();
+          target.release();
+        });
+      open(entry);
+    } catch (reason) {
+      return errorMessage(reason);
     }
   }
 
@@ -384,12 +436,6 @@ export function Workspace({
     }
   }
 
-  function rebuildLocalData() {
-    if (!online) return setNotice("Reconnect before rebuilding local data.");
-    sessionStorage.setItem(`obsync:${vault.id}:rebuild`, "1");
-    window.location.reload();
-  }
-
   const navigate = useCallback(
     (href: string) => {
       if (/^[a-z][a-z\d+.-]*:/i.test(href)) {
@@ -480,8 +526,9 @@ export function Workspace({
 
   return (
     <>
-      <SidebarProvider>
+      <SidebarProvider style={{ "--sidebar-width": "20rem" } as CSSProperties}>
         <WorkspaceSidebar
+          api={api}
           vault={vault}
           vaults={vaults}
           entries={entries}
@@ -490,9 +537,8 @@ export function Workspace({
           uploadInput={uploadInput}
           onSelectVault={onSelect}
           onCreateVault={onCreate}
-          onQuickOpen={() => setSearchMode("open")}
-          onSearch={() => setSearchMode("search")}
-          onDiagnostics={() => setDiagnosticsOpen(true)}
+          onDailyNote={createDailyNote}
+          onNewFromTemplate={() => setTemplateOpen(true)}
           graph={graph}
           trash={trash}
           onOpen={open}
@@ -504,6 +550,8 @@ export function Workspace({
           onSettings={onSettings}
           onVaultSettings={onVaultSettings}
           onLogout={onLogout}
+          view={sidebarView}
+          onViewChange={setSidebarView}
         />
         <WorkspaceContent
           api={api}
@@ -536,18 +584,21 @@ export function Workspace({
           onAddCanvasFile={() => setSearchMode("canvas")}
           onOpenEntry={open}
           onCreateGraphDocument={createGraphDocument}
+          userName={userName}
+          pinned={Boolean(activeEntry && productivity.pinned.includes(activeEntry.id))}
+          onTogglePinned={() =>
+            activeEntry && updateProductivity((current) => togglePinned(current, activeEntry.id))
+          }
         />
       </SidebarProvider>
       <VaultSearchDialog
-        api={api}
-        vaultId={vault.id}
         mode={searchMode}
         entries={entries}
         actions={[
           {
             label: "Search Vault",
             shortcut: "⌘⇧F",
-            run: () => setSearchMode("search"),
+            run: () => setSidebarView("search"),
           },
           {
             label: "Open graph",
@@ -555,6 +606,7 @@ export function Workspace({
           },
           { label: "Vault settings", run: onVaultSettings },
         ]}
+        priorityIds={[...productivity.pinned, ...productivity.recent]}
         close={() => setSearchMode(undefined)}
         open={(entry) => {
           if (searchMode === "canvas") canvasSession?.addFile(entry.path);
@@ -567,6 +619,12 @@ export function Workspace({
         rename={(name) => (renameTarget ? rename(renameTarget, name) : undefined)}
       />
       <CreateEntryDialog kind={createKind} close={() => setCreateKind(undefined)} create={create} />
+      <TemplateDialog
+        entries={entries}
+        open={templateOpen}
+        close={() => setTemplateOpen(false)}
+        create={createFromTemplate}
+      />
       <DeleteFileDialog
         entry={deleteTarget}
         close={() => setDeleteTarget(undefined)}
@@ -580,13 +638,6 @@ export function Workspace({
           if (moveTarget) move(moveTarget.entry, moveTarget.parentPath);
           setMoveTarget(undefined);
         }}
-      />
-      <SyncDiagnosticsSheet
-        open={diagnosticsOpen}
-        close={() => setDiagnosticsOpen(false)}
-        status={connectionStatus}
-        diagnostics={diagnostics}
-        rebuild={rebuildLocalData}
       />
       <AttachmentUploadStatus upload={uploadProgress} />
     </>

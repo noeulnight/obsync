@@ -1,5 +1,5 @@
 import { History, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,11 +32,13 @@ export function VersionHistorySheet({
   vaultId,
   fileId,
   readOnly,
+  trigger,
 }: {
   api: ApiClient;
   vaultId: string;
   fileId: string;
   readOnly: boolean;
+  trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
@@ -56,9 +58,11 @@ export function VersionHistorySheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Version history">
-          <History />
-        </Button>
+        {trigger ?? (
+          <Button variant="ghost" size="icon-sm" aria-label="Version history">
+            <History />
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent
         className="w-full max-w-[calc(100vw-24px)] gap-0 overflow-hidden sm:max-w-none"

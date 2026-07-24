@@ -1,5 +1,5 @@
 import { Check, Copy, Globe2 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,15 @@ import {
   useUnpublishFile,
 } from "../queries/use-public-share";
 
-export function ShareButton({ vaultId, fileId }: { vaultId: string; fileId: string }) {
+export function ShareButton({
+  vaultId,
+  fileId,
+  trigger,
+}: {
+  vaultId: string;
+  fileId: string;
+  trigger?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const share = usePublicShareStatus(vaultId, fileId, open);
   const publish = usePublishFile(vaultId, fileId);
@@ -32,9 +40,11 @@ export function ShareButton({ vaultId, fileId }: { vaultId: string; fileId: stri
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Globe2 /> Share
-        </Button>
+        {trigger ?? (
+          <Button variant="ghost" size="sm">
+            <Globe2 /> Share
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

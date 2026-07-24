@@ -2,6 +2,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
 import { FileHeader } from "@/features/workspace/components/FileHeader";
+import { CollaboratorsMenu } from "@/features/workspace/components/CollaboratorsMenu";
+import { Button } from "@/components/ui/button";
+import { Star } from "lucide-react";
 import { ShareButton } from "@/features/sharing/components/ShareButton";
 import type { WebCanvas } from "../lib/sync";
 import { CanvasSurface } from "./CanvasSurface";
@@ -23,6 +26,9 @@ export function CanvasEditor({
   readOnly = false,
   canShare = false,
   headerLeading,
+  userName = "You",
+  pinned = false,
+  onTogglePinned = () => undefined,
 }: {
   session: WebCanvas;
   fileId?: string;
@@ -40,6 +46,9 @@ export function CanvasEditor({
   readOnly?: boolean;
   canShare?: boolean;
   headerLeading?: ReactNode;
+  userName?: string;
+  pinned?: boolean;
+  onTogglePinned?: () => void;
 }) {
   const [, render] = useState(0);
 
@@ -53,7 +62,20 @@ export function CanvasEditor({
         vaultName={vaultName}
         path={path}
         leading={headerLeading}
-        actions={canShare && vaultId && fileId && <ShareButton vaultId={vaultId} fileId={fileId} />}
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={pinned ? "Unpin Canvas" : "Pin Canvas"}
+              onClick={onTogglePinned}
+            >
+              <Star className={pinned ? "fill-current" : undefined} />
+            </Button>
+            <CollaboratorsMenu userName={userName} session={session} />
+            {canShare && vaultId && fileId && <ShareButton vaultId={vaultId} fileId={fileId} />}
+          </>
+        }
         onRename={readOnly ? undefined : onRename}
         onDelete={readOnly ? undefined : onDelete}
       />

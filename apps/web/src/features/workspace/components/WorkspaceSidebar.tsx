@@ -1,11 +1,14 @@
 import {
-  Activity,
+  CalendarDays,
+  ChevronsUpDown,
   CircleUserRound,
   FilePlus2,
+  Folder,
   FolderPlus,
   LayoutDashboard,
   Network,
   LogOut,
+  PanelLeft,
   Plus,
   Settings2,
   Search,
@@ -22,31 +25,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { FileTree } from "@/features/documents/components/FileTree";
 import type { FileEntry } from "@/features/documents/lib/files";
 import type { Vault } from "@/features/vaults/types/vault";
+import type { ApiClient } from "@/lib/api/client";
 import type { CreateEntryKind } from "./FileDialogs";
+import { WorkspaceSearchPanel } from "./WorkspaceSearchPanel";
+
+export type WorkspaceSidebarView = "files" | "search";
 
 export function WorkspaceSidebar({
+  api,
   vault,
   vaults,
   entries,
@@ -55,9 +54,8 @@ export function WorkspaceSidebar({
   uploadInput,
   onSelectVault,
   onCreateVault,
-  onQuickOpen,
-  onSearch,
-  onDiagnostics,
+  onDailyNote,
+  onNewFromTemplate,
   graph,
   trash,
   onOpen,
@@ -69,7 +67,10 @@ export function WorkspaceSidebar({
   onSettings,
   onVaultSettings,
   onLogout,
+  view,
+  onViewChange,
 }: {
+  api: ApiClient;
   vault: Vault;
   vaults: Vault[];
   entries: FileEntry[];
@@ -78,9 +79,8 @@ export function WorkspaceSidebar({
   uploadInput: RefObject<HTMLInputElement | null>;
   onSelectVault: (id: string) => void;
   onCreateVault: () => void;
-  onQuickOpen: () => void;
-  onSearch: () => void;
-  onDiagnostics: () => void;
+  onDailyNote: () => void;
+  onNewFromTemplate: () => void;
   graph: boolean;
   trash: boolean;
   onOpen: (entry: FileEntry) => void;
@@ -92,175 +92,224 @@ export function WorkspaceSidebar({
   onSettings: () => void;
   onVaultSettings: () => void;
   onLogout: () => void;
+  view: WorkspaceSidebarView;
+  onViewChange: (view: WorkspaceSidebarView) => void;
 }) {
+  const { setOpen, toggleSidebar } = useSidebar();
+  const show = (next: WorkspaceSidebarView) => {
+    setOpen(true);
+    onViewChange(next);
+  };
+
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="px-2 py-2">
-        <div className="flex gap-1">
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <Select value={vault.id} onValueChange={onSelectVault}>
-              <SelectTrigger
-                className="w-full border-0 bg-transparent px-2 font-medium shadow-none hover:bg-sidebar-accent focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent dark:hover:bg-sidebar-accent"
-                aria-label="Select Vault"
+      <div className="flex min-h-0 flex-1">
+        <nav className="flex w-12 shrink-0 flex-col border-r p-1 group-data-[collapsible=icon]:border-r-0">
+          <SidebarMenu className="items-center">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="w-8 justify-center"
+                tooltip="Toggle sidebar"
+                onClick={toggleSidebar}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {vaults.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                    {item.role === "VIEWER" ? " (Read only)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="New Vault" onClick={onCreateVault}>
-            <Plus />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Vault settings"
-            className="group-data-[collapsible=icon]:hidden"
-            onClick={onVaultSettings}
-          >
-            <Settings2 />
-          </Button>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup className="py-1">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Quick switcher" onClick={onQuickOpen}>
-                  <Search />
-                  <span>Quick switcher</span>
-                  <kbd className="ml-auto text-[10px] text-muted-foreground">⌘P</kbd>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Search" onClick={onSearch}>
-                  <Search />
-                  <span>Search</span>
-                  <kbd className="ml-auto text-[10px] text-muted-foreground">⌘⇧F</kbd>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Trash" isActive={trash}>
-                  <Link to={`/vaults/${vault.id}/trash`}>
-                    <Trash2 />
-                    <span>Trash</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Graph" isActive={graph}>
-                  <Link to={`/vaults/${vault.id}/graph`}>
-                    <Network />
-                    <span>Graph</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Sync diagnostics" onClick={onDiagnostics}>
-                  <Activity />
-                  <span>Sync diagnostics</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="justify-between pr-1">
-            <span>Files</span>
-            {canWrite && (
-              <span className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="New document"
-                  onClick={() => onCreateEntry("markdown")}
-                >
-                  <FilePlus2 />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="New folder"
-                  onClick={() => onCreateEntry("folder")}
-                >
-                  <FolderPlus />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="New Canvas"
-                  onClick={() => onCreateEntry("canvas")}
-                >
-                  <LayoutDashboard />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Upload attachments"
-                  onClick={() => uploadInput.current?.click()}
-                >
-                  <Upload />
-                </Button>
-              </span>
+                <PanelLeft />
+                <span className="sr-only">Toggle sidebar</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="w-8 justify-center"
+                tooltip="Files"
+                isActive={view === "files" && !graph && !trash}
+                onClick={() => show("files")}
+              >
+                <Folder />
+                <span className="sr-only">Files</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="w-8 justify-center"
+                tooltip="Search Vault"
+                isActive={view === "search"}
+                onClick={() => show("search")}
+              >
+                <Search />
+                <span className="sr-only">Search Vault</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="w-8 justify-center"
+                asChild
+                tooltip="Graph"
+                isActive={graph}
+              >
+                <Link to={`/vaults/${vault.id}/graph`} onClick={() => setOpen(true)}>
+                  <Network />
+                  <span className="sr-only">Graph</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="w-8 justify-center"
+                asChild
+                tooltip="Trash"
+                isActive={trash}
+              >
+                <Link to={`/vaults/${vault.id}/trash`} onClick={() => setOpen(true)}>
+                  <Trash2 />
+                  <span className="sr-only">Trash</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <SidebarMenu className="mt-auto items-center">
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    className="w-8 justify-center"
+                    tooltip="Account menu"
+                    aria-label="Account menu"
+                  >
+                    <CircleUserRound />
+                    <span className="sr-only">Account menu</span>
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right" align="end">
+                  <DropdownMenuItem onSelect={onSettings}>
+                    <Settings2 />
+                    Account settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onLogout}>
+                    <LogOut />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </nav>
+        <div className="flex min-w-0 flex-1 flex-col group-data-[collapsible=icon]:hidden">
+          <SidebarContent>
+            {view === "search" ? (
+              <WorkspaceSearchPanel
+                api={api}
+                vaultId={vault.id}
+                entries={entries}
+                open={onOpen}
+                close={() => onViewChange("files")}
+              />
+            ) : (
+              <SidebarGroup className="min-h-0 flex-1">
+                <SidebarGroupLabel className="justify-start px-1">
+                  {canWrite && (
+                    <span className="flex items-center gap-0.5">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-xs" aria-label="Create file">
+                            <FilePlus2 />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => onCreateEntry("markdown")}>
+                            <FilePlus2 />
+                            New document
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={onDailyNote}>
+                            <CalendarDays />
+                            Daily note
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={onNewFromTemplate}>
+                            <FilePlus2 />
+                            New from template
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="New folder"
+                        onClick={() => onCreateEntry("folder")}
+                      >
+                        <FolderPlus />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="New Canvas"
+                        onClick={() => onCreateEntry("canvas")}
+                      >
+                        <LayoutDashboard />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Upload attachments"
+                        onClick={() => uploadInput.current?.click()}
+                      >
+                        <Upload />
+                      </Button>
+                    </span>
+                  )}
+                </SidebarGroupLabel>
+                <input
+                  ref={uploadInput}
+                  className="hidden"
+                  type="file"
+                  multiple
+                  onChange={(event) => onUpload(event.target.files)}
+                />
+                <SidebarGroupContent>
+                  <FileTree
+                    entries={entries}
+                    active={active}
+                    open={onOpen}
+                    rename={onRename}
+                    remove={onDelete}
+                    move={onMove}
+                    canManage={canWrite}
+                  />
+                </SidebarGroupContent>
+              </SidebarGroup>
             )}
-          </SidebarGroupLabel>
-          <input
-            ref={uploadInput}
-            className="hidden"
-            type="file"
-            multiple
-            onChange={(event) => onUpload(event.target.files)}
-          />
-          <SidebarGroupContent>
-            <FileTree
-              entries={entries}
-              active={active}
-              open={onOpen}
-              rename={onRename}
-              remove={onDelete}
-              move={onMove}
-              canManage={canWrite}
-            />
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="border-t">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton aria-label="Account menu">
-                  <CircleUserRound />
-                  <span>Account</span>
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="top"
-                align="start"
-                className="w-(--radix-dropdown-menu-trigger-width)"
+          </SidebarContent>
+          {view === "files" && (
+            <div className="flex items-center gap-1 border-t p-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="min-w-0 flex-1 justify-between gap-2 px-2">
+                    <span className="truncate">{vault.name}</span>
+                    <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="min-w-52">
+                  {vaults.map((item) => (
+                    <DropdownMenuItem key={item.id} onSelect={() => onSelectVault(item.id)}>
+                      {item.name}
+                      {item.id === vault.id ? " (Current)" : ""}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem onSelect={onCreateVault}>
+                    <Plus />
+                    New Vault
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Vault settings"
+                onClick={onVaultSettings}
               >
-                <DropdownMenuItem onSelect={onSettings}>
-                  <Settings2 />
-                  Account settings
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={onLogout}>
-                  <LogOut />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-      <SidebarRail />
+                <Settings2 />
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
     </Sidebar>
   );
 }

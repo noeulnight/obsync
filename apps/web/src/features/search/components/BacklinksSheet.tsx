@@ -1,5 +1,5 @@
 import { Link2 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { ApiClient } from "@/lib/api/client";
@@ -10,11 +10,13 @@ export function BacklinksSheet({
   vaultId,
   fileId,
   openDocument,
+  trigger,
 }: {
   api: ApiClient;
   vaultId: string;
   fileId: string;
   openDocument: (fileId: string) => void;
+  trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const backlinks = useBacklinks(api, vaultId, fileId);
@@ -22,10 +24,12 @@ export function BacklinksSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={`Backlinks (${results.length})`}>
-          <Link2 />
-          {results.length}
-        </Button>
+        {trigger ?? (
+          <Button variant="ghost" size="sm" aria-label={`Backlinks (${results.length})`}>
+            <Link2 />
+            {results.length}
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent className="w-full gap-0 p-0 sm:max-w-md">
         <SheetHeader>

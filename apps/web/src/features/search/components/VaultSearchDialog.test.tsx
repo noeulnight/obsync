@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { FileEntry } from "@/features/documents/lib/files";
-import type { ApiClient } from "@/lib/api/client";
 import { VaultSearchDialog, type SearchMode } from "./VaultSearchDialog";
 
 const entries = [
@@ -59,8 +58,6 @@ describe("VaultSearchDialog", () => {
     render(
       <QueryClientProvider client={client}>
         <VaultSearchDialog
-          api={{ searchVault: vi.fn() } as unknown as ApiClient}
-          vaultId="vault"
           mode="open"
           entries={[...entries]}
           actions={[{ label: "Open graph", run: action }]}
@@ -72,6 +69,28 @@ describe("VaultSearchDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open graph" }));
     expect(action).toHaveBeenCalledOnce();
+  });
+
+  it("shows pinned and recent files before the rest when opening the switcher", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <VaultSearchDialog
+          mode="open"
+          entries={[...entries]}
+          priorityIds={["two", "one"]}
+          close={() => undefined}
+          open={() => undefined}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen
+        .getAllByRole("button")
+        .filter((button) => button.textContent?.includes(".md"))
+        .map((button) => button.textContent),
+    ).toEqual(["BetaNotes/Beta.md", "AlphaAlpha.md"]);
   });
 });
 
@@ -92,14 +111,7 @@ function dialog(
 ) {
   return (
     <QueryClientProvider client={client}>
-      <VaultSearchDialog
-        api={{ searchVault: vi.fn() } as unknown as ApiClient}
-        vaultId="vault"
-        mode={mode}
-        entries={files}
-        close={() => undefined}
-        open={open}
-      />
+      <VaultSearchDialog mode={mode} entries={files} close={() => undefined} open={open} />
     </QueryClientProvider>
   );
 }

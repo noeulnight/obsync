@@ -46,10 +46,6 @@ export class BrowserFileOutbox {
     return this.operations.toArray();
   }
 
-  pendingCount() {
-    return this.operations.toArray().filter((operation) => !operation.confirmedVersions).length;
-  }
-
   enqueue(operation: Omit<FileOperation, "createdAt">) {
     this.operations.push([{ ...operation, createdAt: Date.now() }]);
     void this.flush();

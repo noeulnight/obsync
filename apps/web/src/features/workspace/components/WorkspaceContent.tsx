@@ -49,6 +49,9 @@ export function WorkspaceContent({
   onAddCanvasFile,
   onOpenEntry,
   onCreateGraphDocument,
+  userName,
+  pinned,
+  onTogglePinned,
 }: {
   api: ApiClient;
   vaultId: string;
@@ -80,6 +83,9 @@ export function WorkspaceContent({
   onAddCanvasFile: () => void;
   onOpenEntry: (entry: FileEntry) => void;
   onCreateGraphDocument: (path: string) => void;
+  userName: string;
+  pinned: boolean;
+  onTogglePinned: () => void;
 }) {
   const headerLeading = <SidebarTrigger className="mr-1 md:hidden" />;
   return (
@@ -131,6 +137,9 @@ export function WorkspaceContent({
               readOnly={!canWrite}
               canShare={canShare}
               headerLeading={headerLeading}
+              userName={userName}
+              pinned={pinned}
+              onTogglePinned={onTogglePinned}
             />
           </Suspense>
         ) : canvasSession && activeEntry ? (
@@ -152,6 +161,9 @@ export function WorkspaceContent({
               readOnly={!canWrite}
               canShare={canShare}
               headerLeading={headerLeading}
+              userName={userName}
+              pinned={pinned}
+              onTogglePinned={onTogglePinned}
             />
           </Suspense>
         ) : activeEntry?.kind === "attachment" ? (

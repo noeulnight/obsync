@@ -14,6 +14,7 @@ export function FileHeader({
   title,
   leading,
   actions,
+  mobileActions,
   onRename,
   onDelete,
 }: {
@@ -22,6 +23,7 @@ export function FileHeader({
   title?: string;
   leading?: ReactNode;
   actions?: ReactNode;
+  mobileActions?: ReactNode;
   onRename?: () => void;
   onDelete?: () => void;
 }) {
@@ -45,10 +47,10 @@ export function FileHeader({
           ))}
         </ol>
       </nav>
-      {(actions || (onRename && onDelete)) && (
+      {(actions || mobileActions || (onRename && onDelete)) && (
         <div className="flex items-center justify-self-end gap-1">
           {actions}
-          {onRename && onDelete && (
+          {(mobileActions || (onRename && onDelete)) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-sm" aria-label="File menu">
@@ -56,17 +58,25 @@ export function FileHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => window.setTimeout(onRename)}>
-                  <Pencil />
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                  onSelect={() => window.setTimeout(onDelete)}
-                >
-                  <Trash2 />
-                  Delete
-                </DropdownMenuItem>
+                {mobileActions && <div className="sm:hidden">{mobileActions}</div>}
+                {mobileActions && onRename && onDelete && (
+                  <div className="mx-1 my-1 h-px bg-border sm:hidden" />
+                )}
+                {onRename && onDelete && (
+                  <>
+                    <DropdownMenuItem onSelect={() => window.setTimeout(onRename)}>
+                      <Pencil />
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                      onSelect={() => window.setTimeout(onDelete)}
+                    >
+                      <Trash2 />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

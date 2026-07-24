@@ -48,6 +48,7 @@ export type CanvasSession = {
   nodes: () => CanvasNode[];
   edges: () => CanvasEdge[];
   presence: () => CanvasPresence[];
+  lastUpdatedAt: () => number | undefined;
   text: (id: string) => Y.Text;
   updateNode: WebCanvas["updateNode"];
   setPresence: WebCanvas["setPresence"];
@@ -78,6 +79,7 @@ export class WebCanvas {
   private readonly presenceListeners = new Set<() => void>();
   private path: string;
   private destroyed = false;
+  private lastChange?: number;
 
   constructor(
     vaultId: string,
@@ -170,6 +172,10 @@ export class WebCanvas {
       y,
       focusId,
     });
+  }
+
+  lastUpdatedAt() {
+    return this.lastChange;
   }
 
   get hasUnsyncedChanges() {
@@ -321,6 +327,8 @@ export class WebCanvas {
   };
 
   private readonly notifyStructure = (transaction: Y.Transaction) => {
+    this.lastChange = Date.now();
+    this.notifyPresence();
     const changed = new Set<unknown>(transaction.changedParentTypes.keys());
     if (changed.has(this.nodesMap) || changed.has(this.zOrder) || changed.has(this.edgesMap)) {
       this.notify();

@@ -194,6 +194,8 @@ class StaticCanvasSession implements CanvasSession {
   text = (id: string) => this.document.getText(`canvas-node:${id}:text`);
   updateNode = () => undefined;
   setPresence = () => undefined;
+
+  lastUpdatedAt = () => undefined;
   bringToFront = () => undefined;
   connect = () => undefined;
   deleteEdge = () => undefined;

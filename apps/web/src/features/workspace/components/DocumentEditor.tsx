@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { History, Link2, Network, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Editor } from "@/features/documents/components/Editor";
 import { renamedMarkdownPath, type FileEntry } from "@/features/documents/lib/files";
 import type { WebDocument } from "@/features/documents/lib/sync";
@@ -10,6 +13,7 @@ import { errorMessage } from "@/lib/error";
 import { ShareButton } from "@/features/sharing/components/ShareButton";
 import { LocalGraphSheet } from "@/features/graph/components/LocalGraphSheet";
 import { FileHeader } from "./FileHeader";
+import { CollaboratorsMenu } from "./CollaboratorsMenu";
 
 export function DocumentEditor({
   entry,
@@ -28,6 +32,9 @@ export function DocumentEditor({
   readOnly = false,
   canShare = false,
   headerLeading,
+  userName,
+  pinned = false,
+  onTogglePinned,
 }: {
   entry: FileEntry;
   api: ApiClient;
@@ -45,6 +52,9 @@ export function DocumentEditor({
   readOnly?: boolean;
   canShare?: boolean;
   headerLeading?: ReactNode;
+  userName: string;
+  pinned?: boolean;
+  onTogglePinned: () => void;
 }) {
   const original = basename(entry.path);
   const [title, setTitle] = useState(original);
@@ -76,7 +86,16 @@ export function DocumentEditor({
         title={title}
         leading={headerLeading}
         actions={
-          <>
+          <div className="hidden items-center sm:contents">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={pinned ? "Unpin document" : "Pin document"}
+              onClick={onTogglePinned}
+            >
+              <Star className={pinned ? "fill-current" : undefined} />
+            </Button>
+            <CollaboratorsMenu userName={userName} session={session} />
             {canShare && <ShareButton vaultId={vaultId} fileId={entry.id} />}
             <BacklinksSheet
               api={api}
@@ -95,6 +114,50 @@ export function DocumentEditor({
               vaultId={vaultId}
               fileId={entry.id}
               readOnly={readOnly}
+            />
+          </div>
+        }
+        mobileActions={
+          <>
+            <DropdownMenuItem onSelect={onTogglePinned}>
+              <Star className={pinned ? "fill-current" : undefined} />
+              {pinned ? "Unpin document" : "Pin document"}
+            </DropdownMenuItem>
+            <BacklinksSheet
+              api={api}
+              vaultId={vaultId}
+              fileId={entry.id}
+              openDocument={onOpenDocument}
+              trigger={
+                <DropdownMenuItem>
+                  <Link2 />
+                  Backlinks
+                </DropdownMenuItem>
+              }
+            />
+            <LocalGraphSheet
+              api={api}
+              vaultId={vaultId}
+              fileId={entry.id}
+              openDocument={onOpenDocument}
+              trigger={
+                <DropdownMenuItem>
+                  <Network />
+                  Local graph
+                </DropdownMenuItem>
+              }
+            />
+            <VersionHistorySheet
+              api={api}
+              vaultId={vaultId}
+              fileId={entry.id}
+              readOnly={readOnly}
+              trigger={
+                <DropdownMenuItem>
+                  <History />
+                  Version history
+                </DropdownMenuItem>
+              }
             />
           </>
         }

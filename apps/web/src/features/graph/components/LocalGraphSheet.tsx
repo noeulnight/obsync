@@ -1,5 +1,5 @@
 import { Network } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -19,11 +19,13 @@ export function LocalGraphSheet({
   vaultId,
   fileId,
   openDocument,
+  trigger,
 }: {
   api: ApiClient;
   vaultId: string;
   fileId: string;
   openDocument: (fileId: string) => void;
+  trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(() => Math.min(960, window.innerWidth - 24));
@@ -33,9 +35,11 @@ export function LocalGraphSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Local graph">
-          <Network />
-        </Button>
+        {trigger ?? (
+          <Button variant="ghost" size="icon-sm" aria-label="Local graph">
+            <Network />
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent
         className="w-full max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0 sm:max-w-none"

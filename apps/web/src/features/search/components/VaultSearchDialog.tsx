@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { FileEntry } from "@/features/documents/lib/files";
-import { useVaultSearch } from "../queries/use-vault-search";
-import type { ApiClient, DocumentSearchResult } from "@/lib/api/client";
+import type { DocumentSearchResult } from "@/lib/api/client";
 
-export type SearchMode = "open" | "search" | "canvas";
+export type SearchMode = "open" | "canvas";
 
 export type VaultQuickAction = {
   label: string;
@@ -14,37 +13,27 @@ export type VaultQuickAction = {
 };
 
 export function VaultSearchDialog({
-  api,
-  vaultId,
   mode,
   entries,
   actions = [],
+  priorityIds = [],
   close,
   open,
 }: {
-  api: ApiClient;
-  vaultId: string;
   mode?: SearchMode;
   entries: FileEntry[];
   actions?: VaultQuickAction[];
+  priorityIds?: string[];
   close: () => void;
   open: (entry: FileEntry) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
   const [selected, setSelected] = useState(0);
 
   useEffect(() => {
     setQuery("");
-    setDebounced("");
     setSelected(0);
   }, [mode]);
-
-  useEffect(() => {
-    if (mode !== "search") return;
-    const timeout = window.setTimeout(() => setDebounced(query.trim()), 200);
-    return () => window.clearTimeout(timeout);
-  }, [mode, query]);
 
   const local = useMemo(
     () =>
@@ -56,12 +45,23 @@ export function VaultSearchDialog({
             (mode !== "canvas" || entry.kind === "markdown" || entry.kind === "canvas") &&
             entry.path.toLowerCase().includes(query.trim().toLowerCase()),
         )
-        .sort((left, right) => left.path.localeCompare(right.path))
+        .sort((left, right) => {
+          if (mode === "open" && !query.trim()) {
+            const leftPriority = priorityIds.indexOf(left.id);
+            const rightPriority = priorityIds.indexOf(right.id);
+            if (leftPriority !== rightPriority) {
+              return (
+                (leftPriority < 0 ? Number.MAX_SAFE_INTEGER : leftPriority) -
+                (rightPriority < 0 ? Number.MAX_SAFE_INTEGER : rightPriority)
+              );
+            }
+          }
+          return left.path.localeCompare(right.path);
+        })
         .map((entry) => ({ id: entry.id, path: entry.path, excerpt: "" })),
-    [entries, mode, query],
+    [entries, mode, priorityIds, query],
   );
-  const search = useVaultSearch(api, vaultId, debounced, mode === "search");
-  const results = mode === "search" ? (search.data ?? []) : local;
+  const results = local;
 
   useEffect(() => setSelected(0), [mode, query, results.length]);
 
@@ -76,28 +76,16 @@ export function VaultSearchDialog({
     <Dialog open={Boolean(mode)} onOpenChange={(value) => !value && close()}>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl" showCloseButton={false}>
         <DialogTitle className="sr-only">
-          {mode === "search" ? "Search Vault" : mode === "canvas" ? "Add to Canvas" : "Quick open"}
+          {mode === "canvas" ? "Add to Canvas" : "Quick open"}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          {mode === "search"
-            ? "Search document titles and contents."
-            : mode === "canvas"
-              ? "Add a document or Canvas to the Canvas."
-              : "Open a Vault file."}
+          {mode === "canvas" ? "Add a document or Canvas to the Canvas." : "Open a Vault file."}
         </DialogDescription>
         <Input
           autoFocus
-          aria-label={
-            mode === "search" ? "Search Vault" : mode === "canvas" ? "Add to Canvas" : "Quick open"
-          }
+          aria-label={mode === "canvas" ? "Add to Canvas" : "Quick open"}
           className="h-12 rounded-none border-0 bg-transparent px-4 text-base shadow-none focus-visible:ring-0 dark:bg-transparent"
-          placeholder={
-            mode === "search"
-              ? "Search titles and contents…"
-              : mode === "canvas"
-                ? "Add a document or Canvas…"
-                : "Open a file…"
-          }
+          placeholder={mode === "canvas" ? "Add a document or Canvas…" : "Open a file…"}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -135,11 +123,7 @@ export function VaultSearchDialog({
           </div>
         )}
         <div className="max-h-[min(420px,60vh)] overflow-y-auto border-t p-1">
-          {mode === "search" && !query.trim() ? (
-            <Message>Type to search the Vault.</Message>
-          ) : search.isFetching && !results.length ? (
-            <Message>Searching…</Message>
-          ) : !results.length ? (
+          {!results.length ? (
             <Message>No results found.</Message>
           ) : (
             results.map((result, index) => (
