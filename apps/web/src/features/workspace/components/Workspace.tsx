@@ -2,7 +2,10 @@ import { type CSSProperties, useCallback, useEffect, useRef, useState } from "re
 import { useMatch, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { useUploadAttachment } from "@/features/attachments/queries/use-attachments";
+import {
+  useAttachmentUrlResolver,
+  useUploadAttachment,
+} from "@/features/attachments/queries/use-attachments";
 import {
   renamedFilePath,
   renamedMarkdownPath,
@@ -15,6 +18,10 @@ import {
 } from "@/features/documents/lib/files";
 import { WebVault } from "@/features/documents/lib/sync";
 import {
+  usePermanentlyDeleteFile,
+  useRestoreDeletedFile,
+} from "@/features/documents/queries/use-deleted-files";
+import {
   loadProductivity,
   recordRecent,
   saveProductivity,
@@ -24,8 +31,6 @@ import type { Vault } from "@/features/vaults/types/vault";
 import { VaultSearchDialog, type SearchMode } from "@/features/search/components/VaultSearchDialog";
 import type { ApiClient } from "@/lib/api/client";
 import { errorMessage } from "@/lib/error";
-import { queryClient } from "@/lib/query/client";
-import { queryKeys } from "@/lib/query/keys";
 import {
   CreateEntryDialog,
   type CreateEntryKind,
@@ -91,6 +96,9 @@ export function Workspace({
   const [productivity, setProductivity] = useState(() => loadProductivity(vault.id));
   const uploadInput = useRef<HTMLInputElement>(null);
   const uploadAttachment = useUploadAttachment(api, vault.id);
+  const resolveAttachmentUrl = useAttachmentUrlResolver(api, vault.id);
+  const restoreDeletedFile = useRestoreDeletedFile(api, vault.id);
+  const permanentlyDeleteFile = usePermanentlyDeleteFile(api, vault.id);
   const canWrite = vault.role !== "VIEWER" && online;
   const activeEntry = entries.find((entry) => entry.id === active);
 
@@ -420,7 +428,7 @@ export function Workspace({
 
   async function restore(entry: FileEntry) {
     try {
-      await api.restoreDeletedFile(vault.id, entry.id);
+      await restoreDeletedFile.mutateAsync(entry);
       toast.success(`${entry.path} restored.`);
     } catch (reason) {
       toast.error(`Restore failed: ${errorMessage(reason)}`);
@@ -429,7 +437,7 @@ export function Workspace({
 
   async function permanentlyDelete(entry: FileEntry) {
     try {
-      await api.permanentlyDeleteFile(vault.id, entry.id);
+      await permanentlyDeleteFile.mutateAsync(entry);
       toast.success(`${entry.path} permanently deleted.`);
     } catch (reason) {
       toast.error(`Permanent deletion failed: ${errorMessage(reason)}`);
@@ -459,14 +467,9 @@ export function Workspace({
       if (/^(?:https?:|data:|blob:)/i.test(href)) return href;
       const entry = resolveFileLink(entries, currentPath, href);
       if (entry?.kind !== "attachment" || !entry.attachmentId) return undefined;
-      const attachmentId = entry.attachmentId;
-      return queryClient.fetchQuery({
-        queryKey: queryKeys.attachment(vault.id, attachmentId),
-        queryFn: () => api.downloadUrl(vault.id, attachmentId),
-        staleTime: 4 * 60 * 1000,
-      });
+      return resolveAttachmentUrl(entry.attachmentId);
     },
-    [api, entries, vault.id],
+    [entries, resolveAttachmentUrl],
   );
 
   const resolveAsset = useCallback(

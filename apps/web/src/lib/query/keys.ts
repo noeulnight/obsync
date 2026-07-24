@@ -1,5 +1,6 @@
 export const queryKeys = {
   session: ["session"] as const,
+  oidcConfig: ["auth", "oidc"] as const,
   account: ["account"] as const,
   accountSessions: ["account", "sessions"] as const,
   mcpConfig: ["mcp", "config"] as const,

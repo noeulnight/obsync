@@ -38,7 +38,7 @@ export function useSession() {
 
 export function useOidcConfig() {
   return useQuery({
-    queryKey: ["auth", "oidc"],
+    queryKey: queryKeys.oidcConfig,
     queryFn: () => api.oidcConfig(),
     staleTime: Infinity,
   });
