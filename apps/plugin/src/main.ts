@@ -437,8 +437,19 @@ export default class ObsyncPlugin extends Plugin {
   private bindEditorView(view: EditorView) {
     const info = view.state.field(editorInfoField as never, false) as MarkdownFileInfo | undefined;
     if (!info) return;
-    if (info.file) this.bindEditor(info.file, { cm: view });
-    else this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view });
+    if (info.file) {
+      const leaf = this.app.workspace
+        .getLeavesOfType("markdown")
+        .find(
+          (candidate) =>
+            candidate.view instanceof MarkdownView &&
+            candidate.view.file === info.file &&
+            (candidate.view.editor as CodeMirrorEditor).cm === view,
+        );
+      if (leaf) this.bindEditor(info.file, { cm: view });
+      return;
+    }
+    this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view });
   }
 
   private bindEditor(file: TFile | null, editor: CodeMirrorEditor) {

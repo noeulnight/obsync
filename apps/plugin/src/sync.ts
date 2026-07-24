@@ -141,6 +141,11 @@ export class VaultSync {
     changed = false,
     onDetached?: () => void,
   ): { key?: string; extension: Extension; text: string; ready: boolean } {
+    // Obsidian exposes CodeMirror instances for embeds and other internal views.
+    // Only a real Markdown file may own a document Y.Text binding.
+    if (file.extension !== "md") {
+      return { extension: [], text: editorText, ready: false };
+    }
     const existing = this.files.findPath(file.path);
     if (!existing && !this.manifestLoaded) {
       return { extension: [], text: editorText, ready: false };
