@@ -17,7 +17,11 @@ import {
   ObsyncSettingTab,
   type PluginSettings,
 } from "./settings";
-import { replaceEditorBinding } from "./editor-binding";
+import {
+  isSourceMarkdownEditor,
+  removeEditorBinding,
+  replaceEditorBinding,
+} from "./editor-binding";
 import { VaultSync } from "./sync";
 import type { InitialSyncMode } from "./sync-types";
 
@@ -74,8 +78,8 @@ export default class ObsyncPlugin extends Plugin {
         const refresh = () => {
           if (retry !== undefined) window.clearTimeout(retry);
           retry = undefined;
-          this.bindEditorView(view);
-          if (this.sync && !this.boundEditors.has(view)) {
+          const eligible = this.bindEditorView(view);
+          if (this.sync && eligible && !this.boundEditors.has(view)) {
             retry = window.setTimeout(() => void this.run(refresh), 1_000);
           }
         };
@@ -100,6 +104,7 @@ export default class ObsyncPlugin extends Plugin {
 
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshViews()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshViews()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshViews()));
     this.registerEvent(
       this.app.vault.on("create", (file) => {
         void this.run(() => this.sync?.created(file));
@@ -422,34 +427,47 @@ export default class ObsyncPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       if (!(leaf.view instanceof MarkdownView)) continue;
       const editor = leaf.view.editor as CodeMirrorEditor;
-      if (editor.cm) seen.add(editor.cm);
-      this.bindEditor(leaf.view.file, editor);
+      if (!editor.cm || seen.has(editor.cm)) continue;
+      seen.add(editor.cm);
+      this.bindEditorView(editor.cm);
     }
 
     const active = this.app.workspace.activeEditor;
     const editor = active?.editor as CodeMirrorEditor | undefined;
     if (active && editor?.cm && !seen.has(editor.cm)) {
-      if (active.file) this.bindEditor(active.file, editor);
-      else this.bindCanvasTextEditor(active as CanvasTextInfo, editor);
+      this.bindEditorView(editor.cm);
     }
   }
 
   private bindEditorView(view: EditorView) {
     const info = view.state.field(editorInfoField as never, false) as MarkdownFileInfo | undefined;
-    if (!info) return;
+    if (!info) {
+      this.unbindEditor(view);
+      return false;
+    }
     if (info.file) {
       const leaf = this.app.workspace
         .getLeavesOfType("markdown")
         .find(
           (candidate) =>
             candidate.view instanceof MarkdownView &&
-            candidate.view.file === info.file &&
-            (candidate.view.editor as CodeMirrorEditor).cm === view,
+            isSourceMarkdownEditor(candidate.view, info.file!, view),
         );
-      if (leaf) this.bindEditor(info.file, { cm: view });
-      return;
+      if (!leaf) {
+        this.unbindEditor(view);
+        return false;
+      }
+      this.bindEditor(info.file, { cm: view });
+      return true;
     }
     this.bindCanvasTextEditor(info as CanvasTextInfo, { cm: view });
+    return true;
+  }
+
+  private unbindEditor(view: EditorView) {
+    if (!this.boundEditors.delete(view)) return;
+    const compartment = this.bindings.get(view);
+    if (compartment) removeEditorBinding(view, compartment);
   }
 
   private bindEditor(file: TFile | null, editor: CodeMirrorEditor) {
