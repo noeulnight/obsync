@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { History, Link2, Network, Star } from "lucide-react";
+import { CodeXml, Globe2, History, Link2, Network, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -59,6 +59,7 @@ export function DocumentEditor({
   const original = basename(entry.path);
   const [title, setTitle] = useState(original);
   const [error, setError] = useState("");
+  const [sourceMode, setSourceMode] = useState(false);
 
   useEffect(() => setTitle(original), [original]);
 
@@ -86,7 +87,7 @@ export function DocumentEditor({
         title={title}
         leading={headerLeading}
         actions={
-          <div className="hidden items-center sm:contents">
+          <div className="flex items-center">
             <Button
               variant="ghost"
               size="icon-sm"
@@ -96,33 +97,26 @@ export function DocumentEditor({
               <Star className={pinned ? "fill-current" : undefined} />
             </Button>
             <CollaboratorsMenu userName={userName} session={session} />
-            {canShare && <ShareButton vaultId={vaultId} fileId={entry.id} />}
-            <BacklinksSheet
-              api={api}
-              vaultId={vaultId}
-              fileId={entry.id}
-              openDocument={onOpenDocument}
-            />
-            <LocalGraphSheet
-              api={api}
-              vaultId={vaultId}
-              fileId={entry.id}
-              openDocument={onOpenDocument}
-            />
-            <VersionHistorySheet
-              api={api}
-              vaultId={vaultId}
-              fileId={entry.id}
-              readOnly={readOnly}
-            />
           </div>
         }
-        mobileActions={
+        menuActions={
           <>
-            <DropdownMenuItem onSelect={onTogglePinned}>
-              <Star className={pinned ? "fill-current" : undefined} />
-              {pinned ? "Unpin document" : "Pin document"}
+            <DropdownMenuItem onSelect={() => setSourceMode((value) => !value)}>
+              <CodeXml />
+              {sourceMode ? "Live preview" : "Source mode"}
             </DropdownMenuItem>
+            {canShare && (
+              <ShareButton
+                vaultId={vaultId}
+                fileId={entry.id}
+                trigger={
+                  <DropdownMenuItem>
+                    <Globe2 />
+                    Share
+                  </DropdownMenuItem>
+                }
+              />
+            )}
             <BacklinksSheet
               api={api}
               vaultId={vaultId}
@@ -190,6 +184,7 @@ export function DocumentEditor({
           resolveAsset={resolveAsset}
           onPasteImages={onPasteImages}
           readOnly={readOnly}
+          sourceMode={sourceMode}
         />
       </div>
     </div>

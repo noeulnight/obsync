@@ -14,6 +14,7 @@ export function FileHeader({
   title,
   leading,
   actions,
+  menuActions,
   mobileActions,
   onRename,
   onDelete,
@@ -23,6 +24,7 @@ export function FileHeader({
   title?: string;
   leading?: ReactNode;
   actions?: ReactNode;
+  menuActions?: ReactNode;
   mobileActions?: ReactNode;
   onRename?: () => void;
   onDelete?: () => void;
@@ -47,10 +49,10 @@ export function FileHeader({
           ))}
         </ol>
       </nav>
-      {(actions || mobileActions || (onRename && onDelete)) && (
+      {(actions || menuActions || mobileActions || (onRename && onDelete)) && (
         <div className="flex items-center justify-self-end gap-1">
           {actions}
-          {(mobileActions || (onRename && onDelete)) && (
+          {(menuActions || mobileActions || (onRename && onDelete)) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-sm" aria-label="File menu">
@@ -58,6 +60,10 @@ export function FileHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {menuActions}
+                {menuActions && (mobileActions || (onRename && onDelete)) && (
+                  <div className="mx-1 my-1 h-px bg-border" />
+                )}
                 {mobileActions && <div className="sm:hidden">{mobileActions}</div>}
                 {mobileActions && onRename && onDelete && (
                   <div className="mx-1 my-1 h-px bg-border sm:hidden" />

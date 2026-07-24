@@ -106,6 +106,24 @@ describe("Editor", () => {
     expect(rendered.container.querySelector(".cm-live-bullet")?.textContent).toBe("•");
   });
 
+  it("shows raw Markdown without live-preview decorations in source mode", () => {
+    const { connected } = session();
+    connected.text.insert(0, "- first\n- second\n\n**bold**");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        sourceMode
+      />,
+    );
+
+    expect(rendered.container.querySelector(".cm-live-bullet")).toBeNull();
+    expect(rendered.container.querySelector(".cm-live-strong")).toBeNull();
+    expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("- first");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("**bold**");
+  });
+
   it("renders Markdown tables and horizontal rules", () => {
     const { connected } = session();
     connected.text.insert(0, "| Name | Value |\n| :--- | ---: |\n| One | Two |\n\n---\n");

@@ -2,7 +2,7 @@ import { autocompletion, type CompletionSource } from "@codemirror/autocomplete"
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { yCollab } from "y-codemirror.next";
@@ -22,6 +22,7 @@ export function Editor({
   files = [],
   compact = false,
   readOnly = false,
+  sourceMode = false,
 }: {
   session: EditorSession;
   onNavigate: (href: string) => void;
@@ -30,6 +31,7 @@ export function Editor({
   files?: FileEntry[];
   compact?: boolean;
   readOnly?: boolean;
+  sourceMode?: boolean;
 }) {
   const parent = useRef<HTMLDivElement>(null);
   const editor = useRef<EditorView | null>(null);
@@ -37,6 +39,7 @@ export function Editor({
   const asset = useRef(resolveAsset);
   const pasteImages = useRef(onPasteImages);
   const vaultFiles = useRef(files);
+  const preview = useRef(new Compartment());
   navigate.current = onNavigate;
   asset.current = resolveAsset;
   pasteImages.current = onPasteImages;
@@ -96,9 +99,13 @@ export function Editor({
               return true;
             },
           }),
-          livePreview(
-            (href) => navigate.current(href),
-            (href) => asset.current(href),
+          preview.current.of(
+            sourceMode
+              ? []
+              : livePreview(
+                  (href) => navigate.current(href),
+                  (href) => asset.current(href),
+                ),
           ),
           ...(session.provider ? [yCollab(session.text, session.provider.awareness)] : []),
         ],
@@ -115,6 +122,19 @@ export function Editor({
   useEffect(() => {
     editor.current?.dispatch({ effects: refreshLivePreview.of(undefined) });
   }, [files]);
+
+  useEffect(() => {
+    editor.current?.dispatch({
+      effects: preview.current.reconfigure(
+        sourceMode
+          ? []
+          : livePreview(
+              (href) => navigate.current(href),
+              (href) => asset.current(href),
+            ),
+      ),
+    });
+  }, [sourceMode]);
 
   useEffect(() => {
     session.acquire();
