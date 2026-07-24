@@ -4,12 +4,6 @@ import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import { imagePath } from "./files";
 import { decorateInlineHtml, overlapsHtml } from "./markdown-rendering-html";
 import { type AssetResolver, editing, hidden, hide } from "./markdown-rendering-decoration";
-import {
-  isTableLine,
-  tableAlignments,
-  tableCells,
-  tableSeparator,
-} from "./markdown-rendering-table";
 
 export function decorateLine(
   view: EditorView,
@@ -52,49 +46,6 @@ export function decorateLine(
       );
     }
     return;
-  }
-
-  const cells = tableCells(text);
-  if (cells && isTableLine(view.state, lineFrom)) {
-    if (tableSeparator(text)) {
-      if (!editing(cursor, lineFrom, lineTo)) {
-        ranges.push(Decoration.line({ class: "cm-markdown-table-separator" }).range(lineFrom));
-        ranges.push(hidden.range(lineFrom, lineTo));
-      }
-      return;
-    }
-    if (!editing(cursor, lineFrom, lineTo)) {
-      const alignments = tableAlignments(view.state, lineFrom);
-      ranges.push(
-        Decoration.line({
-          class: "cm-markdown-table-row",
-          attributes: { style: `--table-columns:${cells.length}` },
-        }).range(lineFrom),
-      );
-      let hiddenFrom = 0;
-      for (const [index, cell] of cells.entries()) {
-        if (cell.from > hiddenFrom) {
-          ranges.push(hidden.range(lineFrom + hiddenFrom, lineFrom + cell.from));
-        }
-        if (cell.to > cell.from) {
-          ranges.push(
-            Decoration.mark({
-              class: "cm-markdown-table-cell",
-              attributes:
-                alignments[index] === "left"
-                  ? undefined
-                  : { style: `text-align:${alignments[index]}` },
-            }).range(lineFrom + cell.from, lineFrom + cell.to),
-          );
-          for (const match of cell.text.matchAll(/\\\|/g)) {
-            const slash = lineFrom + cell.from + (match.index ?? 0);
-            ranges.push(hidden.range(slash, slash + 1));
-          }
-        }
-        hiddenFrom = cell.to;
-      }
-      if (hiddenFrom < text.length) ranges.push(hidden.range(lineFrom + hiddenFrom, lineTo));
-    }
   }
 
   const bullet = /^(\s*)[-+*]\s+(?!\[[ xX]\])/.exec(text);

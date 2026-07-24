@@ -123,7 +123,7 @@ export function DocumentEditor({
               fileId={entry.id}
               openDocument={onOpenDocument}
               trigger={
-                <DropdownMenuItem>
+                <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
                   <Link2 />
                   Backlinks
                 </DropdownMenuItem>
@@ -135,7 +135,7 @@ export function DocumentEditor({
               fileId={entry.id}
               openDocument={onOpenDocument}
               trigger={
-                <DropdownMenuItem>
+                <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
                   <Network />
                   Local graph
                 </DropdownMenuItem>
@@ -147,7 +147,7 @@ export function DocumentEditor({
               fileId={entry.id}
               readOnly={readOnly}
               trigger={
-                <DropdownMenuItem>
+                <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
                   <History />
                   Version history
                 </DropdownMenuItem>

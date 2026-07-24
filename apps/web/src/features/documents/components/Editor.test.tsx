@@ -189,34 +189,19 @@ describe("Editor", () => {
       rendered.container.querySelector(".cm-editor") as HTMLElement,
     );
     if (!editor) throw new Error("Editor was not mounted");
-    editor.dispatch({ selection: { anchor: editor.state.doc.length } });
-
-    expect(rendered.container.querySelectorAll(".cm-markdown-table-row")).toHaveLength(2);
-    expect(rendered.container.querySelectorAll(".cm-markdown-table-cell")).toHaveLength(4);
-    expect(rendered.container.querySelector(".cm-markdown-table-separator")).toBeTruthy();
+    const inputs = rendered.container.querySelectorAll<HTMLInputElement>(".cm-table-cell-input");
+    expect(rendered.container.querySelector(".cm-table-widget table")).toBeTruthy();
+    expect(inputs).toHaveLength(4);
     expect(rendered.container.querySelector(".cm-markdown-horizontal-rule")).toBeTruthy();
+    expect(inputs[1]?.value).toBe("Value");
+    expect(inputs[2]?.value).toBe("One | Uno");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).not.toContain("| Name |");
 
-    const row = rendered.container.querySelector<HTMLElement>(".cm-markdown-table-row");
-    if (!row) throw new Error("Table row was not rendered");
-    const helpers = [...row.children].filter(
-      (child) =>
-        child.classList.contains("cm-widgetBuffer") ||
-        child.matches('span[contenteditable="false"]:empty'),
-    );
-    expect(helpers.length).toBeGreaterThan(0);
-    for (const helper of helpers) {
-      expect(getComputedStyle(helper).position).toBe("absolute");
-    }
-    expect(
-      rendered.container.querySelectorAll<HTMLElement>(".cm-markdown-table-cell")[1]?.style
-        .textAlign,
-    ).toBe("right");
-    expect(
-      rendered.container.querySelectorAll<HTMLElement>(".cm-markdown-table-cell")[2]?.textContent,
-    ).toBe("One | Uno");
+    fireEvent.input(inputs[1]!, { target: { value: "Amount" } });
+    expect(editor.state.doc.toString()).toContain("| Name | Amount |");
   });
 
-  it("navigates table cells with Tab and adds a row after the last cell", () => {
+  it("navigates table cells with Tab and adds a row after the last cell", async () => {
     const { connected } = session();
     connected.text.insert(0, "| Name | Value |\n| --- | --- |\n| One | Two |");
     const rendered = render(
@@ -231,17 +216,12 @@ describe("Editor", () => {
     );
     if (!editor) throw new Error("Editor was not mounted");
 
-    const value = editor.state.doc.toString().indexOf("Value");
-    editor.dispatch({ selection: { anchor: value - 5 } });
-    fireEvent.keyDown(editor.contentDOM, { key: "Tab" });
-    expect(
-      editor.state.sliceDoc(editor.state.selection.main.from, editor.state.selection.main.to),
-    ).toBe("Value");
-
-    const two = editor.state.doc.toString().indexOf("Two");
-    editor.dispatch({ selection: { anchor: two } });
-    fireEvent.keyDown(editor.contentDOM, { key: "Tab" });
-    expect(editor.state.doc.lines).toBe(4);
+    const inputs = rendered.container.querySelectorAll<HTMLInputElement>(".cm-table-cell-input");
+    inputs[0]?.focus();
+    fireEvent.keyDown(inputs[0]!, { key: "Tab" });
+    await waitFor(() => expect(document.activeElement).toBe(inputs[1]));
+    fireEvent.keyDown(inputs[3]!, { key: "Tab" });
+    await waitFor(() => expect(editor.state.doc.lines).toBe(4));
     expect(connected.text.toJSON()).toBe(editor.state.doc.toString());
   });
 

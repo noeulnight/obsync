@@ -398,39 +398,54 @@ const markdownRenderingTheme = EditorView.theme({
     borderTop: "2px solid var(--border)",
     verticalAlign: "middle",
   },
-  ".cm-markdown-table-row": {
-    display: "grid",
-    gridTemplateColumns: "repeat(var(--table-columns), minmax(0, 1fr))",
-    borderRight: "1px solid var(--border)",
-    borderBottom: "1px solid var(--border)",
-    borderLeft: "1px solid var(--border)",
+  ".cm-table-widget": {
+    position: "relative",
+    margin: "0.5rem 0",
   },
-  ".cm-markdown-table-row:has(+ .cm-markdown-table-separator)": {
-    borderTop: "1px solid var(--border)",
-    backgroundColor: "var(--muted)",
-    fontWeight: "600",
+  ".cm-table-wrapper": { position: "relative", width: "fit-content", minWidth: "100%" },
+  ".cm-table-widget table": { width: "100%", borderCollapse: "collapse" },
+  ".cm-table-widget th, .cm-table-widget td": {
+    minWidth: "8rem",
+    border: "1px solid var(--border)",
+    padding: "0",
+    textAlign: "left",
   },
-  ".cm-markdown-table-cell": {
+  ".cm-table-widget th": { backgroundColor: "var(--muted)", fontWeight: "600" },
+  ".cm-table-cell-input": {
+    boxSizing: "border-box",
+    width: "100%",
     minWidth: "0",
+    border: "0",
+    background: "transparent",
     padding: "0.35rem 0.5rem",
-    borderRight: "1px solid var(--border)",
+    color: "inherit",
+    font: "inherit",
+    outline: "none",
   },
-  '.cm-markdown-table-row > .cm-widgetBuffer, .cm-markdown-table-row > span[contenteditable="false"]:empty':
-    {
-      position: "absolute",
-      width: "0",
-      height: "0",
-      overflow: "hidden",
-    },
-  ".cm-markdown-table-cell:last-child, .cm-markdown-table-cell:not(:has(~ .cm-markdown-table-cell))":
-    {
-      borderRight: "0",
-    },
-  ".cm-markdown-table-separator": {
-    height: "0",
-    overflow: "hidden",
-    lineHeight: "0",
+  ".cm-table-cell-input:focus": {
+    backgroundColor: "color-mix(in oklab, var(--primary) 10%, transparent)",
+    boxShadow: "inset 0 0 0 1px var(--primary)",
   },
+  ".cm-table-row-btn, .cm-table-col-btn": {
+    position: "absolute",
+    zIndex: "1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "1.25rem",
+    height: "1.25rem",
+    border: "1px solid var(--border)",
+    borderRadius: "999px",
+    backgroundColor: "var(--background)",
+    color: "var(--muted-foreground)",
+    opacity: "0",
+    transition: "opacity 120ms ease",
+  },
+  ".cm-table-widget:hover .cm-table-row-btn, .cm-table-widget:hover .cm-table-col-btn": {
+    opacity: "1",
+  },
+  ".cm-table-row-btn": { bottom: "-0.625rem", left: "50%", transform: "translateX(-50%)" },
+  ".cm-table-col-btn": { top: "50%", right: "-0.625rem", transform: "translateY(-50%)" },
   ".cm-markdown-code-line, .cm-markdown-code-fence": {
     backgroundColor: "color-mix(in oklab, var(--muted) 58%, transparent)",
     fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",

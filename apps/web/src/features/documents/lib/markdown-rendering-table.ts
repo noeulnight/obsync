@@ -1,11 +1,283 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
-import { EditorView, keymap, type KeyBinding } from "@codemirror/view";
+import {
+  Decoration,
+  EditorView,
+  keymap,
+  ViewPlugin,
+  WidgetType,
+  type KeyBinding,
+} from "@codemirror/view";
 
 type Cell = { from: number; to: number; text: string };
 type Row = { from: number; to: number; cells: Cell[]; separator: boolean };
 type Table = { from: number; to: number; rows: Row[] };
 type Alignment = "left" | "center" | "right";
+
+export function tableWidgets() {
+  const controller = new TableController();
+  return [
+    EditorView.decorations.compute(["doc"], (state) =>
+      tableDecorations(markdownTables(state), controller),
+    ),
+    ViewPlugin.fromClass(
+      class {
+        constructor(view: EditorView) {
+          controller.attach(view);
+          controller.sync(markdownTables(view.state));
+        }
+
+        update(update: { docChanged: boolean; view: EditorView }) {
+          if (update.docChanged) controller.sync(markdownTables(update.view.state));
+        }
+
+        destroy() {
+          controller.destroy();
+        }
+      },
+    ),
+  ];
+}
+
+function tableDecorations(tables: Table[], controller: TableController) {
+  return Decoration.set(
+    tables.map((table) =>
+      Decoration.replace({ block: true, widget: new TableWidget(table, controller) }).range(
+        table.from,
+        table.to,
+      ),
+    ),
+    true,
+  );
+}
+
+function markdownTables(state: EditorState) {
+  const tables: Table[] = [];
+  let line = state.doc.line(1);
+  while (true) {
+    const header = tableCells(line.text, line.from);
+    const next = line.to < state.doc.length ? state.doc.line(line.number + 1) : undefined;
+    if (!header || !next || !tableSeparator(next.text)) {
+      if (line.to >= state.doc.length) break;
+      line = state.doc.line(line.number + 1);
+      continue;
+    }
+    const rows: Row[] = [
+      { from: line.from, to: line.to, cells: header, separator: false },
+      {
+        from: next.from,
+        to: next.to,
+        cells: tableCells(next.text, next.from) ?? [],
+        separator: true,
+      },
+    ];
+    let current = next;
+    while (current.to < state.doc.length) {
+      const candidate = state.doc.line(current.number + 1);
+      const cells = tableCells(candidate.text, candidate.from);
+      if (!cells || tableSeparator(candidate.text)) break;
+      rows.push({ from: candidate.from, to: candidate.to, cells, separator: false });
+      current = candidate;
+    }
+    tables.push({ from: line.from, to: current.to, rows });
+    if (current.to >= state.doc.length) break;
+    line = state.doc.line(current.number + 1);
+  }
+  return tables;
+}
+
+class TableWidget extends WidgetType {
+  constructor(
+    private table: Table,
+    private controller: TableController,
+  ) {
+    super();
+  }
+
+  eq(other: TableWidget) {
+    return (
+      this.controller === other.controller &&
+      this.table.from === other.table.from &&
+      shape(this.table) === shape(other.table)
+    );
+  }
+
+  toDOM() {
+    const root = document.createElement("div");
+    root.className = "cm-table-widget";
+    root.dataset.tableId = String(this.table.from);
+    root.dataset.shape = shape(this.table);
+    const wrapper = document.createElement("div");
+    wrapper.className = "cm-table-wrapper";
+    const table = document.createElement("table");
+    const rows = editableRows(this.table);
+    for (const [rowIndex, row] of rows.entries()) {
+      const tr = document.createElement("tr");
+      for (const [column, cell] of row.cells.entries()) {
+        const element = document.createElement(rowIndex === 0 ? "th" : "td");
+        const input = document.createElement("input");
+        input.className = "cm-table-cell-input";
+        input.value = cellText(cell.text);
+        input.dataset.row = String(rowIndex);
+        input.dataset.column = String(column);
+        input.setAttribute("aria-label", `Table row ${rowIndex + 1}, column ${column + 1}`);
+        let composing = false;
+        const commit = () =>
+          this.controller.updateCell(this.table.from, rowIndex, column, input.value);
+        input.addEventListener("compositionstart", () => {
+          composing = true;
+        });
+        input.addEventListener("compositionend", () => {
+          composing = false;
+          commit();
+        });
+        input.addEventListener("input", () => {
+          if (!composing) commit();
+        });
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (event) => {
+          if (event.key !== "Tab") return;
+          event.preventDefault();
+          event.stopPropagation();
+          queueMicrotask(() =>
+            this.controller.moveCell(this.table.from, rowIndex, column, event.shiftKey ? -1 : 1),
+          );
+        });
+        input.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          this.controller.showMenu(cell.from, event.clientX, event.clientY);
+        });
+        element.append(input);
+        tr.append(element);
+      }
+      table.append(tr);
+    }
+    const addRow = document.createElement("button");
+    addRow.type = "button";
+    addRow.className = "cm-table-row-btn";
+    addRow.setAttribute("aria-label", "Add row below");
+    addRow.textContent = "+";
+    addRow.addEventListener("mousedown", (event) => event.preventDefault());
+    addRow.addEventListener("click", () => this.controller.addRow(this.table.from));
+    const addColumn = document.createElement("button");
+    addColumn.type = "button";
+    addColumn.className = "cm-table-col-btn";
+    addColumn.setAttribute("aria-label", "Add column to the right");
+    addColumn.textContent = "+";
+    addColumn.addEventListener("mousedown", (event) => event.preventDefault());
+    addColumn.addEventListener("click", () => this.controller.addColumn(this.table.from));
+    wrapper.append(table, addRow, addColumn);
+    root.append(wrapper);
+    this.controller.register(this.table.from, root);
+    return root;
+  }
+
+  destroy(dom: HTMLElement) {
+    this.controller.unregister(this.table.from, dom);
+  }
+}
+
+class TableController {
+  private roots = new Map<number, HTMLElement>();
+  private view: EditorView | undefined;
+
+  attach(view: EditorView) {
+    this.view = view;
+  }
+
+  register(id: number, root: HTMLElement) {
+    this.roots.set(id, root);
+  }
+
+  unregister(id: number, root: HTMLElement) {
+    if (this.roots.get(id) === root) this.roots.delete(id);
+  }
+
+  destroy() {
+    this.roots.clear();
+    this.view = undefined;
+  }
+
+  sync(tables: Table[]) {
+    for (const table of tables) {
+      const root = this.roots.get(table.from);
+      if (!root || shape(table) !== root.dataset.shape) continue;
+      for (const [rowIndex, row] of editableRows(table).entries()) {
+        for (const [column, cell] of row.cells.entries()) {
+          const input = root.querySelector<HTMLInputElement>(
+            `[data-row="${rowIndex}"][data-column="${column}"]`,
+          );
+          if (input && input !== document.activeElement) input.value = cellText(cell.text);
+        }
+      }
+    }
+  }
+
+  updateCell(id: number, rowIndex: number, column: number, value: string) {
+    if (!this.view) return;
+    const table = markdownTables(this.view.state).find((item) => item.from === id);
+    const cell = table && editableRows(table)[rowIndex]?.cells[column];
+    if (!cell) return;
+    const text = value.replaceAll("|", "\\|");
+    if (cell.text === text) return;
+    this.view.dispatch({
+      changes: { from: cell.from, to: cell.to, insert: text },
+      userEvent: "input",
+    });
+  }
+
+  moveCell(id: number, rowIndex: number, column: number, direction: number) {
+    if (!this.view) return;
+    const table = markdownTables(this.view.state).find((item) => item.from === id);
+    if (!table) return;
+    const rows = editableRows(table);
+    const width = rows[0]?.cells.length ?? 0;
+    const next = rowIndex * width + column + direction;
+    if (next >= rows.length * width) {
+      this.addRow(id);
+      requestAnimationFrame(() => this.focus(id, rows.length, 0));
+      return;
+    }
+    if (next >= 0) this.focus(id, Math.floor(next / width), next % width);
+  }
+
+  addRow(id: number) {
+    if (!this.view) return;
+    const table = markdownTables(this.view.state).find((item) => item.from === id);
+    if (!table) return;
+    const last = editableRows(table).at(-1)?.cells[0];
+    if (last) editRows(this.view, last.from, "add-after");
+  }
+
+  addColumn(id: number) {
+    if (!this.view) return;
+    const table = markdownTables(this.view.state).find((item) => item.from === id);
+    const last = table && editableRows(table)[0]?.cells.at(-1);
+    if (last) editColumns(this.view, last.from, "add-after");
+  }
+
+  showMenu(position: number, x: number, y: number) {
+    if (!this.view) return;
+    showTableMenu(this.view, position, x, y);
+  }
+
+  private focus(id: number, row: number, column: number) {
+    this.roots
+      .get(id)
+      ?.querySelector<HTMLInputElement>(`[data-row="${row}"][data-column="${column}"]`)
+      ?.focus();
+  }
+}
+
+function shape(table: Table) {
+  return editableRows(table)
+    .map((row) => row.cells.length)
+    .join(",");
+}
+
+function cellText(text: string) {
+  return text.replaceAll("\\|", "|");
+}
 
 export function tableCells(text: string, lineFrom = 0) {
   const pipes: number[] = [];

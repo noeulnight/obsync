@@ -10,6 +10,7 @@ import { codeBlocks, decorateCodeLine } from "./markdown-rendering-code";
 import type { AssetResolver } from "./markdown-rendering-decoration";
 import { htmlBlockDecorations, htmlBlockRanges, overlapsHtml } from "./markdown-rendering-html";
 import { decorateLine } from "./markdown-rendering-inline";
+import { isTableLine, tableWidgets } from "./markdown-rendering-table";
 import { frontmatter, propertyDecorations } from "./markdown-rendering-properties";
 
 export const refreshMarkdownRendering = StateEffect.define<void>();
@@ -17,6 +18,7 @@ export const refreshMarkdownRendering = StateEffect.define<void>();
 export function markdownRendering(onNavigate: (href: string) => void, resolveAsset: AssetResolver) {
   return [
     htmlBlockDecorations,
+    ...tableWidgets(),
     EditorView.decorations.compute(["doc", "selection"], propertyDecorations),
     ViewPlugin.fromClass(
       class {
@@ -65,7 +67,7 @@ function decorations(view: EditorView, resolveAsset: AssetResolver, assetRevisio
       if (!properties || line.to < properties.from || line.from > properties.to) {
         const block = blocks.find((item) => line.number >= item.start && line.number <= item.end);
         if (block) decorateCodeLine(line.from, line.to, line.number, cursor, block, ranges);
-        else if (!overlapsHtml(line.from, line.to, html))
+        else if (!isTableLine(view.state, line.from) && !overlapsHtml(line.from, line.to, html))
           decorateLine(view, line.from, line.text, cursor, ranges, resolveAsset, assetRevision);
       }
       if (line.to >= view.state.doc.length) break;

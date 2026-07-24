@@ -3,12 +3,51 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ApiClient } from "@/lib/api/client";
 import { VersionHistorySheet } from "./VersionHistorySheet";
 
 afterEach(cleanup);
 
 describe("VersionHistorySheet", () => {
+  it("stays open when launched from the file menu", async () => {
+    const api = {
+      fileVersions: vi.fn().mockResolvedValue([]),
+      fileVersion: vi.fn(),
+      restoreFileVersion: vi.fn(),
+    } as unknown as ApiClient;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <DropdownMenu>
+          <DropdownMenuTrigger>More</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <VersionHistorySheet
+              api={api}
+              vaultId="vault"
+              fileId="file"
+              readOnly={false}
+              trigger={
+                <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+                  Version history
+                </DropdownMenuItem>
+              }
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "More" }), { button: 0 });
+    fireEvent.click(await screen.findByText("Version history"));
+    expect(await screen.findByText("No versions yet.")).toBeTruthy();
+  });
+
   it("previews and restores a saved document version", async () => {
     const restoreFileVersion = vi.fn().mockResolvedValue(undefined);
     const api = {
