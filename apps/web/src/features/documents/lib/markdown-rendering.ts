@@ -6,15 +6,15 @@ import {
   type ViewUpdate,
   ViewPlugin,
 } from "@codemirror/view";
-import { codeBlocks, decorateCodeLine } from "./live-preview-code";
-import type { AssetResolver } from "./live-preview-decoration";
-import { htmlBlockDecorations, htmlBlockRanges, overlapsHtml } from "./live-preview-html";
-import { decorateLine } from "./live-preview-inline";
-import { frontmatter, propertyDecorations } from "./live-preview-properties";
+import { codeBlocks, decorateCodeLine } from "./markdown-rendering-code";
+import type { AssetResolver } from "./markdown-rendering-decoration";
+import { htmlBlockDecorations, htmlBlockRanges, overlapsHtml } from "./markdown-rendering-html";
+import { decorateLine } from "./markdown-rendering-inline";
+import { frontmatter, propertyDecorations } from "./markdown-rendering-properties";
 
-export const refreshLivePreview = StateEffect.define<void>();
+export const refreshMarkdownRendering = StateEffect.define<void>();
 
-export function livePreview(onNavigate: (href: string) => void, resolveAsset: AssetResolver) {
+export function markdownRendering(onNavigate: (href: string) => void, resolveAsset: AssetResolver) {
   return [
     htmlBlockDecorations,
     EditorView.decorations.compute(["doc", "selection"], propertyDecorations),
@@ -29,7 +29,7 @@ export function livePreview(onNavigate: (href: string) => void, resolveAsset: As
 
         update(update: ViewUpdate) {
           const refreshAssets = update.transactions.some((transaction) =>
-            transaction.effects.some((effect) => effect.is(refreshLivePreview)),
+            transaction.effects.some((effect) => effect.is(refreshMarkdownRendering)),
           );
           if (refreshAssets) this.assetRevision += 1;
           if (update.docChanged || update.selectionSet || update.viewportChanged || refreshAssets) {

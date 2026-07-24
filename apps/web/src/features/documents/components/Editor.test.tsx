@@ -58,7 +58,7 @@ describe("Editor", () => {
     editor.dispatch({ selection: { anchor: 10 } });
 
     await waitFor(() => expect(screen.getByLabelText("Properties")).toBeTruthy());
-    expect(rendered.container.querySelectorAll(".cm-live-property-chip")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-markdown-property-chip")).toHaveLength(2);
     const date = screen
       .getAllByLabelText("Property value")
       .find((input) => (input as HTMLInputElement).value.includes("2026")) as HTMLInputElement;
@@ -75,8 +75,8 @@ describe("Editor", () => {
     fireEvent.blur(date);
     fireEvent.click(screen.getByLabelText("Toggle properties"));
     expect(screen.getByLabelText("Properties").classList.contains("is-collapsed")).toBe(true);
-    expect(rendered.container.querySelector(".cm-live-code-language")?.textContent).toBe("ts");
-    expect(rendered.container.querySelector(".cm-live-code-line")?.textContent).toContain(
+    expect(rendered.container.querySelector(".cm-markdown-code-language")?.textContent).toBe("ts");
+    expect(rendered.container.querySelector(".cm-markdown-code-line")?.textContent).toContain(
       "const value = 1",
     );
 
@@ -102,11 +102,11 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
-    expect(rendered.container.querySelectorAll(".cm-live-bullet")).toHaveLength(2);
-    expect(rendered.container.querySelector(".cm-live-bullet")?.textContent).toBe("•");
+    expect(rendered.container.querySelectorAll(".cm-markdown-bullet")).toHaveLength(2);
+    expect(rendered.container.querySelector(".cm-markdown-bullet")?.textContent).toBe("•");
   });
 
-  it("shows raw Markdown without live-preview decorations in source mode", () => {
+  it("shows raw Markdown without rendering decorations in source mode", () => {
     const { connected } = session();
     connected.text.insert(0, "- first\n- second\n\n**bold**");
     const rendered = render(
@@ -118,8 +118,8 @@ describe("Editor", () => {
       />,
     );
 
-    expect(rendered.container.querySelector(".cm-live-bullet")).toBeNull();
-    expect(rendered.container.querySelector(".cm-live-strong")).toBeNull();
+    expect(rendered.container.querySelector(".cm-markdown-bullet")).toBeNull();
+    expect(rendered.container.querySelector(".cm-markdown-strong")).toBeNull();
     expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("- first");
     expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("**bold**");
   });
@@ -143,8 +143,8 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: 0 } });
 
-    await waitFor(() => expect(rendered.container.querySelector(".cm-live-html")).toBeTruthy());
-    const widgets = [...rendered.container.querySelectorAll<HTMLElement>(".cm-live-html")];
+    await waitFor(() => expect(rendered.container.querySelector(".cm-markdown-html")).toBeTruthy());
+    const widgets = [...rendered.container.querySelectorAll<HTMLElement>(".cm-markdown-html")];
     expect(widgets.some((element) => element.textContent === "red")).toBe(true);
     expect(widgets.some((element) => element.textContent === "")).toBe(true);
     expect(rendered.container.querySelector("script")).toBeNull();
@@ -166,8 +166,10 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: 0 } });
 
-    await waitFor(() => expect(rendered.container.querySelector("div.cm-live-html")).toBeTruthy());
-    expect(rendered.container.querySelector("div.cm-live-html")?.textContent).toContain(
+    await waitFor(() =>
+      expect(rendered.container.querySelector("div.cm-markdown-html")).toBeTruthy(),
+    );
+    expect(rendered.container.querySelector("div.cm-markdown-html")?.textContent).toContain(
       "Block HTML",
     );
     expect(rendered.container.querySelector(".cm-content")?.textContent).not.toContain("<div>");
@@ -175,7 +177,7 @@ describe("Editor", () => {
 
   it("renders Markdown tables and horizontal rules", () => {
     const { connected } = session();
-    connected.text.insert(0, "| Name | Value |\n| :--- | ---: |\n| One | Two |\n\n---\n");
+    connected.text.insert(0, "| Name | Value |\n| :--- | ---: |\n| One \\| Uno | Two |\n\n---\n");
     const rendered = render(
       <Editor
         session={connected}
@@ -189,12 +191,12 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
-    expect(rendered.container.querySelectorAll(".cm-live-table-row")).toHaveLength(2);
-    expect(rendered.container.querySelectorAll(".cm-live-table-cell")).toHaveLength(4);
-    expect(rendered.container.querySelector(".cm-live-table-separator")).toBeTruthy();
-    expect(rendered.container.querySelector(".cm-live-horizontal-rule")).toBeTruthy();
+    expect(rendered.container.querySelectorAll(".cm-markdown-table-row")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-markdown-table-cell")).toHaveLength(4);
+    expect(rendered.container.querySelector(".cm-markdown-table-separator")).toBeTruthy();
+    expect(rendered.container.querySelector(".cm-markdown-horizontal-rule")).toBeTruthy();
 
-    const row = rendered.container.querySelector<HTMLElement>(".cm-live-table-row");
+    const row = rendered.container.querySelector<HTMLElement>(".cm-markdown-table-row");
     if (!row) throw new Error("Table row was not rendered");
     const helpers = [...row.children].filter(
       (child) =>
@@ -206,8 +208,41 @@ describe("Editor", () => {
       expect(getComputedStyle(helper).position).toBe("absolute");
     }
     expect(
-      rendered.container.querySelectorAll<HTMLElement>(".cm-live-table-cell")[1]?.style.textAlign,
+      rendered.container.querySelectorAll<HTMLElement>(".cm-markdown-table-cell")[1]?.style
+        .textAlign,
     ).toBe("right");
+    expect(
+      rendered.container.querySelectorAll<HTMLElement>(".cm-markdown-table-cell")[2]?.textContent,
+    ).toBe("One | Uno");
+  });
+
+  it("navigates table cells with Tab and adds a row after the last cell", () => {
+    const { connected } = session();
+    connected.text.insert(0, "| Name | Value |\n| --- | --- |\n| One | Two |");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+
+    const value = editor.state.doc.toString().indexOf("Value");
+    editor.dispatch({ selection: { anchor: value - 5 } });
+    fireEvent.keyDown(editor.contentDOM, { key: "Tab" });
+    expect(
+      editor.state.sliceDoc(editor.state.selection.main.from, editor.state.selection.main.to),
+    ).toBe("Value");
+
+    const two = editor.state.doc.toString().indexOf("Two");
+    editor.dispatch({ selection: { anchor: two } });
+    fireEvent.keyDown(editor.contentDOM, { key: "Tab" });
+    expect(editor.state.doc.lines).toBe(4);
+    expect(connected.text.toJSON()).toBe(editor.state.doc.toString());
   });
 
   it("uses Markdown syntax for inline formatting", () => {
@@ -226,11 +261,44 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
-    expect(rendered.container.querySelectorAll(".cm-live-em")).toHaveLength(2);
-    expect(rendered.container.querySelectorAll(".cm-live-strong")).toHaveLength(2);
-    expect(rendered.container.querySelectorAll(".cm-live-em")[0]?.textContent).toBe("asterisk");
-    expect(rendered.container.querySelectorAll(".cm-live-em")[1]?.textContent).toBe("underscore");
-    expect(rendered.container.querySelectorAll(".cm-live-em")[2]).toBeUndefined();
+    expect(rendered.container.querySelectorAll(".cm-markdown-em")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-markdown-strong")).toHaveLength(2);
+    expect(rendered.container.querySelectorAll(".cm-markdown-em")[0]?.textContent).toBe("asterisk");
+    expect(rendered.container.querySelectorAll(".cm-markdown-em")[1]?.textContent).toBe(
+      "underscore",
+    );
+    expect(rendered.container.querySelectorAll(".cm-markdown-em")[2]).toBeUndefined();
+  });
+
+  it("renders Obsidian callouts, highlights, tags, footnotes, comments, and inline code", () => {
+    const { connected } = session();
+    connected.text.insert(
+      0,
+      "> [!note] Read this\n> quoted\n\n`code` ==marked== #sync [^1] %%hidden%% ^block-id",
+    );
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: editor.state.doc.toString().indexOf("quoted") + 2 } });
+
+    expect(rendered.container.querySelectorAll(".cm-markdown-callout")).toHaveLength(2);
+    expect(rendered.container.querySelector(".cm-markdown-callout-label")?.textContent).toContain(
+      "note",
+    );
+    expect(rendered.container.querySelector(".cm-markdown-inline-code")?.textContent).toBe("code");
+    expect(rendered.container.querySelector(".cm-markdown-highlight")?.textContent).toBe("marked");
+    expect(rendered.container.querySelector(".cm-markdown-tag")?.textContent).toBe("#sync");
+    expect(rendered.container.querySelector(".cm-markdown-footnote")?.textContent).toBe("[^1]");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).not.toContain("hidden");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).not.toContain("^block-id");
   });
 
   it("keeps pointer placement on the clicked DOM line when measured coordinates drift", () => {
@@ -641,7 +709,7 @@ describe("Editor", () => {
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
     await waitFor(() =>
-      expect(view.container.querySelector(".cm-live-image")?.textContent).toContain(
+      expect(view.container.querySelector(".cm-markdown-image")?.textContent).toContain(
         "Image not found",
       ),
     );
@@ -656,7 +724,7 @@ describe("Editor", () => {
     );
 
     await waitFor(() =>
-      expect(view.container.querySelector<HTMLImageElement>(".cm-live-image img")?.src).toBe(
+      expect(view.container.querySelector<HTMLImageElement>(".cm-markdown-image img")?.src).toBe(
         "https://example.com/photo.png",
       ),
     );
@@ -799,7 +867,7 @@ describe("Editor", () => {
     if (!editor) throw new Error("Editor was not mounted");
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
-    const link = await waitFor(() => rendered.container.querySelector(".cm-live-link"));
+    const link = await waitFor(() => rendered.container.querySelector(".cm-markdown-link"));
     if (!link) throw new Error("Wiki link was not rendered");
     fireEvent.mouseDown(link, { button: 0 });
 
@@ -824,7 +892,7 @@ describe("Editor", () => {
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
     const link = await waitFor(() =>
-      rendered.container.querySelector<HTMLElement>(".cm-live-link"),
+      rendered.container.querySelector<HTMLElement>(".cm-markdown-link"),
     );
     if (!link) throw new Error("Wiki alias was not rendered");
     expect(link.textContent).toBe("Readable title");
@@ -833,7 +901,7 @@ describe("Editor", () => {
     expect(onNavigate).toHaveBeenCalledWith("Notes/Beta");
   });
 
-  it("distinguishes internal and external live-preview links", async () => {
+  it("distinguishes internal and external rendered links", async () => {
     const { connected } = session();
     connected.text.insert(0, "[[Notes/Beta]] and [Website](https://example.com)\nEnd");
     const rendered = render(
@@ -850,8 +918,8 @@ describe("Editor", () => {
     editor.dispatch({ selection: { anchor: editor.state.doc.length } });
 
     await waitFor(() => {
-      expect(rendered.container.querySelector(".cm-live-internal-link")).toBeTruthy();
-      expect(rendered.container.querySelector(".cm-live-external-link")).toBeTruthy();
+      expect(rendered.container.querySelector(".cm-markdown-internal-link")).toBeTruthy();
+      expect(rendered.container.querySelector(".cm-markdown-external-link")).toBeTruthy();
     });
   });
 });

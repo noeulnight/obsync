@@ -1,6 +1,6 @@
 import type { Range } from "@codemirror/state";
 import { Decoration, type EditorView, WidgetType } from "@codemirror/view";
-import { editing, hidden } from "./live-preview-decoration";
+import { editing, hidden } from "./markdown-rendering-decoration";
 
 type CodeBlock = {
   start: number;
@@ -47,7 +47,7 @@ export function decorateCodeLine(
   const boundary = number === block.start || number === block.end;
   ranges.push(
     Decoration.line({
-      class: boundary ? "cm-live-code-fence" : "cm-live-code-line",
+      class: boundary ? "cm-markdown-code-fence" : "cm-markdown-code-line",
     }).range(from),
   );
   if (editing(cursor, block.from, block.to) || !boundary) return;
@@ -70,7 +70,7 @@ class CodeLanguageWidget extends WidgetType {
 
   toDOM() {
     const label = document.createElement("span");
-    label.className = "cm-live-code-language";
+    label.className = "cm-markdown-code-language";
     label.textContent = this.language;
     return label;
   }

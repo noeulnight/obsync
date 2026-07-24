@@ -83,12 +83,12 @@ class PropertiesWidget extends WidgetType {
 
   toDOM(view: EditorView) {
     const panel = document.createElement("section");
-    panel.className = "cm-live-properties";
+    panel.className = "cm-markdown-properties";
     panel.classList.toggle("is-collapsed", collapsedViews.has(view));
     panel.setAttribute("aria-label", "Properties");
     const title = document.createElement("button");
     title.type = "button";
-    title.className = "cm-live-properties-title";
+    title.className = "cm-markdown-properties-title";
     title.setAttribute("aria-label", "Toggle properties");
     title.setAttribute("aria-expanded", String(!collapsedViews.has(view)));
     const chevron = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -114,7 +114,7 @@ class PropertiesWidget extends WidgetType {
     const editable = view.state.facet(EditorView.editable);
     for (const row of this.properties.rows) {
       const wrapper = document.createElement("div");
-      wrapper.className = "cm-live-property";
+      wrapper.className = "cm-markdown-property";
       wrapper.append(
         this.input(view, row.key, "Property name", row.keyFrom, row.keyTo, editable),
         this.value(view, row, editable),
@@ -125,7 +125,7 @@ class PropertiesWidget extends WidgetType {
     if (editable) {
       const add = document.createElement("button");
       add.type = "button";
-      add.className = "cm-live-property-add";
+      add.className = "cm-markdown-property-add";
       add.textContent = "+ Add property";
       add.addEventListener("click", () => {
         view.dispatch({
@@ -175,7 +175,7 @@ class PropertiesWidget extends WidgetType {
     }
     if (type === "checkbox") {
       const wrapper = document.createElement("label");
-      wrapper.className = "cm-live-property-checkbox";
+      wrapper.className = "cm-markdown-property-checkbox";
       const input = document.createElement("input");
       input.type = "checkbox";
       input.checked = propertyValue(row.value) === "true";
@@ -219,11 +219,11 @@ class PropertiesWidget extends WidgetType {
 
   private list(view: EditorView, row: PropertyRow, editable: boolean) {
     const wrapper = document.createElement("div");
-    wrapper.className = "cm-live-property-list";
+    wrapper.className = "cm-markdown-property-list";
     const values = propertyList(row.value, row.key.toLowerCase() === "tags");
     for (const value of values) {
       const chip = document.createElement("span");
-      chip.className = "cm-live-property-chip";
+      chip.className = "cm-markdown-property-chip";
       chip.append(document.createTextNode(value));
       if (editable) {
         const remove = document.createElement("button");
@@ -254,13 +254,13 @@ class PropertiesWidget extends WidgetType {
   private propertyMenu(view: EditorView, wrapper: HTMLElement, row: PropertyRow) {
     wrapper.addEventListener("contextmenu", (event) => {
       event.preventDefault();
-      document.querySelector(".cm-live-property-menu")?.remove();
+      document.querySelector(".cm-markdown-property-menu")?.remove();
       const menu = document.createElement("div");
-      menu.className = "cm-live-property-menu";
+      menu.className = "cm-markdown-property-menu";
       menu.style.left = `${event.clientX}px`;
       menu.style.top = `${event.clientY}px`;
       const title = document.createElement("div");
-      title.className = "cm-live-property-menu-title";
+      title.className = "cm-markdown-property-menu-title";
       title.textContent = "Property type";
       menu.append(title);
       for (const type of propertyTypes) {

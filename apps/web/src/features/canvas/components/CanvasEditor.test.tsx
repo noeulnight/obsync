@@ -193,8 +193,8 @@ describe("CanvasEditor", () => {
     );
 
     await waitFor(() => {
-      expect(view.container.querySelector(".cm-live-heading-1")).not.toBeNull();
-      expect(view.container.querySelector(".cm-live-strong")).not.toBeNull();
+      expect(view.container.querySelector(".cm-markdown-heading-1")).not.toBeNull();
+      expect(view.container.querySelector(".cm-markdown-strong")).not.toBeNull();
     });
   });
 

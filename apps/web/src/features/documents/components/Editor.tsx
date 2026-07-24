@@ -6,7 +6,8 @@ import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { yCollab } from "y-codemirror.next";
-import { livePreview, refreshLivePreview } from "../lib/live-preview";
+import { markdownRendering, refreshMarkdownRendering } from "../lib/markdown-rendering";
+import { tableEditing } from "../lib/markdown-rendering-table";
 import { markdownLinkOptions, type FileEntry } from "../lib/files";
 import type { WebDocument } from "../lib/sync";
 
@@ -64,7 +65,8 @@ export function Editor({
           correctPointerLine,
           baseEditorTheme,
           compact ? compactEditorTheme : editorTheme,
-          livePreviewTheme,
+          markdownRenderingTheme,
+          tableEditing(),
           EditorView.domEventHandlers({
             paste(event, view) {
               if (readOnly) return false;
@@ -102,7 +104,7 @@ export function Editor({
           preview.current.of(
             sourceMode
               ? []
-              : livePreview(
+              : markdownRendering(
                   (href) => navigate.current(href),
                   (href) => asset.current(href),
                 ),
@@ -120,7 +122,7 @@ export function Editor({
   }, [session, compact, readOnly]);
 
   useEffect(() => {
-    editor.current?.dispatch({ effects: refreshLivePreview.of(undefined) });
+    editor.current?.dispatch({ effects: refreshMarkdownRendering.of(undefined) });
   }, [files]);
 
   useEffect(() => {
@@ -128,7 +130,7 @@ export function Editor({
       effects: preview.current.reconfigure(
         sourceMode
           ? []
-          : livePreview(
+          : markdownRendering(
               (href) => navigate.current(href),
               (href) => asset.current(href),
             ),
@@ -268,85 +270,125 @@ const baseEditorTheme = EditorView.theme({
   ".cm-ySelectionCaret:hover > .cm-ySelectionInfo": { opacity: "1" },
 });
 
-const livePreviewTheme = EditorView.theme({
-  ".cm-live-heading-1": {
+const markdownRenderingTheme = EditorView.theme({
+  ".cm-markdown-heading-1": {
     fontSize: "1.618em",
     lineHeight: "1.2",
     fontWeight: "700",
     paddingTop: "1rem !important",
   },
-  ".cm-live-heading-2": {
+  ".cm-markdown-heading-2": {
     fontSize: "1.462em",
     lineHeight: "1.2",
     fontWeight: "600",
     paddingTop: "1rem !important",
   },
-  ".cm-live-heading-3": {
+  ".cm-markdown-heading-3": {
     fontSize: "1.318em",
     lineHeight: "1.3",
     fontWeight: "600",
     paddingTop: "1rem !important",
   },
-  ".cm-live-heading-4": {
+  ".cm-markdown-heading-4": {
     fontSize: "1.188em",
     lineHeight: "1.4",
     fontWeight: "600",
     paddingTop: "1rem !important",
   },
-  ".cm-live-heading-5": {
+  ".cm-markdown-heading-5": {
     fontSize: "1.076em",
     fontWeight: "600",
     paddingTop: "1rem !important",
   },
-  ".cm-live-heading-6": {
+  ".cm-markdown-heading-6": {
     fontSize: "1em",
     fontWeight: "600",
     paddingTop: "1rem !important",
   },
-  ".cm-live-heading-1, .cm-live-heading-2, .cm-live-heading-3, .cm-live-heading-4, .cm-live-heading-5, .cm-live-heading-6, .cm-live-heading-1 *, .cm-live-heading-2 *, .cm-live-heading-3 *, .cm-live-heading-4 *, .cm-live-heading-5 *, .cm-live-heading-6 *":
+  ".cm-markdown-heading-1, .cm-markdown-heading-2, .cm-markdown-heading-3, .cm-markdown-heading-4, .cm-markdown-heading-5, .cm-markdown-heading-6, .cm-markdown-heading-1 *, .cm-markdown-heading-2 *, .cm-markdown-heading-3 *, .cm-markdown-heading-4 *, .cm-markdown-heading-5 *, .cm-markdown-heading-6 *":
     {
       textDecoration: "none !important",
       borderBottom: "0 !important",
     },
-  ".cm-live-strong": { fontWeight: "700" },
-  ".cm-live-em": { fontStyle: "italic" },
-  ".cm-live-strike": { textDecoration: "line-through", color: "var(--muted-foreground)" },
-  ".cm-live-link, .cm-live-embed": {
+  ".cm-markdown-strong": { fontWeight: "700" },
+  ".cm-markdown-em": { fontStyle: "italic" },
+  ".cm-markdown-strike": { textDecoration: "line-through", color: "var(--muted-foreground)" },
+  ".cm-markdown-inline-code": {
+    borderRadius: "var(--radius-sm)",
+    backgroundColor: "color-mix(in oklab, var(--muted) 72%, transparent)",
+    padding: "0.1em 0.25em",
+    color: "var(--code-normal, var(--foreground))",
+    fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
+    fontSize: "0.9em",
+  },
+  ".cm-markdown-highlight": {
+    backgroundColor: "var(--text-highlight-bg, color-mix(in oklab, #ffd54f 45%, transparent))",
+  },
+  ".cm-markdown-tag, .cm-markdown-footnote": {
+    color: "var(--link-color)",
+    textDecoration: "none",
+  },
+  ".cm-markdown-tag": {
+    borderRadius: "999px",
+    backgroundColor: "color-mix(in oklab, var(--link-color) 14%, transparent)",
+    padding: "0.05em 0.35em",
+  },
+  ".cm-markdown-quote": {
+    borderLeft: "2px solid var(--blockquote-border-color, var(--border))",
+    paddingLeft: "0.9rem !important",
+    color: "var(--blockquote-color, var(--muted-foreground))",
+  },
+  ".cm-markdown-quote-mark": { display: "inline-block", width: "0" },
+  ".cm-markdown-callout": {
+    borderLeftColor: "var(--callout-color, var(--link-color))",
+    backgroundColor:
+      "color-mix(in oklab, var(--callout-color, var(--link-color)) 10%, transparent)",
+    color: "var(--foreground)",
+  },
+  ".cm-markdown-callout-label": {
+    marginRight: "0.45rem",
+    color: "var(--callout-color, var(--link-color))",
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  ".cm-markdown-link, .cm-markdown-embed": {
     cursor: "pointer",
   },
-  ".cm-live-internal-link, .cm-live-embed": {
+  ".cm-markdown-internal-link, .cm-markdown-embed": {
     color: "var(--link-color)",
     textDecoration: "underline",
   },
-  ".cm-live-external-link": {
+  ".cm-markdown-external-link": {
     color: "var(--link-external-color)",
     textDecoration: "underline",
   },
-  ".cm-live-internal-link:hover, .cm-live-embed:hover": { color: "var(--link-color-hover)" },
-  ".cm-live-external-link:hover": { color: "var(--link-external-color-hover)" },
-  ".cm-live-embed": { textDecorationStyle: "dashed" },
-  ".cm-live-image": {
+  ".cm-markdown-internal-link:hover, .cm-markdown-embed:hover": {
+    color: "var(--link-color-hover)",
+  },
+  ".cm-markdown-external-link:hover": { color: "var(--link-external-color-hover)" },
+  ".cm-markdown-embed": { textDecorationStyle: "dashed" },
+  ".cm-markdown-image": {
     display: "block",
     margin: "0.75rem 0",
     color: "var(--muted-foreground)",
     fontSize: "0.875rem",
   },
-  ".cm-live-image img": {
+  ".cm-markdown-image img": {
     display: "block",
     maxWidth: "100%",
     maxHeight: "32rem",
     borderRadius: "var(--radius-lg)",
     objectFit: "contain",
   },
-  ".cm-live-checkbox": { verticalAlign: "-2px", margin: "0 7px 0 1px" },
-  ".cm-live-list-item": { position: "relative" },
-  ".cm-live-bullet": {
+  ".cm-markdown-checkbox": { verticalAlign: "-2px", margin: "0 7px 0 1px" },
+  ".cm-markdown-list-item": { position: "relative" },
+  ".cm-markdown-bullet": {
     display: "inline-block",
     width: "1.25em",
     color: "var(--foreground)",
     textAlign: "center",
   },
-  ".cm-live-horizontal-rule": {
+  ".cm-markdown-horizontal-rule": {
     display: "inline-block",
     boxSizing: "border-box",
     width: "100%",
@@ -356,61 +398,62 @@ const livePreviewTheme = EditorView.theme({
     borderTop: "2px solid var(--border)",
     verticalAlign: "middle",
   },
-  ".cm-live-table-row": {
+  ".cm-markdown-table-row": {
     display: "grid",
     gridTemplateColumns: "repeat(var(--table-columns), minmax(0, 1fr))",
     borderRight: "1px solid var(--border)",
     borderBottom: "1px solid var(--border)",
     borderLeft: "1px solid var(--border)",
   },
-  ".cm-live-table-row:has(+ .cm-live-table-separator)": {
+  ".cm-markdown-table-row:has(+ .cm-markdown-table-separator)": {
     borderTop: "1px solid var(--border)",
     backgroundColor: "var(--muted)",
     fontWeight: "600",
   },
-  ".cm-live-table-cell": {
+  ".cm-markdown-table-cell": {
     minWidth: "0",
     padding: "0.35rem 0.5rem",
     borderRight: "1px solid var(--border)",
   },
-  '.cm-live-table-row > .cm-widgetBuffer, .cm-live-table-row > span[contenteditable="false"]:empty':
+  '.cm-markdown-table-row > .cm-widgetBuffer, .cm-markdown-table-row > span[contenteditable="false"]:empty':
     {
       position: "absolute",
       width: "0",
       height: "0",
       overflow: "hidden",
     },
-  ".cm-live-table-cell:last-child, .cm-live-table-cell:not(:has(~ .cm-live-table-cell))": {
-    borderRight: "0",
-  },
-  ".cm-live-table-separator": {
+  ".cm-markdown-table-cell:last-child, .cm-markdown-table-cell:not(:has(~ .cm-markdown-table-cell))":
+    {
+      borderRight: "0",
+    },
+  ".cm-markdown-table-separator": {
     height: "0",
     overflow: "hidden",
     lineHeight: "0",
   },
-  ".cm-live-code-line, .cm-live-code-fence": {
+  ".cm-markdown-code-line, .cm-markdown-code-fence": {
     backgroundColor: "color-mix(in oklab, var(--muted) 58%, transparent)",
     fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
     fontSize: "0.9em",
     padding: "0 14px",
   },
-  ".cm-live-code-fence": {
+  ".cm-markdown-code-fence": {
     minHeight: "12px",
     color: "var(--muted-foreground)",
   },
-  ".cm-live-code-language": {
+  ".cm-markdown-code-language": {
     display: "inline-block",
     padding: "3px 0",
     color: "var(--muted-foreground)",
     fontSize: "11px",
     textTransform: "lowercase",
   },
-  ".cm-live-properties": {
+  ".cm-markdown-properties": {
     marginBottom: "1.5rem",
     borderBottom: "1px solid var(--border)",
     padding: "0.25rem 0 1rem",
   },
-  ".cm-live-properties-title": {
+  ".cm-markdown-properties-title": {
     display: "flex",
     width: "100%",
     marginBottom: "0.4rem",
@@ -426,25 +469,25 @@ const livePreviewTheme = EditorView.theme({
     textAlign: "left",
     cursor: "pointer",
   },
-  ".cm-live-properties-title svg": {
+  ".cm-markdown-properties-title svg": {
     width: "14px",
     height: "14px",
     flex: "0 0 14px",
     transition: "transform 120ms ease",
   },
-  '.cm-live-properties-title[aria-expanded="false"] svg': { transform: "rotate(-90deg)" },
-  ".cm-live-properties.is-collapsed": { paddingBottom: "0.25rem" },
-  ".cm-live-properties.is-collapsed .cm-live-properties-title": { marginBottom: "0" },
-  ".cm-live-properties.is-collapsed .cm-live-property, .cm-live-properties.is-collapsed .cm-live-property-add":
+  '.cm-markdown-properties-title[aria-expanded="false"] svg': { transform: "rotate(-90deg)" },
+  ".cm-markdown-properties.is-collapsed": { paddingBottom: "0.25rem" },
+  ".cm-markdown-properties.is-collapsed .cm-markdown-properties-title": { marginBottom: "0" },
+  ".cm-markdown-properties.is-collapsed .cm-markdown-property, .cm-markdown-properties.is-collapsed .cm-markdown-property-add":
     { display: "none" },
-  ".cm-live-property": {
+  ".cm-markdown-property": {
     display: "grid",
     gridTemplateColumns: "minmax(110px, 0.38fr) minmax(0, 1fr)",
     alignItems: "center",
     minHeight: "32px",
     gap: "10px",
   },
-  ".cm-live-property input": {
+  ".cm-markdown-property input": {
     minWidth: "0",
     border: "0",
     borderRadius: "var(--radius-sm)",
@@ -454,9 +497,9 @@ const livePreviewTheme = EditorView.theme({
     font: "inherit",
     outline: "none",
   },
-  ".cm-live-property input:first-child": { color: "var(--muted-foreground)" },
-  ".cm-live-property input:focus": { backgroundColor: "var(--muted)" },
-  ".cm-live-property-list": {
+  ".cm-markdown-property input:first-child": { color: "var(--muted-foreground)" },
+  ".cm-markdown-property input:focus": { backgroundColor: "var(--muted)" },
+  ".cm-markdown-property-list": {
     display: "flex",
     minHeight: "30px",
     flexWrap: "wrap",
@@ -464,8 +507,8 @@ const livePreviewTheme = EditorView.theme({
     gap: "5px",
     padding: "2px 6px",
   },
-  ".cm-live-property-list > input": { minWidth: "80px", flex: "1" },
-  ".cm-live-property-chip": {
+  ".cm-markdown-property-list > input": { minWidth: "80px", flex: "1" },
+  ".cm-markdown-property-chip": {
     display: "inline-flex",
     alignItems: "center",
     gap: "3px",
@@ -475,21 +518,21 @@ const livePreviewTheme = EditorView.theme({
     color: "var(--foreground)",
     fontSize: "0.9em",
   },
-  ".cm-live-property-chip button": {
+  ".cm-markdown-property-chip button": {
     border: "0",
     background: "transparent",
     padding: "0",
     color: "inherit",
     cursor: "pointer",
   },
-  ".cm-live-property-checkbox": {
+  ".cm-markdown-property-checkbox": {
     display: "flex",
     alignItems: "center",
     gap: "8px",
     padding: "4px 6px",
   },
-  ".cm-live-property-checkbox input": { width: "16px", height: "16px" },
-  ".cm-live-property-menu": {
+  ".cm-markdown-property-checkbox input": { width: "16px", height: "16px" },
+  ".cm-markdown-property-menu": {
     position: "fixed",
     zIndex: "100",
     display: "grid",
@@ -501,12 +544,12 @@ const livePreviewTheme = EditorView.theme({
     color: "var(--popover-foreground)",
     boxShadow: "var(--shadow-lg)",
   },
-  ".cm-live-property-menu-title": {
+  ".cm-markdown-property-menu-title": {
     padding: "6px 8px",
     color: "var(--muted-foreground)",
     fontSize: "12px",
   },
-  ".cm-live-property-menu button": {
+  ".cm-markdown-property-menu button": {
     border: "0",
     borderRadius: "var(--radius-sm)",
     background: "transparent",
@@ -516,8 +559,8 @@ const livePreviewTheme = EditorView.theme({
     textAlign: "left",
     cursor: "pointer",
   },
-  ".cm-live-property-menu button:hover": { backgroundColor: "var(--accent)" },
-  ".cm-live-property-add": {
+  ".cm-markdown-property-menu button:hover": { backgroundColor: "var(--accent)" },
+  ".cm-markdown-property-add": {
     marginTop: "4px",
     border: "0",
     background: "transparent",
@@ -526,7 +569,7 @@ const livePreviewTheme = EditorView.theme({
     font: "inherit",
     cursor: "pointer",
   },
-  ".cm-live-property-source": {
+  ".cm-markdown-property-source": {
     color: "var(--muted-foreground)",
     fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
     fontSize: "0.9em",

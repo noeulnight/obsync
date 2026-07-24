@@ -150,7 +150,7 @@ class HtmlWidget extends WidgetType {
 
   toDOM() {
     const wrapper = document.createElement(this.block ? "div" : "span");
-    wrapper.className = "cm-live-html";
+    wrapper.className = "cm-markdown-html";
     wrapper.innerHTML = sanitizeHtml(this.html, wrapper.ownerDocument);
     return wrapper;
   }
