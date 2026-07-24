@@ -19,6 +19,12 @@ import { BrowserFileOutbox } from "./file-outbox";
 
 export { WebDocument } from "./document";
 
+export type VaultDiagnostics = {
+  manifestReady: boolean;
+  pendingOperations: number;
+  lastSyncedAt?: number;
+};
+
 export class WebVault {
   private readonly serverManifestDocument = new Y.Doc();
   private readonly serverManifest = this.serverManifestDocument.getMap<FileEntry>("files");
@@ -33,6 +39,7 @@ export class WebVault {
   private readonly listeners = new Set<() => void>();
   private manifestLoaded = false;
   private manifestSynced = false;
+  private lastSyncedAt?: number;
   private readonly preservingDeletes = new Set<string>();
   private destroyed = false;
 
@@ -111,6 +118,7 @@ export class WebVault {
           this.cachedManifest.clear();
           for (const [id, entry] of this.serverManifest) this.cachedManifest.set(id, entry);
         });
+        this.lastSyncedAt = Date.now();
         this.notify();
         setStatus("Synced");
         this.setOnline(true);
@@ -142,6 +150,14 @@ export class WebVault {
 
   readyForNewEntries() {
     return this.manifestLoaded;
+  }
+
+  diagnostics(): VaultDiagnostics {
+    return {
+      manifestReady: this.manifestLoaded && this.manifestSynced,
+      pendingOperations: this.outbox.pendingCount(),
+      lastSyncedAt: this.lastSyncedAt,
+    };
   }
 
   openDocument(entry: FileEntry, api: ApiClient, userName: string) {
@@ -395,4 +411,26 @@ function connectionStatus(status: string) {
 
 function samePath(left: string, right: string) {
   return pathKey(left) === pathKey(right);
+}
+
+export async function clearLocalVaultData(vaultId: string) {
+  const factory = indexedDB as IDBFactory & {
+    databases?: () => Promise<Array<{ name?: string }>>;
+  };
+  const databases = await factory.databases?.();
+  if (!databases) throw new Error("This browser cannot clear local Vault data automatically.");
+  await Promise.all(
+    databases
+      .map((database) => database.name)
+      .filter((name): name is string => Boolean(name?.startsWith(`obsync:${vaultId}:`)))
+      .map(
+        (name) =>
+          new Promise<void>((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+            request.onblocked = () => reject(new Error("Close other Vault tabs and try again."));
+          }),
+      ),
+  );
 }

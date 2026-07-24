@@ -171,3 +171,33 @@ export function DeleteFileDialog({
     </AlertDialog>
   );
 }
+
+export function MoveFileDialog({
+  entry,
+  destination,
+  close,
+  move,
+}: {
+  entry?: FileEntry;
+  destination?: string;
+  close: () => void;
+  move: () => void;
+}) {
+  const name = entry?.path.split("/").at(-1) ?? "";
+  return (
+    <AlertDialog open={Boolean(entry)} onOpenChange={(open) => !open && close()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Move “{name}”?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Move to {destination ? `“${destination}”` : "the Vault root"}.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={move}>Move</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

@@ -87,6 +87,30 @@ export function FileTree({
 
   return (
     <SidebarMenu {...tree.getContainerProps("Vault files")}>
+      {dragging && canDrop(dragging, "") && (
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            aria-label="Move to Vault root"
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              setDropPath(ROOT_ID);
+            }}
+            onDragLeave={() => dropPath === ROOT_ID && setDropPath("")}
+            onDrop={(event) => {
+              event.preventDefault();
+              move(dragging, "");
+              clearDrag();
+            }}
+            className={cn(
+              "mb-1 h-7 border border-dashed text-xs text-muted-foreground",
+              dropPath === ROOT_ID && "bg-sidebar-accent ring-1 ring-sidebar-ring",
+            )}
+          >
+            Move to Vault root
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )}
       {tree.getItems().map((item) => {
         const node = item.getItemData();
         const folder = item.isFolder();

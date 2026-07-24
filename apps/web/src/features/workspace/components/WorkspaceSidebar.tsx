@@ -1,4 +1,5 @@
 import {
+  Activity,
   CircleUserRound,
   FilePlus2,
   FolderPlus,
@@ -54,7 +55,9 @@ export function WorkspaceSidebar({
   uploadInput,
   onSelectVault,
   onCreateVault,
+  onQuickOpen,
   onSearch,
+  onDiagnostics,
   graph,
   trash,
   onOpen,
@@ -75,7 +78,9 @@ export function WorkspaceSidebar({
   uploadInput: RefObject<HTMLInputElement | null>;
   onSelectVault: (id: string) => void;
   onCreateVault: () => void;
+  onQuickOpen: () => void;
   onSearch: () => void;
+  onDiagnostics: () => void;
   graph: boolean;
   trash: boolean;
   onOpen: (entry: FileEntry) => void;
@@ -129,6 +134,13 @@ export function WorkspaceSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Quick switcher" onClick={onQuickOpen}>
+                  <Search />
+                  <span>Quick switcher</span>
+                  <kbd className="ml-auto text-[10px] text-muted-foreground">⌘P</kbd>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Search" onClick={onSearch}>
                   <Search />
                   <span>Search</span>
@@ -149,6 +161,12 @@ export function WorkspaceSidebar({
                     <Network />
                     <span>Graph</span>
                   </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Sync diagnostics" onClick={onDiagnostics}>
+                  <Activity />
+                  <span>Sync diagnostics</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

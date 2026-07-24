@@ -54,11 +54,40 @@ describe("file actions", () => {
     );
 
     const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn() };
+    fireEvent.click(screen.getByText("notes").closest("button")!);
     fireEvent.dragStart(screen.getByText("note").closest("button")!, { dataTransfer });
     fireEvent.dragOver(screen.getByText("notes").closest("button")!, { dataTransfer });
     fireEvent.drop(screen.getByText("notes").closest("button")!, { dataTransfer });
 
     expect(move).toHaveBeenCalledWith(expect.objectContaining({ id: "note" }), "notes");
+  });
+
+  it("offers the Vault root as a drop target", () => {
+    const move = vi.fn();
+    render(
+      <TooltipProvider>
+        <SidebarProvider>
+          <FileTree
+            entries={[
+              { id: "folder", kind: "folder", path: "notes", deleted: false },
+              { id: "note", kind: "markdown", path: "notes/note.md", deleted: false },
+            ]}
+            active="note"
+            open={() => undefined}
+            rename={() => undefined}
+            remove={() => undefined}
+            move={move}
+          />
+        </SidebarProvider>
+      </TooltipProvider>,
+    );
+
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: vi.fn() };
+    fireEvent.click(screen.getByText("notes").closest("button")!);
+    fireEvent.dragStart(screen.getByText("note").closest("button")!, { dataTransfer });
+    fireEvent.drop(screen.getByRole("button", { name: "Move to Vault root" }), { dataTransfer });
+
+    expect(move).toHaveBeenCalledWith(expect.objectContaining({ id: "note" }), "");
   });
 
   it("submits the new name from the rename dialog", () => {

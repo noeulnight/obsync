@@ -64,10 +64,28 @@ export function Editor({
           livePreviewTheme,
           EditorView.domEventHandlers({
             paste(event, view) {
+              if (readOnly) return false;
               const images = [...(event.clipboardData?.files ?? [])].filter((file) =>
                 file.type.startsWith("image/"),
               );
               if (!images.length || !pasteImages.current) return false;
+              event.preventDefault();
+              void pasteImages.current(images).then((paths) => {
+                if (!paths.length || editor.current !== view) return;
+                view.dispatch(
+                  view.state.replaceSelection(paths.map((path) => `![[${path}]]`).join("\n")),
+                );
+              });
+              return true;
+            },
+            drop(event, view) {
+              if (readOnly) return false;
+              const images = [...(event.dataTransfer?.files ?? [])].filter((file) =>
+                file.type.startsWith("image/"),
+              );
+              if (!images.length || !pasteImages.current) return false;
+              const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
+              if (position !== null) view.dispatch({ selection: { anchor: position } });
               event.preventDefault();
               void pasteImages.current(images).then((paths) => {
                 if (!paths.length || editor.current !== view) return;

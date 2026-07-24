@@ -13,7 +13,14 @@ export function useAttachmentDownload(api: ApiClient, vaultId: string, attachmen
 
 export function useUploadAttachment(api: ApiClient, vaultId: string) {
   return useMutation({
-    mutationFn: ({ file, path }: { file: File; path: string }) =>
-      api.uploadAttachment(vaultId, file, path),
+    mutationFn: ({
+      file,
+      path,
+      onProgress,
+    }: {
+      file: File;
+      path: string;
+      onProgress?: (progress: number) => void;
+    }) => api.uploadAttachment(vaultId, file, path, onProgress),
   });
 }

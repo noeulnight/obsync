@@ -13,7 +13,11 @@ import {
   validVaultPath,
   type FileEntry,
 } from "@/features/documents/lib/files";
-import { WebVault } from "@/features/documents/lib/sync";
+import {
+  clearLocalVaultData,
+  type VaultDiagnostics,
+  WebVault,
+} from "@/features/documents/lib/sync";
 import type { Vault } from "@/features/vaults/types/vault";
 import { VaultSearchDialog, type SearchMode } from "@/features/search/components/VaultSearchDialog";
 import type { ApiClient } from "@/lib/api/client";
@@ -24,10 +28,13 @@ import {
   CreateEntryDialog,
   type CreateEntryKind,
   DeleteFileDialog,
+  MoveFileDialog,
   RenameFileDialog,
 } from "./FileDialogs";
 import { WorkspaceContent } from "./WorkspaceContent";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
+import { SyncDiagnosticsSheet } from "./SyncDiagnosticsSheet";
+import { AttachmentUploadStatus, type UploadProgress } from "./AttachmentUploadStatus";
 
 export function Workspace({
   api,
@@ -70,9 +77,13 @@ export function Workspace({
   navigateRef.current = navigateRoute;
   const [online, setOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Connecting");
+  const [diagnostics, setDiagnostics] = useState<VaultDiagnostics>();
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress>();
   const [renameTarget, setRenameTarget] = useState<FileEntry>();
   const [deleteTarget, setDeleteTarget] = useState<FileEntry>();
+  const [moveTarget, setMoveTarget] = useState<{ entry: FileEntry; parentPath: string }>();
   const [createKind, setCreateKind] = useState<CreateEntryKind>();
   const [searchMode, setSearchMode] = useState<SearchMode>();
   const uploadInput = useRef<HTMLInputElement>(null);
@@ -94,28 +105,45 @@ export function Workspace({
     setEntries([]);
     setOnline(false);
     setConnectionStatus("Connecting");
-    const next = new WebVault(
-      vault.id,
-      api,
-      userName,
-      setConnectionStatus,
-      setOnline,
-      vault.role === "VIEWER",
-      (fromFileId, toFileId) => {
-        if (activeRef.current !== fromFileId) return;
-        setActive(toFileId);
-        void navigateRef.current(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
-      },
-    );
-    const unsubscribe = next.subscribe(() => {
-      setEntries(next.entries());
-      setDeletedEntries(next.deletedEntries());
-    });
-    setSync(next);
-    setActive("");
+    let cancelled = false;
+    let next: WebVault | undefined;
+    let unsubscribe: (() => void) | undefined;
+    const rebuildKey = `obsync:${vault.id}:rebuild`;
+    void (async () => {
+      if (sessionStorage.getItem(rebuildKey)) {
+        sessionStorage.removeItem(rebuildKey);
+        try {
+          await clearLocalVaultData(vault.id);
+        } catch (reason) {
+          if (!cancelled) setNotice(`Local rebuild failed: ${errorMessage(reason)}`);
+        }
+      }
+      if (cancelled) return;
+      next = new WebVault(
+        vault.id,
+        api,
+        userName,
+        setConnectionStatus,
+        setOnline,
+        vault.role === "VIEWER",
+        (fromFileId, toFileId) => {
+          if (activeRef.current !== fromFileId) return;
+          setActive(toFileId);
+          void navigateRef.current(`/vaults/${vault.id}/files/${toFileId}`, { replace: true });
+        },
+      );
+      unsubscribe = next.subscribe(() => {
+        setEntries(next!.entries());
+        setDeletedEntries(next!.deletedEntries());
+        setDiagnostics(next!.diagnostics());
+      });
+      setSync(next);
+      setActive("");
+    })();
     return () => {
-      unsubscribe();
-      next.destroy();
+      cancelled = true;
+      unsubscribe?.();
+      next?.destroy();
       setSync(undefined);
     };
   }, [api, userName, vault.id, vault.role]);
@@ -128,7 +156,10 @@ export function Workspace({
     const shortcuts = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
       const key = event.key.toLowerCase();
-      if (key === "k") {
+      if (key === "p") {
+        event.preventDefault();
+        setSearchMode("open");
+      } else if (key === "k") {
         event.preventDefault();
         setSearchMode(activeEntry?.kind === "canvas" && canWrite ? "canvas" : "open");
       } else if (event.shiftKey && key === "f") {
@@ -175,12 +206,12 @@ export function Workspace({
   }
 
   function move(entry: FileEntry, parentPath: string) {
-    if (!canWrite) return setNotice("Editing is unavailable while offline.");
+    if (!canWrite) return toast.error("Editing is unavailable while offline.");
     if (
       entry.kind === "folder" &&
       (parentPath === entry.path || isWithin(parentPath, entry.path))
     ) {
-      return setNotice("A folder cannot be moved into itself.");
+      return toast.error("A folder cannot be moved into itself.");
     }
     const name = entry.path.split("/").at(-1)!;
     const path = parentPath ? `${parentPath}/${name}` : name;
@@ -188,8 +219,21 @@ export function Workspace({
     try {
       sync?.rename(entry, path);
     } catch (reason) {
-      setNotice(errorMessage(reason));
+      toast.error(`Move failed: ${errorMessage(reason)}`);
     }
+  }
+
+  function requestMove(entry: FileEntry, parentPath: string) {
+    if (!canWrite) return toast.error("Editing is unavailable while offline.");
+    if (
+      entry.kind === "folder" &&
+      (parentPath === entry.path || isWithin(parentPath, entry.path))
+    ) {
+      return toast.error("A folder cannot be moved into itself.");
+    }
+    const name = entry.path.split("/").at(-1)!;
+    const path = parentPath ? `${parentPath}/${name}` : name;
+    if (path !== entry.path) setMoveTarget({ entry, parentPath });
   }
 
   function create(path: string) {
@@ -227,18 +271,35 @@ export function Workspace({
       setNotice("Try again after the initial synchronization finishes.");
       return;
     }
-    setNotice("Uploading attachments…");
+    const attachments = [...files];
     try {
-      for (const file of files) {
-        open(await addAttachment(file, validVaultPath(file.name)));
+      for (const [index, file] of attachments.entries()) {
+        setUploadProgress({
+          name: file.name,
+          completed: index + 1,
+          total: attachments.length,
+          progress: 0,
+        });
+        open(
+          await addAttachment(file, validVaultPath(file.name), (progress) =>
+            setUploadProgress({
+              name: file.name,
+              completed: index + 1,
+              total: attachments.length,
+              progress,
+            }),
+          ),
+        );
       }
-      setNotice("");
       toast.success(
-        files.length === 1 ? "Attachment uploaded." : `${files.length} attachments uploaded.`,
+        attachments.length === 1
+          ? "Attachment uploaded."
+          : `${attachments.length} attachments uploaded.`,
       );
     } catch (reason) {
-      setNotice(`Attachment upload failed: ${errorMessage(reason)}`);
+      toast.error(`Attachment upload failed: ${errorMessage(reason)}`);
     } finally {
+      setUploadProgress(undefined);
       if (uploadInput.current) uploadInput.current.value = "";
     }
   }
@@ -249,20 +310,39 @@ export function Workspace({
     const occupied = new Set(sync.entries().map((entry) => entry.path.toLocaleLowerCase()));
     try {
       const paths: string[] = [];
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
         const path = availableAttachmentPath(file, folder, occupied);
-        await addAttachment(file, path);
+        setUploadProgress({
+          name: file.name,
+          completed: index + 1,
+          total: files.length,
+          progress: 0,
+        });
+        await addAttachment(file, path, (progress) =>
+          setUploadProgress({
+            name: file.name,
+            completed: index + 1,
+            total: files.length,
+            progress,
+          }),
+        );
         paths.push(path);
       }
       toast.success(files.length === 1 ? "Image pasted." : `${files.length} images pasted.`);
       return paths;
     } catch (reason) {
-      setNotice(`Image paste failed: ${errorMessage(reason)}`);
+      toast.error(`Image upload failed: ${errorMessage(reason)}`);
       return [];
+    } finally {
+      setUploadProgress(undefined);
     }
   }
 
-  async function addAttachment(file: File, path: string | undefined) {
+  async function addAttachment(
+    file: File,
+    path: string | undefined,
+    onProgress?: (progress: number) => void,
+  ) {
     if (!sync) throw new Error("Wait for synchronization to connect.");
     if (!path) throw new Error(`Invalid file name: ${file.name}`);
     if (
@@ -270,7 +350,7 @@ export function Workspace({
     ) {
       throw new Error(`A file with this name already exists: ${path}`);
     }
-    const uploaded = await uploadAttachment.mutateAsync({ file, path });
+    const uploaded = await uploadAttachment.mutateAsync({ file, path, onProgress });
     return sync.addAttachment(uploaded);
   }
 
@@ -302,6 +382,12 @@ export function Workspace({
     } catch (reason) {
       toast.error(`Permanent deletion failed: ${errorMessage(reason)}`);
     }
+  }
+
+  function rebuildLocalData() {
+    if (!online) return setNotice("Reconnect before rebuilding local data.");
+    sessionStorage.setItem(`obsync:${vault.id}:rebuild`, "1");
+    window.location.reload();
   }
 
   const navigate = useCallback(
@@ -404,13 +490,15 @@ export function Workspace({
           uploadInput={uploadInput}
           onSelectVault={onSelect}
           onCreateVault={onCreate}
+          onQuickOpen={() => setSearchMode("open")}
           onSearch={() => setSearchMode("search")}
+          onDiagnostics={() => setDiagnosticsOpen(true)}
           graph={graph}
           trash={trash}
           onOpen={open}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
-          onMove={move}
+          onMove={requestMove}
           onCreateEntry={setCreateKind}
           onUpload={(files) => void upload(files)}
           onSettings={onSettings}
@@ -484,6 +572,23 @@ export function Workspace({
         close={() => setDeleteTarget(undefined)}
         remove={() => deleteTarget && remove(deleteTarget)}
       />
+      <MoveFileDialog
+        entry={moveTarget?.entry}
+        destination={moveTarget?.parentPath}
+        close={() => setMoveTarget(undefined)}
+        move={() => {
+          if (moveTarget) move(moveTarget.entry, moveTarget.parentPath);
+          setMoveTarget(undefined);
+        }}
+      />
+      <SyncDiagnosticsSheet
+        open={diagnosticsOpen}
+        close={() => setDiagnosticsOpen(false)}
+        status={connectionStatus}
+        diagnostics={diagnostics}
+        rebuild={rebuildLocalData}
+      />
+      <AttachmentUploadStatus upload={uploadProgress} />
     </>
   );
 }

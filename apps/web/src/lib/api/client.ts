@@ -465,7 +465,12 @@ export class ApiClient {
     });
   }
 
-  async uploadAttachment(vaultId: string, file: File, path: string): Promise<UploadedAttachment> {
+  async uploadAttachment(
+    vaultId: string,
+    file: File,
+    path: string,
+    onProgress?: (progress: number) => void,
+  ): Promise<UploadedAttachment> {
     const data = await file.arrayBuffer();
     const sha256 = await hash(data);
     const mimeType = file.type || "application/octet-stream";
@@ -481,7 +486,10 @@ export class ApiClient {
       },
     });
     if (approval.uploadUrl) {
-      await axios.put(approval.uploadUrl, data, { headers: approval.uploadHeaders });
+      await axios.put(approval.uploadUrl, data, {
+        headers: approval.uploadHeaders,
+        onUploadProgress: (event) => onProgress?.(event.loaded / (event.total || data.byteLength)),
+      });
       await this.request({
         url: `/api/vaults/${vaultId}/attachments/${approval.attachment.id}/complete`,
         method: "POST",

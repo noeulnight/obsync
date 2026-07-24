@@ -597,6 +597,31 @@ describe("Editor", () => {
     expect(onPasteImages).toHaveBeenCalledOnce();
   });
 
+  it("uploads dropped images at the drop selection", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "Before ");
+    const onPasteImages = vi.fn().mockResolvedValue(["Notes/photo.png"]);
+    const view = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+        onPasteImages={onPasteImages}
+      />,
+    );
+
+    fireEvent.drop(view.container.querySelector(".cm-content") as HTMLElement, {
+      clientX: 0,
+      clientY: 0,
+      dataTransfer: {
+        files: [new File(["image"], "photo.png", { type: "image/png" })],
+      },
+    });
+
+    await waitFor(() => expect(connected.text.toJSON()).toContain("![[Notes/photo.png]]"));
+    expect(onPasteImages).toHaveBeenCalledOnce();
+  });
+
   it("releases the session without destroying it during an editor remount", () => {
     const { connected, acquire, release, destroy } = session();
     const first = render(
