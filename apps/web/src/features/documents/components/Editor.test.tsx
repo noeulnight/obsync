@@ -124,6 +124,32 @@ describe("Editor", () => {
     expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("**bold**");
   });
 
+  it("renders Obsidian-compatible inline HTML through DOMPurify", async () => {
+    const { connected } = session();
+    connected.text.insert(
+      0,
+      'x <span style="color: rgb(255, 0, 0)">red</span><br><script>bad()</script>',
+    );
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: 0 } });
+
+    await waitFor(() => expect(rendered.container.querySelector(".cm-live-html")).toBeTruthy());
+    const widgets = [...rendered.container.querySelectorAll<HTMLElement>(".cm-live-html")];
+    expect(widgets.some((element) => element.textContent === "red")).toBe(true);
+    expect(widgets.some((element) => element.textContent === "")).toBe(true);
+    expect(rendered.container.querySelector("script")).toBeNull();
+  });
+
   it("renders Markdown tables and horizontal rules", () => {
     const { connected } = session();
     connected.text.insert(0, "| Name | Value |\n| :--- | ---: |\n| One | Two |\n\n---\n");

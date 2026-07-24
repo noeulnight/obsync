@@ -2,6 +2,7 @@ import type { Range } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import { imagePath } from "./files";
+import { decorateInlineHtml, overlapsHtml } from "./live-preview-html";
 import { type AssetResolver, editing, hidden, hide } from "./live-preview-decoration";
 
 export function decorateLine(
@@ -78,13 +79,15 @@ export function decorateLine(
     hide(lineFrom, lineFrom + heading[0].length, cursor, ranges);
   }
 
-  decorateInlineFormatting(view, lineFrom, lineTo, cursor, ranges);
+  const html = decorateInlineHtml(lineFrom, text, cursor, ranges);
+  decorateInlineFormatting(view, lineFrom, lineTo, cursor, ranges, html);
 
   for (const match of text.matchAll(/(!?)\[\[([^\]]+)\]\]/g)) {
     const start = lineFrom + (match.index ?? 0);
     const contentStart = start + match[1].length + 2;
     const end = start + match[0].length;
-    if (editing(cursor, start, end)) continue;
+    if (editing(cursor, start, end) || overlapsHtml(start - lineFrom, end - lineFrom, html))
+      continue;
     const image = match[1] ? imagePath(match[2]) : undefined;
     if (image) {
       ranges.push(
@@ -111,7 +114,8 @@ export function decorateLine(
   for (const match of text.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)) {
     const start = lineFrom + (match.index ?? 0);
     const end = start + match[0].length;
-    if (editing(cursor, start, end)) continue;
+    if (editing(cursor, start, end) || overlapsHtml(start - lineFrom, end - lineFrom, html))
+      continue;
     ranges.push(
       Decoration.replace({
         widget: new ImageWidget(match[2], match[1], resolveAsset, assetRevision),
@@ -124,7 +128,8 @@ export function decorateLine(
     const labelStart = start + 1;
     const labelEnd = labelStart + match[1].length;
     const end = start + match[0].length;
-    if (editing(cursor, start, end)) continue;
+    if (editing(cursor, start, end) || overlapsHtml(start - lineFrom, end - lineFrom, html))
+      continue;
     ranges.push(hidden.range(start, labelStart));
     ranges.push(
       Decoration.mark({
@@ -138,7 +143,8 @@ export function decorateLine(
   for (const match of text.matchAll(/\[([ xX])\]/g)) {
     const start = lineFrom + (match.index ?? 0);
     const end = start + match[0].length;
-    if (editing(cursor, start, end)) continue;
+    if (editing(cursor, start, end) || overlapsHtml(start - lineFrom, end - lineFrom, html))
+      continue;
     ranges.push(
       Decoration.replace({ widget: new CheckboxWidget(view, start, /[xX]/.test(match[1])) }).range(
         start,
@@ -158,6 +164,7 @@ function decorateInlineFormatting(
   lineTo: number,
   cursor: number,
   ranges: Range<Decoration>[],
+  html: { from: number; to: number }[],
 ) {
   const formats: Record<string, { className: string; markerLength: number }> = {
     Emphasis: { className: "cm-live-em", markerLength: 1 },
@@ -173,7 +180,8 @@ function decorateInlineFormatting(
         !format ||
         node.from < lineFrom ||
         node.to > lineTo ||
-        editing(cursor, node.from, node.to)
+        editing(cursor, node.from, node.to) ||
+        overlapsHtml(node.from - lineFrom, node.to - lineFrom, html)
       ) {
         return;
       }
