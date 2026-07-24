@@ -8,6 +8,7 @@ import {
 } from "@codemirror/view";
 import { codeBlocks, decorateCodeLine } from "./live-preview-code";
 import type { AssetResolver } from "./live-preview-decoration";
+import { htmlBlockDecorations, htmlBlockRanges, overlapsHtml } from "./live-preview-html";
 import { decorateLine } from "./live-preview-inline";
 import { frontmatter, propertyDecorations } from "./live-preview-properties";
 
@@ -15,6 +16,7 @@ export const refreshLivePreview = StateEffect.define<void>();
 
 export function livePreview(onNavigate: (href: string) => void, resolveAsset: AssetResolver) {
   return [
+    htmlBlockDecorations,
     EditorView.decorations.compute(["doc", "selection"], propertyDecorations),
     ViewPlugin.fromClass(
       class {
@@ -54,6 +56,7 @@ export function livePreview(onNavigate: (href: string) => void, resolveAsset: As
 function decorations(view: EditorView, resolveAsset: AssetResolver, assetRevision: number) {
   const ranges: Range<Decoration>[] = [];
   const cursor = view.state.selection.main.head;
+  const html = htmlBlockRanges(view.state);
   const properties = frontmatter(view.state);
   const blocks = codeBlocks(view);
   for (const visible of view.visibleRanges) {
@@ -62,7 +65,8 @@ function decorations(view: EditorView, resolveAsset: AssetResolver, assetRevisio
       if (!properties || line.to < properties.from || line.from > properties.to) {
         const block = blocks.find((item) => line.number >= item.start && line.number <= item.end);
         if (block) decorateCodeLine(line.from, line.to, line.number, cursor, block, ranges);
-        else decorateLine(view, line.from, line.text, cursor, ranges, resolveAsset, assetRevision);
+        else if (!overlapsHtml(line.from, line.to, html))
+          decorateLine(view, line.from, line.text, cursor, ranges, resolveAsset, assetRevision);
       }
       if (line.to >= view.state.doc.length) break;
       line = view.state.doc.line(line.number + 1);

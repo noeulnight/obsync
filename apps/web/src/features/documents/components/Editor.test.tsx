@@ -150,6 +150,29 @@ describe("Editor", () => {
     expect(rendered.container.querySelector("script")).toBeNull();
   });
 
+  it("renders Obsidian-compatible HTML blocks", async () => {
+    const { connected } = session();
+    connected.text.insert(0, "Before\n<div>\n<strong>Block HTML</strong>\n</div>\nAfter");
+    const rendered = render(
+      <Editor
+        session={connected}
+        onNavigate={() => undefined}
+        resolveAsset={() => Promise.resolve(undefined)}
+      />,
+    );
+    const editor = EditorView.findFromDOM(
+      rendered.container.querySelector(".cm-editor") as HTMLElement,
+    );
+    if (!editor) throw new Error("Editor was not mounted");
+    editor.dispatch({ selection: { anchor: 0 } });
+
+    await waitFor(() => expect(rendered.container.querySelector("div.cm-live-html")).toBeTruthy());
+    expect(rendered.container.querySelector("div.cm-live-html")?.textContent).toContain(
+      "Block HTML",
+    );
+    expect(rendered.container.querySelector(".cm-content")?.textContent).not.toContain("<div>");
+  });
+
   it("renders Markdown tables and horizontal rules", () => {
     const { connected } = session();
     connected.text.insert(0, "| Name | Value |\n| :--- | ---: |\n| One | Two |\n\n---\n");

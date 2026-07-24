@@ -1,6 +1,7 @@
 import createDOMPurify, { type Config } from "dompurify";
-import type { Range } from "@codemirror/state";
-import { Decoration, WidgetType } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
+import { StateField, type EditorState, type Range } from "@codemirror/state";
+import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 
 const voidTags = new Set([
   "area",
@@ -68,6 +69,40 @@ export function overlapsHtml(from: number, to: number, html: HtmlRange[]) {
   return html.some((range) => from < range.to && range.from < to);
 }
 
+type HtmlBlocks = { decorations: DecorationSet; ranges: HtmlRange[] };
+
+export const htmlBlockDecorations = StateField.define<HtmlBlocks>({
+  create: htmlBlocks,
+  update(value, transaction) {
+    return transaction.docChanged || transaction.selection ? htmlBlocks(transaction.state) : value;
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+});
+
+export function htmlBlockRanges(state: EditorState) {
+  return state.field(htmlBlockDecorations).ranges;
+}
+
+function htmlBlocks(state: EditorState): HtmlBlocks {
+  const ranges: HtmlRange[] = [];
+  const decorations: Range<Decoration>[] = [];
+  const cursor = state.selection.main.head;
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (node.name !== "HTMLBlock") return;
+      ranges.push({ from: node.from, to: node.to });
+      if (cursor >= node.from && cursor <= node.to) return;
+      decorations.push(
+        Decoration.replace({
+          block: true,
+          widget: new HtmlWidget(state.sliceDoc(node.from, node.to), true),
+        }).range(node.from, node.to),
+      );
+    },
+  });
+  return { decorations: Decoration.set(decorations, true), ranges };
+}
+
 function inlineHtmlRanges(text: string) {
   const html: HtmlRange[] = [];
   const stack: string[] = [];
@@ -102,16 +137,19 @@ function inlineHtmlRanges(text: string) {
 }
 
 class HtmlWidget extends WidgetType {
-  constructor(private readonly html: string) {
+  constructor(
+    private readonly html: string,
+    private readonly block = false,
+  ) {
     super();
   }
 
   eq(other: HtmlWidget) {
-    return other.html === this.html;
+    return other.html === this.html && other.block === this.block;
   }
 
   toDOM() {
-    const wrapper = document.createElement("span");
+    const wrapper = document.createElement(this.block ? "div" : "span");
     wrapper.className = "cm-live-html";
     wrapper.innerHTML = sanitizeHtml(this.html, wrapper.ownerDocument);
     return wrapper;
